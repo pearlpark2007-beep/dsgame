@@ -1,0 +1,82 @@
+* { box-sizing: border-box; }
+
+body {
+    font-family: system-ui, sans-serif;
+    background: #1e1e2e;
+    color: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+}
+
+#message {
+    min-height: 1.5em;
+    font-size: 1.1rem;
+}
+.error { color: #ef5350; }
+
+/* the stack container */
+.stack {
+    display: flex;
+    flex-direction: column-reverse;   /* index 0 at the BOTTOM, like a real stack */
+    gap: 6px;
+    width: 140px;
+    padding: 8px;
+    border: 3px solid #888;
+    border-top: none;                 /* open at the top */
+    border-radius: 0 0 8px 8px;
+    margin: 16px 0;
+}
+.stack.shake {
+    animation: shake 0.4s;
+    border-color: #e53935;
+}
+
+/* one slot of the stack */
+.slot {
+    height: 48px;
+    border: 2px dashed #555;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+.slot.filled {
+    border: 2px solid #4fc3f7;
+    background: #0288d1;
+    animation: drop-in 0.4s ease-out;
+}
+.slot.highlight {
+    background: #ffb300;
+    border-color: #ffb300;
+    color: #1e1e2e;
+}
+
+/* animations */
+@keyframes drop-in {
+    from { transform: translateY(-60px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-8px); }
+    75%      { transform: translateX(8px); }
+}
+
+/* buttons and log */
+.controls button {
+    font-size: 1rem;
+    padding: 8px 16px;
+    margin: 0 4px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.controls button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+#log { color: #aaa; font-size: 0.9rem; }
