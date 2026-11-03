@@ -1,21 +1,24 @@
-public abstract class AbstractStructure implements DataStructures {
+public abstract class ArrayStructure extends BaseStructure {
     protected int[] items;
     protected int count;
 
-    public AbstractStructure(int capacity) {
+    public ArrayStructure(int capacity) {
         items = new int[capacity];
         count = 0;
     }
 
+    @Override
     public boolean isEmpty() {
         return count == 0;
     }
 
+    @Override
     public boolean isFull() {
         return count == items.length;
     }
-    public int size(){
+
+    @Override
+    public int size() {
         return count;
     }
 }
-

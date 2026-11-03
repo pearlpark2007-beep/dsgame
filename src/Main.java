@@ -1,26 +1,46 @@
-public class Main{
-    static void fillAndEmpty(DataStructures ds){
-        System.out.println("---"+ds.getName() + "---");
-        for(int i =1; i<=3; i++){
-            ds.insert(i*10);
+public class Main {
+
+    // print every recorded step of ANY data structure, then clear them
+    static void showSteps(DataStructures ds) {
+        System.out.println("=== " + ds.getName() + " ===");
+        for (Step step : ds.getSteps()) {
+            System.out.println(step);
         }
-        System.out.print("Removed in order: ");
-        while(!ds.isEmpty()){
-            System.out.print(ds.remove()+ " ");
-        }
-        System.out.println();
+        ds.clearSteps();
     }
-    public static void main(String[] args){
-        fillAndEmpty(new Stack(5));
-        fillAndEmpty(new Queue(5));
-        Queue q = new Queue(3);
+
+    public static void main(String[] args) {
+        // Stack
+        Stack s = new Stack(2);
+        s.push(10);
+        s.push(20);
+        s.push(30);     // overflow: capacity is 2
+        s.pop();
+        showSteps(s);
+
+        // Linked list: build, then delete
+        SinglyLinkedList list = new SinglyLinkedList();
+        list.insert(10);
+        list.insert(20);
+        list.insert(30);
+        list.insertAtHead(5);
+        System.out.println(list);
+        list.clearSteps();   // only show the delete's steps below
+
+        list.delete(20);
+        showSteps(list);
+        System.out.println(list);
+
+        // Queue
+        Queue q = new Queue(2);
         q.insert(1);
         q.insert(2);
-        q.insert(3);
+        q.insert(3);    // full
         q.remove();
-        q.remove();
-        q.insert(4);
-        q.insert(5);
-        System.out.println("Front: " + q.peek() + "Size: "+ q.size());
+        showSteps(q);
+
+        // Linked list search
+        System.out.println("Position of 30: " + list.search(30));
+        showSteps(list);
     }
 }

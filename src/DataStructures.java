@@ -1,3 +1,5 @@
+import java.util.List;
+
 public interface DataStructures {
     void insert(int value);
     int remove();
@@ -6,4 +8,6 @@ public interface DataStructures {
     boolean isFull();
     int size();
     String getName();
+    List<Step> getSteps();
+    void clearSteps();
 }
