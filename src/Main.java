@@ -1,14 +1,26 @@
-public class Main {
-    public static void main(String[] args) {
-        Stack s = new Stack(3);   // create an object of the Stack class
-        s.push(10);
-        s.push(20);
-        s.push(30);
-        s.push(40);               // too many: should print Overflow
-        System.out.println(s.pop());
-        System.out.println(s.pop());
-
-        System.out.println("Top: " + s.peek());   // looks at the top without removing it
-        System.out.println("Size: " + s.size());  // how many elements are left
+public class Main{
+    static void fillAndEmpty(DataStructures ds){
+        System.out.println("---"+ds.getName() + "---");
+        for(int i =1; i<=3; i++){
+            ds.insert(i*10);
+        }
+        System.out.print("Removed in order: ");
+        while(!ds.isEmpty()){
+            System.out.print(ds.remove()+ " ");
+        }
+        System.out.println();
+    }
+    public static void main(String[] args){
+        fillAndEmpty(new Stack(5));
+        fillAndEmpty(new Queue(5));
+        Queue q = new Queue(3);
+        q.insert(1);
+        q.insert(2);
+        q.insert(3);
+        q.remove();
+        q.remove();
+        q.insert(4);
+        q.insert(5);
+        System.out.println("Front: " + q.peek() + "Size: "+ q.size());
     }
 }

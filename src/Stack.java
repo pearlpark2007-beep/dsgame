@@ -1,35 +1,33 @@
-public class Stack {
-    private int[] items;
-    private int top;
+public class Stack extends AbstractStructure{
     public Stack(int capacity){
-        items = new int[capacity];
-        top = -1;
+        super(capacity);
     }
-    public void push(int data){
-        if(top == items.length - 1){
-            System.out.println("Overflow! Can't push "+ data);
+    @Override
+    public void insert(int value){
+        if (isFull()) {
+            System.out.println("Overflow! Can't push " + value);
             return;
         }
-        items[++top] = data;
+        items[count++] = value;
     }
-    public int pop(){
-        if(top == -1){
-            System.out.println("Underflow!");
-            return -1;
-        }
-        return items[top--];
-    }
-    public boolean isEmpty(){
-        return top == -1;
-    }
-    public int peek(){
+    @Override
+    public int remove(){
         if(isEmpty()){
             System.out.println("Underflow!");
             return -1;
         }
-        return items[top];
+        return items[--count];
     }
-    public int size(){
-        return top+1;
+    @Override
+    public int peek(){
+        if(isEmpty()){
+            System.out.println("Stack is empty!");
+            return -1;
+        }
+        return items[count -1];
     }
+    @Override
+    public String getName(){return "Stack";}
+    public void  push(int value) {insert(value);}
+    public int pop(){return remove();}
 }
