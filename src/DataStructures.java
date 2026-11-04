@@ -10,4 +10,5 @@ public interface DataStructures {
     String getName();
     List<Step> getSteps();
     void clearSteps();
+    List<Integer> snapshot();   // current contents, without recording steps
 }

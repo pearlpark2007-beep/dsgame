@@ -1,4 +1,6 @@
 package com.dsgame.server.ds;
+import java.util.ArrayList;
+import java.util.List;
 public class SinglyLinkedList extends BaseStructure {
 
     // a Node lives INSIDE the list; no outside code can see or touch nodes
@@ -137,5 +139,13 @@ public class SinglyLinkedList extends BaseStructure {
         }
         sb.append("null");
         return sb.toString();
+    }
+    @Override
+    public List<Integer> snapshot() {
+        List<Integer> result = new ArrayList<>();
+        for (Node current = head; current != null; current = current.next) {
+            result.add(current.data);
+        }
+        return result;   // head → tail
     }
 }

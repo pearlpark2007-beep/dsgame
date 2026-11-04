@@ -1,9 +1,12 @@
 package com.dsgame.server.ds;
+import java.util.ArrayList;
+import java.util.List;
 public class Stack extends ArrayStructure {
 
     public Stack(int capacity) {
         super(capacity);
     }
+
 
     @Override
     public void insert(int value) {        // push
@@ -38,6 +41,7 @@ public class Stack extends ArrayStructure {
         return items[count - 1];
     }
 
+
     @Override
     public String getName() {
         return "Stack";
@@ -45,4 +49,12 @@ public class Stack extends ArrayStructure {
 
     public void push(int value) { insert(value); }
     public int pop()            { return remove(); }
+    @Override
+    public List<Integer> snapshot() {
+        List<Integer> result = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            result.add(items[i]);
+        }
+        return result;   // bottom → top
+    }
 }

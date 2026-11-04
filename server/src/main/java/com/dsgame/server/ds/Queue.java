@@ -1,4 +1,6 @@
 package com.dsgame.server.ds;
+import java.util.ArrayList;
+import java.util.List;
 public class Queue extends ArrayStructure {
     private int front = 0;
     private int rear = -1;
@@ -40,6 +42,14 @@ public class Queue extends ArrayStructure {
         }
         record("PEEK", front, items[front], "Front is " + items[front]);
         return items[front];
+    }
+    @Override
+    public List<Integer> snapshot() {
+        List<Integer> result = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            result.add(items[(front + i) % items.length]);   // start at front, wrap around the circle
+        }
+        return result;   // front → rear
     }
 
     @Override

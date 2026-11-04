@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harbor test scene</title>
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0f12; font-family: system-ui, sans-serif; }
+        canvas { display: block; transition: filter 0.6s; position: relative; z-index: 1; }
+        .frozen { filter: grayscale(0.85) brightness(0.75); }
+        #caption { position: absolute; top: 28px; left: 0; width: 100%; text-align: center; color: #f2ede4; z-index: 10;
+            font-size: 20px; letter-spacing: 2px; text-shadow: 0 0 10px #000; pointer-events: none; }
+        #athena { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 10;
+            width: min(560px, 90vw); background: rgba(12, 16, 22, 0.88); border: 1px solid #c9a227;
+            color: #f2ede4; padding: 16px 20px; border-radius: 8px; display: none; box-sizing: border-box; }
+        #athena h2 { margin: 0 0 4px; font-size: 15px; color: #c9a227; letter-spacing: 4px; }
+        #athena p { margin: 0 0 10px; font-size: 14px; color: #cfc8bb; }
+        #athena textarea { width: 100%; height: 70px; box-sizing: border-box; background: #05070a; color: #9fe1cb;
+            border: 1px solid #333; font-family: monospace; font-size: 14px; padding: 8px; }
+        #athena button { margin-top: 10px; margin-right: 8px; padding: 6px 14px; cursor: pointer; }
+    </style>
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+          }
+        }
+    </script>
+</head>
+<body>
+<div id="caption">Loading...</div>
+
+<div id="athena">
+    <h2>ATHENA</h2>
+    <p>The amphora rests on the top crate. Guide him.</p>
+    <textarea spellcheck="false">push(&s, 99);</textarea>
+    <button id="runGood">Run (correct)</button>
+    <button id="runBad">Run (wrong)</button>
+</div>
+
+<script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+    const caption = document.getElementById("caption");
+    const athena  = document.getElementById("athena");
+
+    // ---------- renderer, scene, camera ----------
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1e24);
+    scene.fog = new THREE.Fog(0x1a1e24, 14, 45);
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+
+    // ---------- lights ----------
+    scene.add(new THREE.HemisphereLight(0xdfe8f0, 0x2a2a2a, 1.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(5, 10, 6);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -15; sun.shadow.camera.right = 15;
+    sun.shadow.camera.top = 15;   sun.shadow.camera.bottom = -15;
+    scene.add(sun);
+
+    // ---------- the harbor: stone floor and Greek columns ----------
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60),
+        new THREE.MeshStandardMaterial({ color: 0xbfbab0, roughness: 0.9 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const columnMat = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.6 });
+    for (let i = 0; i < 6; i++) {
+        for (const x of [-6, 6]) {
+            const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 6, 20), columnMat);
+            col.position.set(x, 3, 4 - i * 5);
+            col.castShadow = true;
+            scene.add(col);
+        }
+    }
+
+    // ---------- the stack: 3 crates and the golden amphora on top ----------
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0x6b4f35, roughness: 0.8 });
+    for (let i = 0; i < 3; i++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), crateMat);
+        crate.position.set(0, 0.6 + i * 1.2, -12);
+        crate.castShadow = true;
+        crate.receiveShadow = true;
+        scene.add(crate);
+    }
+    const profile = [];
+    for (let i = 0; i <= 10; i++) {
+        const t = i / 10;
+        profile.push(new THREE.Vector2(0.12 + Math.sin(t * Math.PI) * 0.22, t * 0.8));
+    }
+    const amphora = new THREE.Mesh(new THREE.LatheGeometry(profile, 24),
+        new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.35, metalness: 0.6 }));
+    amphora.position.set(0, 3.6, -12);
+    amphora.castShadow = true;
+    scene.add(amphora);
+
+    // ---------- small animation helpers ----------
+    let mixer, current, hero;
+    const actions = {};
+    let slowMo = 1;            // 1 = normal speed, 0.35 = slow motion, 0 = frozen
+    let followHero = false;    // when true, the camera keeps looking at him
+    let busy = false;          // stops a button being clicked twice mid-scene
+    const tweens = [];
+
+    function play(name, fade = 0.4) {
+        const next = actions[name];
+        if (!next || next === current) return;
+        next.reset().fadeIn(fade).play();
+        if (current) current.fadeOut(fade);
+        current = next;
+    }
+
+    // run fn(k) for k going 0 → 1 over 'dur' seconds; returns a promise
+    function tween(dur, fn) {
+        return new Promise(resolve => tweens.push({ t: 0, dur, fn, resolve }));
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    async function moveTo(z, speed, anim) {
+        play(anim);
+        const start = hero.position.z;
+        await tween(Math.abs(start - z) / speed, k => { hero.position.z = start + (z - start) * k; });
+    }
+
+    function freeze() {
+        slowMo = 0;
+        renderer.domElement.classList.add("frozen");
+        athena.style.display = "block";
+        busy = false;
+    }
+
+    function unfreeze() {
+        athena.style.display = "none";
+        renderer.domElement.classList.remove("frozen");
+        slowMo = 1;
+    }
+
+    function resetToDecision() {
+        hero.position.set(0, 0, -4);
+        hero.rotation.x = 0;
+        play("Idle", 0.1);
+        camera.position.set(-2.5, 1.2, -2);
+        camera.lookAt(0, 4, -12);
+    }
+
+    // ---------- load the character and make him marble ----------
+    const MARBLE = new THREE.MeshStandardMaterial({ color: 0xeeeae4, roughness: 0.55 });
+
+    new GLTFLoader().load(
+        "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r170/examples/models/gltf/Soldier.glb",
+        gltf => {
+            hero = gltf.scene;
+            hero.traverse(o => { if (o.isMesh) { o.material = MARBLE; o.castShadow = true; } });
+            hero.position.set(0, 0, 6);
+            hero.rotation.y = 0;   // if he walks backwards, change this to Math.PI
+            scene.add(hero);
+            mixer = new THREE.AnimationMixer(hero);
+            for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
+            arrival();
+        },
+        undefined,
+        err => { caption.textContent = "Couldn't load the character. Check your internet connection."; console.error(err); }
+    );
+
+    // ---------- BEAT 1: arrival ----------
+    async function arrival() {
+        busy = true;
+        caption.textContent = "The harbor of the Laestrygonians";
+        camera.position.set(7, 4, 10);      // wide establishing shot
+        followHero = true;
+        await moveTo(-4, 1.4, "Walk");
+        followHero = false;
+
+        caption.textContent = "";
+        play("Idle");
+        camera.position.set(1.2, 0.9, -1.6);   // low close-up: he stops
+        camera.lookAt(0, 1.6, -4);
+        await sleep(1200);
+
+        camera.position.set(-2.5, 1.2, -2);    // tilt up from him to the amphora
+        await tween(2.5, k => camera.lookAt(0, 1.5 + k * 2.5, -4 - k * 8));
+        await sleep(600);
+
+        freeze();                              // BEAT 2: the decision
+    }
+
+    // ---------- BEAT 3b: failure ----------
+    async function runBad() {
+        if (busy) return;
+        busy = true;
+        unfreeze();
+        caption.textContent = "";
+        camera.position.set(4, 2, -3);
+        followHero = true;
+        await moveTo(-10.6, 4, "Run");         // sprints to the stack
+        followHero = false;
+
+        play("Idle", 0.2);
+        slowMo = 0.35;                         // slow motion
+        camera.position.set(3.5, 1.4, -9);
+        camera.lookAt(0, 2, -11);
+        const startZ = hero.position.z;
+
+        await tween(0.8, k => { hero.position.y = 1.8 * Math.sin(k * Math.PI / 2); });    // the leap
+        caption.textContent = "His grip closes on air.";
+        await tween(1.2, k => {                                                           // the fall
+            hero.position.y = 1.8 * (1 - k * k);
+            hero.position.z = startZ + k * 1.5;
+            hero.rotation.x = k * Math.PI / 2;
+        });
+
+        slowMo = 1;
+        await sleep(1500);
+        caption.textContent = "Try again.";
+        resetToDecision();
+        freeze();
+    }
+
+    // ---------- BEAT 3a: success (placeholder climb until 7B) ----------
+    async function runGood() {
+        if (busy) return;
+        busy = true;
+        unfreeze();
+        caption.textContent = "";
+        camera.position.set(4, 2, -3);
+        followHero = true;
+        await moveTo(-10.8, 4, "Run");
+        followHero = false;
+
+        play("Idle", 0.2);
+        camera.position.set(-3, 1, -9);
+        camera.lookAt(0, 2.5, -12);
+        await tween(2.2, k => {                // placeholder climb
+            hero.position.y = 3.6 * k;
+            hero.position.z = -10.8 - 1.2 * k;
+        });
+
+        camera.position.set(9, 6, -3);         // the wide shot
+        camera.lookAt(0, 3, -12);
+        caption.textContent = "He reaches the amphora.";
+
+        await sleep(3000);                     // then back to the decision so you can test again
+        caption.textContent = "";
+        resetToDecision();
+        freeze();
+    }
+
+    document.getElementById("runBad").addEventListener("click", runBad);
+    document.getElementById("runGood").addEventListener("click", runGood);
+
+    // ---------- the render loop ----------
+    const clock = new THREE.Clock();
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = clock.getDelta() * slowMo;
+        if (mixer) mixer.update(dt);
+        for (let i = tweens.length - 1; i >= 0; i--) {
+            const tw = tweens[i];
+            tw.t += dt;
+            const k = Math.min(tw.t / tw.dur, 1);
+            tw.fn(k);
+            if (k >= 1) { tweens.splice(i, 1); tw.resolve(); }
+        }
+        if (followHero && hero) camera.lookAt(hero.position.x, hero.position.y + 1.2, hero.position.z);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    addEventListener("resize", () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+    });
+</script>
+</body>
+</html>
