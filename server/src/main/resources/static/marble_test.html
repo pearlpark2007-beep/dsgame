@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odysseus marble test</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d10; font-family: system-ui, sans-serif; }
+  #ui { position: absolute; top: 16px; left: 16px; z-index: 10; color: #e8e2d6; font-size: 13px;
+        background: rgba(10, 12, 16, 0.75); border: 1px solid #c9a227; border-radius: 8px; padding: 12px 14px; }
+  #ui b { color: #c9a227; letter-spacing: 3px; }
+  #ui label { display: block; margin-top: 8px; }
+  #ui input { vertical-align: middle; }
+  #msg { position: absolute; bottom: 20px; width: 100%; text-align: center; color: #e8e2d6; z-index: 10; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="ui">
+  <b>ODYSSEUS</b>
+  <label><input type="checkbox" id="spin" checked> Turn slowly</label>
+  <label>Veins <input type="range" id="veins" min="0" max="1" step="0.05" value="0.55"></label>
+  <label>Polish <input type="range" id="polish" min="0" max="1" step="0.05" value="0.6"></label>
+  <label>Mood <select id="mood"><option value="museum">Museum</option><option value="dusk">Dusk harbor</option><option value="dark">Underworld</option></select></label>
+  <div style="margin-top:8px;color:#9a9488">Drag to rotate, scroll to zoom</div>
+</div>
+<div id="msg">Loading...</div>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const msg = document.getElementById("msg");
+
+// ---------- renderer: filmic colour like a game engine ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 50);
+camera.position.set(0, 1.25, 4.2);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+controls.enableDamping = true;
+
+// soft reflections from a virtual room, so the polish looks real
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// ---------- lights: warm key, cool rim behind him, gentle fill ----------
+const key = new THREE.DirectionalLight(0xfff1dc, 3.0);
+key.position.set(2.5, 4, 3);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0004;
+Object.assign(key.shadow.camera, { left: -2, right: 2, top: 3, bottom: -1 });
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbcd4ff, 2.5);
+rim.position.set(-3, 3, -3);
+scene.add(rim);
+const fill = new THREE.HemisphereLight(0xdfe6ee, 0x1a1712, 0.35);
+scene.add(fill);
+
+// stone floor
+const floor = new THREE.Mesh(new THREE.CircleGeometry(4, 64),
+  new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.85 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// ---------- marble material ----------
+// The model has no UV map, so the veins are calculated from each point's position
+// (procedural marble). They stay fixed to his body even when he moves.
+const marble = new THREE.MeshPhysicalMaterial({
+  color: 0xf3efe8, roughness: 0.32, metalness: 0.0,
+  clearcoat: 0.6, clearcoatRoughness: 0.25,
+  sheen: 0.35, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.6
+});
+const uniforms = { uVeins: { value: 0.55 } };
+marble.onBeforeCompile = shader => {
+  shader.uniforms.uVeins = uniforms.uVeins;
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", "#include <common>\nvarying vec3 vObjPos;")
+    .replace("#include <begin_vertex>", "#include <begin_vertex>\nvObjPos = position;");
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", `#include <common>
+      varying vec3 vObjPos;
+      uniform float uVeins;
+      float hash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float vnoise(vec3 x) {
+        vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(hash3(i), hash3(i + vec3(1,0,0)), f.x), mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x), mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z);
+      }
+      float fbm(vec3 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * vnoise(p); p *= 2.03; a *= 0.5; } return v; }`)
+    .replace("#include <color_fragment>", `#include <color_fragment>
+      {
+        vec3 p = vObjPos * 2.2;
+        float turb = fbm(p);
+        float bands = abs(sin((p.x * 0.8 + p.y * 1.3 + p.z * 0.5) * 3.0 + turb * 8.0));
+        float vein = pow(1.0 - bands, 18.0);                      // thin dark veins
+        float cloud = fbm(p * 6.0);                                // soft stone grain
+        vec3 stone = mix(vec3(0.95, 0.93, 0.89), vec3(0.88, 0.86, 0.82), cloud);
+        stone = mix(stone, vec3(0.55, 0.56, 0.58), vein * uVeins);
+        diffuseColor.rgb = stone;
+      }`);
+};
+
+// ---------- load Odysseus ----------
+let statue;
+new GLTFLoader().load("models/odysseus.glb", gltf => {
+  statue = gltf.scene;
+  statue.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.computeVertexNormals();   // smooth shading: the file has no normals, which made it look faceted
+    o.material = marble;
+    o.castShadow = true;
+    o.receiveShadow = true;
+  });
+  // scale to 1.8 m and stand him on the floor
+  const box = new THREE.Box3().setFromObject(statue);
+  const s = 1.8 / (box.max.y - box.min.y);
+  statue.scale.setScalar(s);
+  box.setFromObject(statue);
+  statue.position.y -= box.min.y;
+  statue.position.x -= (box.max.x + box.min.x) / 2;
+  statue.position.z -= (box.max.z + box.min.z) / 2;
+  scene.add(statue);
+  msg.textContent = "";
+}, undefined, err => {
+  msg.textContent = "Couldn't load models/odysseus.glb - check the file is in static/models";
+  console.error(err);
+});
+
+// ---------- controls ----------
+document.getElementById("veins").oninput = e => uniforms.uVeins.value = +e.target.value;
+document.getElementById("polish").oninput = e => {
+  const v = +e.target.value;
+  marble.roughness = 0.6 - v * 0.45;
+  marble.clearcoat = v;
+};
+const moods = {
+  museum: { bg: 0x16181c, key: 0xfff1dc, keyI: 3.0, rim: 0xbcd4ff, rimI: 2.5, exp: 1.0 },
+  dusk:   { bg: 0x2a1610, key: 0xffb070, keyI: 3.4, rim: 0x6f8cff, rimI: 3.0, exp: 0.95 },
+  dark:   { bg: 0x050608, key: 0x9fb4ff, keyI: 1.6, rim: 0xc9a227, rimI: 4.0, exp: 0.85 }
+};
+function setMood(name) {
+  const m = moods[name];
+  scene.background = new THREE.Color(m.bg);
+  scene.fog = new THREE.Fog(m.bg, 6, 14);
+  key.color.set(m.key); key.intensity = m.keyI;
+  rim.color.set(m.rim); rim.intensity = m.rimI;
+  renderer.toneMappingExposure = m.exp;
+}
+document.getElementById("mood").onchange = e => setMood(e.target.value);
+setMood("museum");
+
+const spin = document.getElementById("spin");
+renderer.setAnimationLoop(() => {
+  if (statue && spin.checked) statue.rotation.y += 0.004;
+  controls.update();
+  renderer.render(scene, camera);
+});
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

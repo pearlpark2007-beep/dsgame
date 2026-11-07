@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Laestrygonian Harbour</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Spectral:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a227;
+    --gold-soft: #e8c766;
+    --ink: #e9e4da;
+    --muted: #9fb0b3;
+    --panel: rgba(8, 13, 17, 0.9);
+    --line: #26353b;
+    --danger: #e0644a;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #070b0e; color: var(--ink); font-family: 'Spectral', Georgia, serif; }
+  canvas { display: block; transition: filter 0.6s; }
+  canvas.frozen { filter: grayscale(0.7) brightness(0.8); }
+  canvas.shake { animation: shake 0.45s; }
+  @keyframes shake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-10px,3px); } 40% { transform: translate(9px,-4px); } 60% { transform: translate(-6px,2px); } 80% { transform: translate(5px,-2px); } }
+
+  #caption { position: absolute; top: 34px; left: 0; right: 440px; text-align: center; z-index: 10; pointer-events: none;
+             font-family: 'Cinzel', serif; font-size: 22px; letter-spacing: 3px; text-shadow: 0 0 14px #000, 0 0 4px #000; }
+  #subcaption { position: absolute; top: 72px; left: 0; right: 440px; text-align: center; z-index: 10; pointer-events: none;
+                font-style: italic; font-size: 17px; color: #d8d2c6; text-shadow: 0 0 10px #000; }
+
+  #athena { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; box-sizing: border-box; z-index: 10;
+            background: var(--panel); border-left: 1px solid #3a3420; display: flex; flex-direction: column; padding: 22px 24px; gap: 14px; overflow-y: auto; }
+  #athena .brand { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 6px; color: var(--gold); }
+  .tabs { display: flex; gap: 8px; }
+  .tab { flex: 1; padding: 8px 4px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted);
+         font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 1.5px; cursor: pointer; min-height: 44px; }
+  .tab.active { border-color: var(--gold); color: var(--gold-soft); background: rgba(201, 162, 39, 0.08); }
+  .tab .done { color: var(--gold); }
+  h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 600; font-size: 24px; line-height: 1.2; }
+  .story { margin: 0; font-style: italic; color: var(--muted); font-size: 15px; }
+  .goal { margin: 0; font-size: 15px; line-height: 1.5; }
+  .goal b { font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 2px; color: var(--gold); display: block; margin-bottom: 2px; }
+  .hintbox { font-size: 14px; color: #cfc8bb; border: 1px dashed #3a4a50; border-radius: 6px; padding: 8px 10px; }
+  .linkbtn { background: none; border: none; color: var(--gold-soft); font: inherit; font-size: 14px; cursor: pointer; padding: 0; text-align: left; text-decoration: underline; }
+
+  .editor { position: relative; display: flex; border: 1px solid #333c40; border-radius: 6px; background: #05080a; height: 230px; overflow: hidden; }
+  .gutter { width: 38px; padding: 10px 6px 10px 0; box-sizing: border-box; text-align: right; color: #4f5d62; font-family: 'JetBrains Mono', monospace;
+            font-size: 13px; line-height: 20px; white-space: pre; overflow: hidden; user-select: none; background: #080c0f; }
+  .code-wrap { position: relative; flex: 1; overflow: hidden; }
+  .hl { position: absolute; left: 0; right: 0; height: 20px; background: rgba(232, 199, 102, 0.18); border-left: 2px solid var(--gold-soft); display: none; pointer-events: none; }
+  .hl.error { background: rgba(224, 100, 74, 0.22); border-left-color: var(--danger); }
+  textarea { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; resize: none; border: none; outline: none; background: transparent;
+             color: #9fe1cb; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 20px; padding: 10px; white-space: pre; overflow: auto; tab-size: 4; }
+  textarea:focus { box-shadow: inset 0 0 0 1px #4a5a40; }
+  label.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  .actions { display: flex; gap: 10px; }
+  .run { flex: 1; min-height: 46px; border: 1px solid var(--gold); background: var(--gold); color: #1a1406; border-radius: 6px;
+         font-family: 'Cinzel', serif; font-weight: 700; font-size: 14px; letter-spacing: 2px; cursor: pointer; }
+  .run:disabled { opacity: 0.5; cursor: wait; }
+  .ghost { min-height: 46px; padding: 0 16px; border: 1px solid #3a4a50; background: transparent; color: var(--ink); border-radius: 6px; font: inherit; font-size: 14px; cursor: pointer; }
+  .status { min-height: 44px; font-size: 14px; line-height: 1.5; color: #d8d2c6; }
+  .status.bad { color: #f0a08c; }
+  .status.good { color: var(--gold-soft); }
+  .legend { font-size: 13px; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--line); padding-top: 10px; }
+  .legend code { font-family: 'JetBrains Mono', monospace; color: #9fe1cb; font-size: 12px; }
+  .back { color: var(--muted); font-size: 13px; text-decoration: none; }
+  .back:hover { color: var(--gold-soft); }
+
+  @media (max-width: 900px) {
+    #athena { top: auto; width: 100%; height: 55%; border-left: none; border-top: 1px solid #3a3420; }
+    #caption, #subcaption { right: 0; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="caption"></div>
+<div id="subcaption"></div>
+
+<aside id="athena" aria-label="Athena">
+  <div class="brand">ATHENA</div>
+  <div class="tabs" id="tabs"></div>
+  <h1 id="title">The Laestrygonian Harbour</h1>
+  <p class="story" id="story"></p>
+  <p class="goal" id="goal"></p>
+  <div id="hintArea"></div>
+
+  <div class="editor">
+    <div class="gutter" id="gutter">1</div>
+    <div class="code-wrap">
+      <div class="hl" id="hl"></div>
+      <label class="sr" for="code">Your C code</label>
+      <textarea id="code" spellcheck="false" autocomplete="off"></textarea>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="run" id="runBtn">GUIDE HIM</button>
+    <button class="ghost" id="resetBtn">Reset</button>
+  </div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+
+  <div class="legend">
+    Words Athena understands:
+    <code>push(&amp;s, x);</code> <code>pop(&amp;s)</code> <code>peek(&amp;s)</code>
+    <code>isEmpty(&amp;s)</code> <code>isFull(&amp;s)</code> <code>size(&amp;s)</code>
+    <code>int x = ...;</code> <code>if</code> <code>while</code> <code>for</code>
+  </div>
+  <a class="back" href="index.html">Leave the harbour</a>
+</aside>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+// =====================================================================
+// 1. PAGE ELEMENTS
+// =====================================================================
+const $ = id => document.getElementById(id);
+const ui = {
+  caption: $("caption"), sub: $("subcaption"), tabs: $("tabs"), title: $("title"), story: $("story"),
+  goal: $("goal"), hintArea: $("hintArea"), code: $("code"), gutter: $("gutter"), hl: $("hl"),
+  run: $("runBtn"), reset: $("resetBtn"), status: $("status")
+};
+
+// =====================================================================
+// 2. THE 3D SCENE: renderer, camera, light, harbour
+// =====================================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x161f27);
+scene.fog = new THREE.Fog(0x161f27, 12, 42);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+
+scene.add(new THREE.HemisphereLight(0xc9d6e2, 0x1a1410, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.4);
+sun.position.set(-4, 10, 7);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -6 });
+scene.add(sun);
+const ember = new THREE.PointLight(0xe07a3c, 18, 9);
+ember.position.set(-5, 1.6, 2.5);
+scene.add(ember);
+
+// dock, sea, cliffs and columns
+const dock = new THREE.Mesh(new THREE.BoxGeometry(24, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x8e877b, roughness: 0.95 }));
+dock.position.set(0, -0.2, 0);
+dock.receiveShadow = true;
+scene.add(dock);
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x17262f, roughness: 0.35, metalness: 0.2 }));
+sea.rotation.x = -Math.PI / 2;
+sea.position.y = -0.9;
+scene.add(sea);
+const cliffMat = new THREE.MeshStandardMaterial({ color: 0x232c33, roughness: 1 });
+for (const [x, z, h, w] of [[-16, -14, 18, 8], [16, -14, 20, 9], [-9, -24, 26, 10], [10, -26, 24, 12]]) {
+  const cliff = new THREE.Mesh(new THREE.BoxGeometry(w, h, 8), cliffMat);
+  cliff.position.set(x, h / 2 - 1, z);
+  scene.add(cliff);
+}
+const towerMat = new THREE.MeshStandardMaterial({ color: 0x2d3943, roughness: 0.9 });
+for (const [x, z, h] of [[-6, -10, 14], [-3, -13, 20], [3.5, -12, 17], [7, -9, 11]]) {
+  const t = new THREE.Mesh(new THREE.BoxGeometry(1.4, h, 1.4), towerMat);
+  t.position.set(x, h / 2, z);
+  scene.add(t);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 1.5), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x6b5414, emissiveIntensity: 0.6 }));
+  top.position.set(x, h + 0.25, z);
+  scene.add(top);
+}
+const colMat = new THREE.MeshStandardMaterial({ color: 0xd9d3c7, roughness: 0.6 });
+for (const x of [-10, -6, 6, 10]) {
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 5, 18), colMat);
+  col.position.set(x, 2.5, -3.2);
+  col.castShadow = true;
+  scene.add(col);
+}
+
+// =====================================================================
+// 3. CRATES AND PILES (one pile per stack in the level)
+// =====================================================================
+const CRATE = 0.9, GAP = 0.04, STEP_H = CRATE + GAP;
+const PILE_SPACING = 2.4;
+const GROUND = new THREE.Vector3(-3.4, 0, 1.6);   // where lifted crates are set down beside him
+const SPAWN = new THREE.Vector3(-7, 0, 1.2);      // the cargo heap new crates come from
+
+function labelTexture(text, gold) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d");
+  g.fillStyle = gold ? "#b98b1f" : "#6b4f35";
+  g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = gold ? "#f3d77c" : "#4a3524";
+  g.lineWidth = 14;
+  g.strokeRect(10, 10, 236, 236);
+  g.fillStyle = gold ? "#2a1a06" : "#f0e6d2";
+  g.font = "bold 110px Georgia";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(String(text), 128, 136);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function amphoraMesh() {
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    pts.push(new THREE.Vector2(0.08 + Math.sin(t * Math.PI) * 0.18 + (t > 0.85 ? 0.05 : 0), t * 0.62));
+  }
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 24),
+    new THREE.MeshStandardMaterial({ color: 0xd9b54a, metalness: 0.7, roughness: 0.3, emissive: 0x4a3608, emissiveIntensity: 0.5 }));
+  m.position.y = CRATE / 2;
+  m.castShadow = true;
+  return m;
+}
+
+function makeCrate(value) {
+  const gold = value === 99;
+  const mat = new THREE.MeshStandardMaterial({ map: labelTexture(value, gold), roughness: gold ? 0.4 : 0.85, metalness: gold ? 0.4 : 0 });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(CRATE, CRATE, CRATE), mat);
+  box.castShadow = true;
+  box.receiveShadow = true;
+  box.userData.value = value;
+  if (gold) box.add(amphoraMesh());
+  scene.add(box);
+  return box;
+}
+
+let piles = {};        // name -> { x, capacity, crates: [], slots: Group, label }
+let ground = [];       // crates lifted out and set on the dock beside him
+
+function pileTopPosition(pile, index) {
+  return new THREE.Vector3(pile.x, CRATE / 2 + index * STEP_H, 0);
+}
+function groundPosition(i) {
+  return new THREE.Vector3(GROUND.x - (i % 3) * 1.0, CRATE / 2 + Math.floor(i / 3) * STEP_H, GROUND.z);
+}
+
+function nameSprite(text) {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 128;
+  const g = c.getContext("2d");
+  g.font = "600 64px Cinzel, Georgia";
+  g.textAlign = "center";
+  g.fillStyle = "#e8c766";
+  g.fillText(text, 128, 82);
+  const tex = new THREE.CanvasTexture(c);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  s.scale.set(1.2, 0.6, 1);
+  return s;
+}
+
+function clearScene() {
+  for (const p of Object.values(piles)) {
+    p.crates.forEach(c => scene.remove(c));
+    scene.remove(p.slots);
+  }
+  ground.forEach(c => scene.remove(c));
+  piles = {};
+  ground = [];
+}
+
+function buildPiles(structures) {
+  clearScene();
+  const stacks = structures.filter(s => s.kind === "stack");
+  const startX = -((stacks.length - 1) * PILE_SPACING) / 2 + 1.2;
+  stacks.forEach((spec, i) => {
+    const pile = { x: startX + i * PILE_SPACING, capacity: spec.capacity, crates: [], slots: new THREE.Group() };
+    // faint outlines show how many crates the pile can hold (its capacity)
+    for (let k = 0; k < spec.capacity; k++) {
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(CRATE, CRATE, CRATE)),
+        new THREE.LineBasicMaterial({ color: 0x8fa1a4, transparent: true, opacity: 0.25 }));
+      edges.position.copy(pileTopPosition(pile, k));
+      pile.slots.add(edges);
+    }
+    const label = nameSprite(spec.name);
+    label.position.set(pile.x, 0.05, 0.95);
+    pile.slots.add(label);
+    scene.add(pile.slots);
+    spec.initial.forEach((v, k) => {
+      const crate = makeCrate(v);
+      crate.position.copy(pileTopPosition(pile, k));
+      pile.crates.push(crate);
+    });
+    piles[spec.name] = pile;
+  });
+}
+
+// =====================================================================
+// 4. ODYSSEUS (placeholder figure until the final model is ready)
+// =====================================================================
+let hero, mixer, currentAction;
+const actions = {};
+const HERO_HOME = new THREE.Vector3(-4.6, 0, 2.6);
+const MARBLE = new THREE.MeshStandardMaterial({ color: 0xeeeae4, roughness: 0.5 });
+
+function playAnim(name, fade = 0.3) {
+  const next = actions[name];
+  if (!next || next === currentAction) return;
+  next.reset().fadeIn(fade).play();
+  if (currentAction) currentAction.fadeOut(fade);
+  currentAction = next;
+}
+
+const heroReady = new Promise(resolve => {
+  new GLTFLoader().load("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r170/examples/models/gltf/Soldier.glb", gltf => {
+    hero = gltf.scene;
+    hero.traverse(o => { if (o.isMesh) { o.material = MARBLE; o.castShadow = true; } });
+    hero.position.copy(HERO_HOME);
+    scene.add(hero);
+    mixer = new THREE.AnimationMixer(hero);
+    gltf.animations.forEach(clip => actions[clip.name] = mixer.clipAction(clip));
+    playAnim("Idle", 0);
+    resolve();
+  }, undefined, () => {
+    // no internet or blocked: use a simple stand-in so the game still works
+    hero = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 1.0, 6, 12), MARBLE);
+    body.position.y = 0.85;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), MARBLE);
+    head.position.y = 1.65;
+    hero.add(body, head);
+    hero.position.copy(HERO_HOME);
+    scene.add(hero);
+    resolve();
+  });
+});
+
+function faceTowards(x, z) {
+  hero.rotation.y = Math.atan2(x - hero.position.x, z - hero.position.z);
+}
+
+// =====================================================================
+// 5. TIME: tweens, slow motion, camera
+// =====================================================================
+let timeScale = 1;
+const tweens = [];
+const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+function tween(seconds, fn) {
+  return new Promise(resolve => tweens.push({ t: 0, d: Math.max(seconds, 0.001), fn, resolve }));
+}
+const wait = seconds => tween(seconds, () => {});
+
+const camTarget = new THREE.Vector3(0, 1.4, 0);
+const SHOTS = {
+  main:  { pos: [-1.5, 4.2, 9.5], look: [0.2, 1.5, 0] },
+  close: { pos: [-2.2, 2.0, 5.4],  look: [0.2, 1.4, 0] },
+  wide:  { pos: [6.5, 7.5, 12],   look: [0, 2.5, -2] },
+  low:   { pos: [-1.0, 0.6, 4.2],  look: [0.5, 2.6, 0] }
+};
+async function cameraTo(name, seconds = 0.8) {
+  const s = SHOTS[name];
+  const p0 = camera.position.clone(), l0 = camTarget.clone();
+  const p1 = new THREE.Vector3(...s.pos), l1 = new THREE.Vector3(...s.look);
+  await tween(seconds, k => {
+    const e = ease(k);
+    camera.position.lerpVectors(p0, p1, e);
+    camTarget.lerpVectors(l0, l1, e);
+  });
+}
+function cutTo(name) {
+  const s = SHOTS[name];
+  camera.position.set(...s.pos);
+  camTarget.set(...s.look);
+}
+
+// =====================================================================
+// 6. MOVEMENT HELPERS used by the step player
+// =====================================================================
+let pace = 1;    // shrinks for long programs so they don't take forever
+
+async function walkTo(x, z) {
+  const from = hero.position.clone();
+  const to = new THREE.Vector3(x, 0, z);
+  const dist = from.distanceTo(to);
+  if (dist < 0.05) return;
+  faceTowards(x, z);
+  playAnim("Walk");
+  await tween((dist / 3.2) * pace, k => hero.position.lerpVectors(from, to, k));
+  playAnim("Idle");
+}
+
+async function arcCrate(crate, to, height = 1.4, seconds = 0.55) {
+  const from = crate.position.clone();
+  await tween(seconds * pace, k => {
+    const e = ease(k);
+    crate.position.lerpVectors(from, to, e);
+    crate.position.y += Math.sin(Math.PI * e) * height;
+  });
+}
+
+function takeCrateFor(value) {
+  // a crate he set down earlier with this value, or a new one from the cargo heap
+  for (let i = ground.length - 1; i >= 0; i--) {
+    if (ground[i].userData.value === value) {
+      const c = ground.splice(i, 1)[0];
+      ground.forEach((g, j) => g.position.copy(groundPosition(j)));
+      return c;
+    }
+  }
+  const c = makeCrate(value);
+  c.position.copy(SPAWN).add(new THREE.Vector3(0, CRATE / 2, 0));
+  return c;
+}
+
+// =====================================================================
+// 7. THE STEP PLAYER: each step from Java becomes a movement
+// =====================================================================
+async function playStep(step) {
+  const pile = piles[step.target];
+  highlightLine(step.line, false);
+  if (!pile) return;
+
+  switch (step.action) {
+    case "PUSH": {
+      await walkTo(pile.x - 1.0, 0.9);
+      const crate = takeCrateFor(step.value);
+      await arcCrate(crate, pileTopPosition(pile, step.index));
+      pile.crates[step.index] = crate;
+      break;
+    }
+    case "POP": {
+      await walkTo(pile.x - 1.0, 0.9);
+      const crate = pile.crates.pop();
+      if (crate) {
+        ground.push(crate);
+        await arcCrate(crate, groundPosition(ground.length - 1), 1.0);
+      }
+      break;
+    }
+    case "PEEK": {
+      await walkTo(pile.x - 1.0, 0.9);
+      const top = pile.crates[pile.crates.length - 1];
+      if (top) await tween(0.5 * pace, k => top.scale.setScalar(1 + Math.sin(Math.PI * k) * 0.12));
+      break;
+    }
+    case "OVERFLOW":
+    case "FULL":
+      await overflowBeat(pile, step.value);
+      break;
+    case "UNDERFLOW":
+    case "EMPTY":
+      await underflowBeat(pile);
+      break;
+  }
+}
+
+// =====================================================================
+// 8. OUTCOME CINEMATICS
+// =====================================================================
+async function overflowBeat(pile, value) {
+  await walkTo(pile.x - 1.0, 0.9);
+  const crate = takeCrateFor(value);
+  const top = pileTopPosition(pile, pile.capacity);
+  await arcCrate(crate, top, 1.6, 0.7);
+  timeScale = 0.4;
+  cutTo("low");
+  // the tower sways, the extra crate tumbles into the sea
+  const tower = [...pile.crates, crate];
+  await tween(0.6, k => tower.forEach((c, i) => c.rotation.z = Math.sin(k * Math.PI * 3) * 0.04 * (i + 1)));
+  const from = crate.position.clone();
+  await tween(1.0, k => {
+    crate.position.set(from.x + k * 2.2, from.y - k * k * (from.y + 1.6), from.z + k * 2.5);
+    crate.rotation.x = k * 4;
+  });
+  scene.remove(crate);
+  tower.forEach(c => c.rotation.z = 0);
+  timeScale = 1;
+}
+
+async function underflowBeat(pile) {
+  await walkTo(pile.x - 0.8, 0.7);
+  cutTo("close");
+  timeScale = 0.45;
+  faceTowards(pile.x, 0);
+  // he reaches for a crate that is not there, and falls
+  const y0 = hero.position.y;
+  await tween(0.5, k => hero.position.y = y0 + Math.sin(k * Math.PI / 2) * 0.6);
+  await tween(0.8, k => { hero.position.y = y0 + 0.6 * (1 - k * k); hero.rotation.x = k * 1.3; });
+  timeScale = 1;
+  await wait(0.6);
+  hero.rotation.x = 0;
+}
+
+async function climb(pile) {
+  await walkTo(pile.x - 0.05, 0.75);
+  faceTowards(pile.x, -1);
+  const height = pile.crates.length * STEP_H;
+  await cameraTo("low", 0.6);
+  playAnim("Idle");
+  await tween(Math.max(1.2, height * 0.7), k => hero.position.y = ease(k) * height);
+}
+
+async function successBeat(message) {
+  const pile = piles.s;
+  await climb(pile);
+  const amphora = pile.crates[pile.crates.length - 1];
+  await cameraTo("wide", 1.4);
+  if (amphora) await tween(1.0, k => amphora.position.y += 0.004);
+  showCaption("The amphora is his.", message);
+}
+
+async function goalNotMetBeat(message) {
+  const pile = piles.s;
+  await climb(pile);
+  timeScale = 0.45;
+  cutTo("close");
+  const y0 = hero.position.y;
+  await tween(0.4, k => hero.position.y = y0 + Math.sin(k * Math.PI) * 0.3);
+  await tween(0.9, k => { hero.position.y = y0 * (1 - k * k); hero.rotation.x = -k * 1.2; });
+  timeScale = 1;
+  showCaption("Out of reach.", message);
+  await wait(0.8);
+  hero.rotation.x = 0;
+}
+
+async function compileErrorBeat(message, line) {
+  renderer.domElement.classList.remove("shake");
+  void renderer.domElement.offsetWidth;
+  renderer.domElement.classList.add("shake");
+  highlightLine(line, true);
+  showCaption("Athena's words did not reach him.", "Line " + line + ": " + message);
+}
+
+async function infiniteLoopBeat(message, line) {
+  highlightLine(line, true);
+  showCaption("The same moment, again and again.", message);
+  for (let i = 0; i < 3; i++) {
+    await walkTo(HERO_HOME.x + 1.5, HERO_HOME.z);
+    await walkTo(HERO_HOME.x, HERO_HOME.z);
+  }
+}
+
+// =====================================================================
+// 9. ATHENA'S PANEL: levels, editor, running the code
+// =====================================================================
+const STORE_KEY = "odyssey.harbour.done";
+function loadDone() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; } }
+function saveDone(list) { try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch { /* storage unavailable */ } }
+
+let levels = [];
+let level = null;
+let busy = false;
+
+function showCaption(main, sub = "") { ui.caption.textContent = main; ui.sub.textContent = sub; }
+function setStatus(text, kind = "") { ui.status.textContent = text; ui.status.className = "status " + kind; }
+function freeze(on) { renderer.domElement.classList.toggle("frozen", on); }
+
+function updateGutter() {
+  const n = ui.code.value.split("\n").length;
+  ui.gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join("\n");
+  ui.gutter.scrollTop = ui.code.scrollTop;
+}
+function highlightLine(line, isError) {
+  if (!line || line < 1) { ui.hl.style.display = "none"; return; }
+  ui.hl.style.display = "block";
+  ui.hl.classList.toggle("error", isError);
+  ui.hl.style.top = (10 + (line - 1) * 20 - ui.code.scrollTop) + "px";
+}
+ui.code.addEventListener("input", updateGutter);
+ui.code.addEventListener("scroll", () => { ui.gutter.scrollTop = ui.code.scrollTop; ui.hl.style.display = "none"; });
+ui.code.addEventListener("keydown", e => {
+  if (e.key === "Tab") {           // Tab inserts spaces instead of leaving the editor
+    e.preventDefault();
+    const s = ui.code.selectionStart;
+    ui.code.setRangeText("    ", s, ui.code.selectionEnd, "end");
+    updateGutter();
+  }
+});
+
+const TIER_LABEL = { NOVICE: "Novice ★", ADEPT: "Adept ★★", HERO: "Hero ★★★" };
+function renderTabs() {
+  const done = loadDone();
+  ui.tabs.innerHTML = "";
+  levels.forEach(l => {
+    const b = document.createElement("button");
+    b.className = "tab" + (level && l.id === level.id ? " active" : "");
+    b.innerHTML = TIER_LABEL[l.tier] + (done.includes(l.id) ? ' <span class="done">✓</span>' : "");
+    b.setAttribute("aria-pressed", level && l.id === level.id ? "true" : "false");
+    b.addEventListener("click", () => { if (!busy) selectLevel(l); });
+    ui.tabs.appendChild(b);
+  });
+}
+
+function selectLevel(l) {
+  level = l;
+  ui.title.textContent = l.title;
+  ui.story.textContent = l.story;
+  ui.goal.innerHTML = "<b>THE TRIAL</b>";
+  ui.goal.append(l.goal);
+  ui.hintArea.innerHTML = "";
+  if (l.hint) {
+    const btn = document.createElement("button");
+    btn.className = "linkbtn";
+    btn.textContent = "Ask Athena for a hint";
+    btn.addEventListener("click", () => {
+      ui.hintArea.innerHTML = "";
+      const box = document.createElement("div");
+      box.className = "hintbox";
+      box.textContent = l.hint;
+      ui.hintArea.appendChild(box);
+    });
+    ui.hintArea.appendChild(btn);
+  }
+  ui.code.value = l.starterCode;
+  updateGutter();
+  highlightLine(0);
+  setStatus("");
+  showCaption("");
+  resetScene();
+  renderTabs();
+}
+
+function resetScene() {
+  buildPiles(level.structures);
+  if (hero) { hero.position.copy(HERO_HOME); hero.rotation.set(0, 0, 0); faceTowards(0, 0); playAnim("Idle", 0); }
+  cutTo("main");
+  freeze(true);
+}
+
+async function run() {
+  if (busy || !level) return;
+  busy = true;
+  ui.run.disabled = true;
+  setStatus("Athena speaks…");
+  showCaption("");
+  resetScene();
+  freeze(false);
+
+  let result;
+  try {
+    const res = await fetch(`/api/levels/${level.id}/play`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: ui.code.value })
+    });
+    if (!res.ok) throw new Error("Server answered " + res.status);
+    result = await res.json();
+  } catch (err) {
+    setStatus("Can't reach the server. Is Spring Boot running? (" + err.message + ")", "bad");
+    freeze(true); busy = false; ui.run.disabled = false;
+    return;
+  }
+
+  await heroReady;
+  await cameraTo("main", 0.4);
+  pace = result.steps.length > 30 ? 0.35 : 1;
+
+  if (result.outcome === "COMPILE_ERROR") {
+    await compileErrorBeat(result.message, result.line);
+  } else {
+    for (const step of result.steps) await playStep(step);
+    switch (result.outcome) {
+      case "SUCCESS":
+        highlightLine(0);
+        await successBeat(result.message);
+        markDone(level.id);
+        break;
+      case "GOAL_NOT_MET":
+        highlightLine(0);
+        await goalNotMetBeat(result.message);
+        break;
+      case "OVERFLOW":
+        showCaption("The tower could hold no more.", result.message);
+        highlightLine(result.line, true);
+        break;
+      case "UNDERFLOW":
+        showCaption("His hand closed on air.", result.message);
+        highlightLine(result.line, true);
+        break;
+      case "INFINITE_LOOP":
+        await infiniteLoopBeat(result.message, result.line);
+        break;
+      default:
+        showCaption("Something went wrong.", result.message);
+        highlightLine(result.line, true);
+    }
+  }
+
+  const ok = result.outcome === "SUCCESS";
+  setStatus(ok ? result.message : "Fix the code and guide him again.", ok ? "good" : "bad");
+  pace = 1;
+  busy = false;
+  ui.run.disabled = false;
+  if (!ok) { await wait(1.2); freeze(true); }
+}
+
+function markDone(id) {
+  const done = loadDone();
+  if (!done.includes(id)) { done.push(id); saveDone(done); }
+  renderTabs();
+}
+
+ui.run.addEventListener("click", run);
+ui.reset.addEventListener("click", () => { if (!busy && level) selectLevel(level); });
+
+async function loadLevels() {
+  try {
+    const res = await fetch("/api/levels?island=harbour");
+    levels = await res.json();
+    if (!levels.length) throw new Error("no levels");
+    selectLevel(levels[0]);
+  } catch (err) {
+    setStatus("Couldn't load the trials. Open this page from http://localhost:8080/harbour.html with the server running.", "bad");
+  }
+}
+
+// =====================================================================
+// 10. RENDER LOOP AND RESIZE
+// =====================================================================
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta() * timeScale;
+  if (mixer) mixer.update(dt);
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const tw = tweens[i];
+    tw.t += dt;
+    const k = Math.min(tw.t / tw.d, 1);
+    tw.fn(k);
+    if (k >= 1) { tweens.splice(i, 1); tw.resolve(); }
+  }
+  ember.intensity = 16 + Math.sin(performance.now() / 120) * 3;
+  camera.lookAt(camTarget);
+  renderer.render(scene, camera);
+});
+function resize() {
+  const panel = innerWidth > 900 ? 440 : 0;
+  const w = innerWidth - panel, h = innerWidth > 900 ? innerHeight : innerHeight * 0.45;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+resize();
+cutTo("main");
+loadLevels();
+</script>
+</body>
+</html>

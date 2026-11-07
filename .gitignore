@@ -31,3 +31,4 @@ bin/
 ### IntelliJ settings ###
 .idea/
 *.iml
+assets_raw/

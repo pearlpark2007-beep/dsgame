@@ -1,8 +1,8 @@
 package com.dsgame.server.game;
 
-import com.dsgame.server.game.levels.BuriedKeyLevel;
-import com.dsgame.server.game.levels.FerryLineLevel;
-import com.dsgame.server.game.levels.FirstCrateLevel;
+import com.dsgame.server.game.levels.harbour.AmphoraLevel;
+import com.dsgame.server.game.levels.harbour.BuriedAmphoraLevel;
+import com.dsgame.server.game.levels.harbour.NarrowDockLevel;
 import com.dsgame.server.lang.CodeRunner;
 import com.dsgame.server.lang.Interpreter;
 import com.dsgame.server.lang.Outcome;
@@ -21,9 +21,10 @@ public class LevelService {
     private final Map<String, Level> levels = new LinkedHashMap<>();
 
     public LevelService() {
-        register(new FirstCrateLevel());
-        register(new BuriedKeyLevel());
-        register(new FerryLineLevel());
+        // the Laestrygonian Harbour (stack)
+        register(new AmphoraLevel());
+        register(new BuriedAmphoraLevel());
+        register(new NarrowDockLevel());
     }
 
     private void register(Level level) {
@@ -34,6 +35,17 @@ public class LevelService {
         List<LevelInfo> result = new ArrayList<>();
         for (Level level : levels.values()) {
             result.add(level.toInfo());
+        }
+        return result;
+    }
+
+    // only the levels of one island, e.g. "harbour"
+    public List<LevelInfo> getLevelsForIsland(String island) {
+        List<LevelInfo> result = new ArrayList<>();
+        for (Level level : levels.values()) {
+            if (level.getIsland().equals(island)) {
+                result.add(level.toInfo());
+            }
         }
         return result;
     }
@@ -55,8 +67,18 @@ public class LevelService {
         }
 
         GoalResult goal = level.checkGoal(interpreter);
-        Outcome outcome = goal.met() ? Outcome.SUCCESS : Outcome.GOAL_NOT_MET;
-        return new RunResult(outcome, goal.message(), -1, result.steps());
+        if (!goal.met()) {
+            return new RunResult(Outcome.GOAL_NOT_MET, goal.message(), -1, result.steps());
+        }
+
+        // Hero tier: the goal was reached, but was it reached within the move limit?
+        int moves = Level.countMoves(result.steps());
+        if (level.getMaxMoves() > 0 && moves > level.getMaxMoves()) {
+            return new RunResult(Outcome.GOAL_NOT_MET,
+                    "The amphora is on top, but it took " + moves + " moves. The tide allows only "
+                            + level.getMaxMoves() + ".", -1, result.steps());
+        }
+        return new RunResult(Outcome.SUCCESS, goal.message(), -1, result.steps());
     }
 
     private Level findLevel(String id) {

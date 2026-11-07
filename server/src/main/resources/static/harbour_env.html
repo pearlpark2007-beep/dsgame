@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Laestrygonian Harbour</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Spectral:ital@0;1&family=Anton&family=Allerta+Stencil&family=Cabin+Sketch:wght@400;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #06090c; color: #e9e4da; font-family: 'Spectral', Georgia, serif; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+             background: #06090c; z-index: 20; transition: opacity 1.2s; }
+  #loading h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 400; letter-spacing: 8px; font-size: 22px; }
+  #loading .bar { width: 260px; height: 2px; background: #1c2429; }
+  #loading .bar div { height: 100%; width: 0; background: #c9a227; transition: width 0.3s; }
+  #loading p { margin: 0; font-style: italic; color: #8a979b; font-size: 15px; }
+  #hud { position: fixed; left: 16px; bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 10; }
+  #hud button { min-height: 40px; padding: 0 14px; background: rgba(8, 12, 15, 0.7); color: #e9e4da; border: 1px solid #3a4448; border-radius: 6px;
+                font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 1.5px; cursor: pointer; }
+  #hud button.on { border-color: #c9a227; color: #e8c766; }
+  #chapter { position: fixed; left: 6%; top: 15%; pointer-events: none; z-index: 10; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace;
+             font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; }
+  #chapter b { display: block; margin-top: 2px; font-family: Anton, 'Inter Display Black', Impact, sans-serif; font-weight: 400; font-size: 46px;
+               letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f, 0 0 24px rgba(0,0,0,0.6); }
+  #title { position: fixed; top: 26px; left: 0; right: 0; text-align: center; font-family: 'Cinzel', serif; letter-spacing: 10px; font-size: 15px;
+           color: rgba(233, 228, 218, 0.75); text-shadow: 0 0 12px #000; pointer-events: none; z-index: 10; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="loading"><h1>THE LAESTRYGONIAN HARBOUR</h1><div class="bar"><div id="bar"></div></div><p id="loadText">The storm gathers…</p></div>
+<div id="chapter">CHAPTER ONE<b>THE LAESTRYGONIAN HARBOUR</b></div>
+<div id="hud"></div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { World } from "./js/engine/world.js";
+import { manager } from "./js/engine/assets.js";
+import { buildHarbour, makeStackCrate, goldenAmphora, QUAY_TOP } from "./js/islands/harbour/harbourScene.js";
+import { StackGauge, floorStencil, Manifest, loadFonts } from "./js/islands/harbour/dsProps.js";
+
+const params = new URLSearchParams(location.search);
+manager.onProgress = (url, done, total) => { document.getElementById("bar").style.width = (done / total * 100) + "%"; };
+
+const world = new World({ quality: params.get("q") || "auto" });
+world.renderer.localClippingEnabled = true;
+await loadFonts();
+const harbour = await buildHarbour(world);
+
+// sample trial piles: each pile is a stack, with its gauge, TOP pointer and floor stencil
+const PILE_Z = -1.6;
+const piles = [{ name: "s", x: -3, values: [4, 7, 99], cap: 3, base: 0x2A0 }, { name: "t", x: 0, values: [3], cap: 3, base: 0x2C0 }, { name: "u", x: 3, values: [], cap: 3, base: 0x2E0 }];
+const gauges = [];
+for (const p of piles) {
+  let y = QUAY_TOP, h = 0.69;
+  p.values.forEach((v, i) => {
+    const c = makeStackCrate(harbour.models.crate, v, i, "0x" + (p.base + i * 4).toString(16).toUpperCase());
+    c.position.set(p.x, y, PILE_Z);
+    c.rotation.y = (Math.random() - 0.5) * 0.05;
+    world.scene.add(c);
+    y += c.userData.height; h = c.userData.height;
+  });
+  if (p.values.includes(99)) { const a = goldenAmphora(harbour.models.amphora); a.position.set(p.x, y, PILE_Z); world.scene.add(a); }
+  const gauge = new StackGauge(world.scene, { x: p.x, y: QUAY_TOP, z: PILE_Z, capacity: p.cap, crateHeight: 0.69, name: p.name });
+  gauge.setTop(p.values.length - 1, true);
+  gauges.push(world.add(gauge));
+  floorStencil(world.scene, p.x, QUAY_TOP, PILE_Z + 1.05, p.name);
+}
+const manifest = new Manifest(world.scene, { x: 6.2, y: QUAY_TOP, z: -0.4, rotationY: -0.45 });
+manifest.write(piles.map(p => ({ name: p.name, capacity: p.cap, items: p.values })), "// get the 99 on top of s");
+
+// ---------- camera shots
+const SHOTS = {
+  trial:   { pos: [1.4, 3.1, 8.4], look: [0.8, 2.2, -1.6], fov: 40 },
+  manifest: { pos: [4.4, 2.85, 2.3], look: [6.2, 2.9, -0.4], fov: 40 },
+  arrival: { pos: [-9, 9, -42], look: [3, 2, 0], fov: 46 },
+  giants:  { pos: [-3, 2.3, 4], look: [6, 40, -200], fov: 52 },
+  goddess: { pos: [-16, 3, -28], look: [-30, 16, -70], fov: 44 },
+  ship:    { pos: [27, 5, -2], look: [18, 2, -18], fov: 48 },
+  harbour: { pos: [0, 60, 40], look: [0, 0, -240], fov: 50 },
+  queen:   { pos: [-8, 6, -20], look: [-140, 70, -460], fov: 40 }
+};
+const controls = new OrbitControls(world.camera, world.renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.495;
+let drift = params.get("still") ? 0 : 1;
+controls.addEventListener("start", () => drift = 0);
+
+function shot(name) {
+  const s = SHOTS[name];
+  world.camera.position.set(...s.pos);
+  controls.target.set(...s.look);
+  world.camera.fov = s.fov; world.camera.updateProjectionMatrix();
+  controls.update();
+  document.querySelectorAll("#hud button[data-shot]").forEach(b => b.classList.toggle("on", b.dataset.shot === name));
+}
+window.__shot = shot;
+window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
+
+const hud = document.getElementById("hud");
+Object.keys(SHOTS).forEach(name => {
+  const b = document.createElement("button");
+  b.textContent = name; b.dataset.shot = name;
+  b.onclick = () => shot(name);
+  hud.appendChild(b);
+});
+const qb = document.createElement("button");
+const showQ = () => qb.textContent = "quality: " + world.quality;
+qb.onclick = () => { world.autoQuality = false; world.quality = world.quality === "high" ? "low" : "high"; world.applyQuality(); showQ(); };
+hud.appendChild(qb);
+
+shot(params.get("shot") || "trial");
+let t0 = 0;
+const onFrame = (dt, time, raw) => {
+  // a slow, breathing camera drift until the player grabs the camera
+  if (drift) { t0 += raw; world.camera.position.x += Math.sin(t0 * 0.15) * 0.004; world.camera.position.y += Math.sin(t0 * 0.21) * 0.002; }
+  controls.update();
+  showQ();
+};
+const loading = document.getElementById("loading");
+if (params.get("capture")) {
+  // test mode: no live loop, frames are drawn on request (used for checking screenshots)
+  world.onFrame = onFrame;
+  window.__frames = (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) world.step(dt, i === n - 1); };
+  loading.remove();
+} else {
+  world.start(onFrame);
+  loading.style.opacity = 0;
+  setTimeout(() => loading.remove(), 1300);
+}
+window.__ready = true; window.__world = world;
+</script>
+</body>
+</html>
