@@ -40,18 +40,17 @@ int main() {
     int d = pop();         // one too many
 }`;
 
-// ctx: { hero, trial, director, HEAP, DROP, newCrate(value) }
+// ctx: { hero, trial, director, HEAP, bench, newCrate(value) }
 export function stackLesson(ctx) {
-  const { hero, trial, director, HEAP, DROP } = ctx;
+  const { hero, trial, director, HEAP, bench } = ctx;
   const s = trial.piles.s;
   const CAP = s.capacity;
   const S = { top: -1, items: Array(CAP).fill(null), ret: {} };
   const addr = Array.from({ length: CAP }, (_, i) => trial.address(s, i));
   const vars = (extra = {}) => ({ CAP, top: S.top, items: { items: [...S.items], top: S.top, addr }, ...S.ret, ...extra });
   // he works from beside the pile (its right side), so the camera in front sees gauge, pile and him side by side
-const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside the pile, on its right
+  const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside the pile, on its right
   const heapFront = new THREE.Vector3(HEAP.x, QUAY_TOP, HEAP.z + 0.78);
-  const dropFront = new THREE.Vector3(DROP.x, QUAY_TOP, DROP.z + 0.78);
 
   // ---------- small acted pieces, reused by many steps
   async function fetch(value) {
@@ -74,10 +73,12 @@ const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside t
     await hero.lift(c);
     return c;
   }
-  async function setAside(c) {
-    await hero.walkTo(dropFront.x, dropFront.z);
-    await hero.place(DROP.clone());
-    await fadeAway(c);           // a dock hand carries it off, so the trestle is free again
+  // the returned value goes on the Return Bench, under a slate naming its variable
+  async function setAside(c, name, i) {
+    const f = bench.front(i);
+    await hero.walkTo(f.x, f.z);
+    await hero.place(bench.slot(i), 0);
+    bench.tag(i, `${name} = ${c.userData.value}`);
   }
   const moveTop = t => { S.top = t; s.gauge.setTop(t); };
   // fade one crate away (its materials are shared with other crates, so it gets its own copies first)
@@ -94,14 +95,14 @@ const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside t
     await hero.wait(0.35);
     await setInSlot(c);
   }
-  async function quickPop(name) {
+  async function quickPop(name, i) {
     await hero.walkTo(stand.x, stand.z); await hero.face(s.x, s.z);
     s.gauge.flash("check", S.top);
     await hero.wait(0.3);
     const c = await takeTop();
     S.ret[name] = c.userData.value; S.items[S.top] = null; s.crates.length = S.top;
     moveTop(S.top - 1); trial.write();
-    await setAside(c);
+    await setAside(c, name, i);
   }
 
   // three-quarter view from the front right: the pile, its gauge, and Odysseus beside it
@@ -142,7 +143,8 @@ const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside t
       },
       say: "<b>top == CAP - 1</b>? top is 2, CAP - 1 is 2. <b>Yes — the pile is full.</b> There is no slot [3]." },
     { line: 7, out: "Overflow", get vars() { return vars(); }, act: async () => {
-        await hero.walkTo(heapFront.x, heapFront.z); await hero.place(HEAP.clone());
+        await director.siren({ title: "STACK OVERFLOW", sub: "push(5): s is full (3/3). top stays 2.", lineNo: 7, lineText: 'printf("Overflow");', focus: { x: s.x, z: s.z, y: QUAY_TOP + 1 } });
+        await hero.walkTo(heapFront.x, heapFront.z); await hero.place(HEAP.clone(), 0);
         await fadeAway(ctx.held);
       },
       say: "<b>Overflow.</b> The push stops here and nothing changes: top stays 2. He puts crate 5 back." },
@@ -155,12 +157,12 @@ const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside t
     { line: 20, get vars() { return vars({ top: 1, items: { items: [4, 7, null], top: 1, addr }, x: 99 }); },
       act: async () => { S.items[2] = null; s.crates.length = 2; moveTop(1); trial.write(); await hero.wait(0.7); },
       say: "<b>top = top - 1</b>: TOP slides down to <b>1</b>. Crate 7 is the top now." },
-    { line: 21, get vars() { return vars({ a: 99 }); }, act: async () => { S.ret.a = 99; await setAside(ctx.held); },
-      say: "<b>return x</b>: so <b>a = 99</b>. He sets it aside.",
+    { line: 21, ret: "a = 99", get vars() { return vars({ a: 99 }); }, act: async () => { S.ret.a = 99; await setAside(ctx.held, "a", 0); },
+      say: "<b>return x</b>: so <b>a = 99</b>. He sets it on the Return Bench, under a slate that says so.",
       quiz: { q: "After that pop, what is top?", options: ["-1", "1", "2"], answer: 1, why: "Yes: <b>top = 2 - 1 = 1</b>. Crate 7 sits in slot [1], on top." } },
-    { line: 30, get vars() { return vars({ b: 7 }); }, act: () => quickPop("b"),
+    { line: 30, ret: "b = 7", get vars() { return vars({ b: 7 }); }, act: () => quickPop("b", 1),
       say: "<b>b = pop()</b>: check, take items[1] — the 7 — and top drops to 0." },
-    { line: 31, get vars() { return vars({ c: 4 }); }, act: () => quickPop("c"),
+    { line: 31, ret: "c = 4", get vars() { return vars({ c: 4 }); }, act: () => quickPop("c", 2),
       say: "<b>c = pop()</b>: the 4. top is <b>-1</b> again: empty." },
     { line: 32, get vars() { return vars(); }, act: async () => {
         await hero.walkTo(stand.x, stand.z); await hero.face(s.x, s.z);
@@ -168,8 +170,12 @@ const stand = new THREE.Vector3(s.x + 0.66, QUAY_TOP, s.z + 0.02);   // beside t
         await hero.reachFor(trial.slot(s, 0));
       },
       say: "<b>d = pop()</b>: one too many. Check: is <b>top == -1</b>? <b>Yes.</b> He reaches for a crate that is not there." },
-    { line: 16, out: "Underflow", get vars() { return vars({ d: -1 }); }, act: async () => { await hero.wait(0.6); },
-      say: "<b>Underflow.</b> There was nothing to take, so pop() returns <b>-1</b> as a warning." },
+    { line: 16, out: "Underflow", ret: "d = -1", get vars() { return vars({ d: -1 }); }, act: async () => {
+        await director.siren({ title: "STACK UNDERFLOW", sub: "pop(): s is empty (top = -1). Nothing to take.", lineNo: 16, lineText: 'printf("Underflow");', focus: { x: s.x, z: s.z, y: QUAY_TOP } });
+        bench.tag(3, "d = -1", { bad: true });
+        await hero.wait(1.2);
+      },
+      say: "<b>Underflow.</b> There was nothing to take, so pop() returns <b>-1</b> as a warning — chalked in red on the last slate." },
     { line: 33, get vars() { return vars({ d: -1 }); }, act: async () => { await hero.wait(0.3); },
       say: "That is the whole stack: <b>an array, one index called top, and two checks</b> — before you push, and before you pop. Now the harbour will test you." }
   ];

@@ -85,6 +85,7 @@ export class Hero {
     this.speed = 1.35;                       // a measured, kingly walk (m/s)
     this.carrying = null;                    // the crate in his hands
     this.grip = { crate: null, w: 0 };       // what his hands hold, and how strongly IK pulls them there (0..1)
+    this.pace = 1;                           // how fast he does everything (the player's pace dial)
   }
 
   async load(dir = "assets/odysseus/") {
@@ -152,7 +153,7 @@ export class Hero {
   over(seconds, fn) {
     return new Promise(res => {
       let t = 0;
-      const u = { update: dt => { t += dt; const k = Math.min(1, t / seconds); fn(k); if (k >= 1) { this.world.updaters.splice(this.world.updaters.indexOf(u), 1); res(); } } };
+      const u = { update: dt => { t += dt * this.pace; const k = Math.min(1, t / seconds); fn(k); if (k >= 1) { this.world.updaters.splice(this.world.updaters.indexOf(u), 1); res(); } } };
       this.world.add(u);
     });
   }
@@ -298,7 +299,7 @@ export class Hero {
 
   update(dt) {
     if (!this.mixer) return;
-    this.mixer.update(dt);
+    this.mixer.update(dt * this.pace);
     if (this.carrying) { this.carrySpot(this.carrying.position); this.carrying.rotation.y = this.group.rotation.y; }
     const g = this.grip;
     if (g.crate && g.w > 0) {

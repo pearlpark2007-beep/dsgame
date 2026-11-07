@@ -60,6 +60,74 @@ export class Director {
     w.timeScale = before;
   }
 
+  // slam a stencil stamp on screen: STACK OVERFLOW, THE AMPHORA IS HIS, ...
+  // kind: "bad" (red), "good" (gold), "info" (cream)
+  async stamp(title, sub = "", { kind = "bad", seconds = 2.4 } = {}) {
+    if (!this.stampEl) {
+      this.stampEl = document.createElement("div"); this.stampEl.className = "stamp";
+      this.stampEl.innerHTML = "<div class='st-t'></div><div class='st-s'></div>";
+      document.body.appendChild(this.stampEl);
+    }
+    const el = this.stampEl;
+    el.querySelector(".st-t").textContent = title;
+    el.querySelector(".st-s").innerHTML = sub;
+    el.className = "stamp " + kind + (title.length > 18 ? " long" : "");
+    void el.offsetWidth;
+    el.classList.add("on");
+    if (kind === "bad") { document.body.classList.remove("jolt"); void document.body.offsetWidth; document.body.classList.add("jolt"); }
+    if (this.skipping) seconds = 0.05;
+    await this._wait(seconds);
+    el.classList.remove("on");
+  }
+
+  // Kill Bill siren: red flash, a wailing whistle, and a split screen. Left half: the line of code
+  // that did it, big. Right half: the live scene, framed on the pile it happened to. Then a caption.
+  //   opts: { title, sub, lineNo, lineText, focus: {x, z, y}, seconds }
+  async siren({ title, sub = "", lineNo = 0, lineText = "", focus = null, seconds = 3.4 }) {
+    if (!this.sirenEl) {
+      const el = this.sirenEl = document.createElement("div"); el.className = "siren";
+      el.innerHTML = "<div class='sr-flash'></div><div class='sr-left'><div class='sr-tag'>THE LINE</div><div class='sr-code'><span class='sr-n'></span><span class='sr-t'></span></div><div class='sr-mark'></div></div><div class='sr-cap'><div class='sr-title'></div><div class='sr-sub'></div></div>";
+      document.body.appendChild(el);
+    }
+    const el = this.sirenEl, cam = this.cam;
+    el.querySelector(".sr-n").textContent = lineNo > 0 ? lineNo : "";
+    el.querySelector(".sr-t").textContent = lineText || "";
+    el.querySelector(".sr-mark").textContent = lineNo > 0 ? "\u25B2 here" : "";
+    el.querySelector(".sr-title").textContent = title;
+    el.querySelector(".sr-sub").textContent = sub;
+    // remember the shot, then frame the pile in the right half of the picture
+    const before = { pos: cam.position.clone(), look: this.look.clone(), fov: cam.fov, view: cam.view ? { ...cam.view } : null, mode: this.mode };
+    const panel = document.body.classList.contains("side-panel") && innerWidth > 900 ? 460 : 0;
+    const W = innerWidth - panel, H = innerHeight;
+    el.style.width = W + "px";
+    if (focus) {
+      this.cut([focus.x + 1.5, (focus.y ?? 1.4) + 1.6, focus.z + 3.6], [focus.x, (focus.y ?? 1.4) + 0.9, focus.z], 40);
+      cam.setViewOffset(innerWidth, H, innerWidth / 2 - 0.75 * W, 0, innerWidth, H);
+    }
+    el.className = "siren on";
+    this._whistle();
+    document.body.classList.remove("jolt"); void document.body.offsetWidth; document.body.classList.add("jolt");
+    await this._wait(this.skipping ? 0.05 : seconds);
+    el.className = "siren";
+    // back to the shot from before
+    cam.position.copy(before.pos); this.look.copy(before.look); this.setFov(before.fov); this.mode = before.mode;
+    if (before.view && before.view.enabled) cam.setViewOffset(before.view.fullWidth, before.view.fullHeight, before.view.offsetX, before.view.offsetY, before.view.width, before.view.height);
+    else cam.clearViewOffset();
+  }
+  // a two-note siren wail made on the spot (no sound file); quiet, and silent if audio is not allowed yet
+  _whistle() {
+    try {
+      const A = this.audio ||= new (window.AudioContext || window.webkitAudioContext)();
+      if (A.state === "suspended") A.resume();
+      const o = A.createOscillator(), g = A.createGain(), t = A.currentTime;
+      o.type = "sine";
+      [[0, 880], [0.35, 1320], [0.7, 880], [1.05, 1320], [1.4, 990]].forEach(([dt, f]) => o.frequency.linearRampToValueAtTime(f, t + dt + 0.12));
+      o.frequency.setValueAtTime(880, t);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.06, t + 0.05); g.gain.setValueAtTime(0.06, t + 1.4); g.gain.linearRampToValueAtTime(0, t + 1.8);
+      o.connect(g).connect(A.destination); o.start(t); o.stop(t + 1.85);
+    } catch { /* no audio: the picture still tells it */ }
+  }
+
   _wait(seconds) { return this._move(seconds, () => {}, true); }
   _move(seconds, fn, realTime = false) { return new Promise(res => this.moves.push({ t: 0, d: Math.max(seconds, 1e-3), fn, res, realTime })); }
 
@@ -90,6 +158,37 @@ css.textContent = `
 .name-card.on { opacity: 1; transform: none; }
 .nc-name { font-family: Anton, 'Inter Display Black', Impact, sans-serif; font-size: clamp(48px, 8vw, 96px); line-height: 0.9; color: #f2c230; text-transform: uppercase;
            text-shadow: 4px 4px 0 #7e1a0f, 0 0 30px rgba(0,0,0,0.6); }
+.stamp { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(1.6) rotate(-4deg); z-index: 31; pointer-events: none; opacity: 0;
+         text-align: center; transition: opacity 0.15s, transform 0.22s cubic-bezier(.2,1.6,.4,1); max-width: 80vw; }
+.stamp.on { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-4deg); }
+@media (min-width: 901px) { body.side-panel .stamp { left: calc(50% - 230px); max-width: calc(90vw - 460px); } }
+.st-t { font-family: 'Allerta Stencil', Anton, Impact, sans-serif; font-size: clamp(40px, 7vw, 92px); letter-spacing: 3px; line-height: 1;
+        padding: 6px 22px; border: 6px solid currentColor; display: inline-block; }
+.st-s { margin-top: 12px; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace; font-size: clamp(14px, 1.6vw, 20px); color: #f3e6c8; text-shadow: 2px 2px 0 #000; }
+.stamp.bad .st-t { color: #e0442a; text-shadow: 0 0 18px rgba(0,0,0,0.6); background: rgba(20,6,4,0.55); }
+.stamp.good .st-t { color: #f2c230; background: rgba(20,14,4,0.55); }
+.siren { position: fixed; left: 0; top: 0; bottom: 0; z-index: 36; pointer-events: none; display: none; }
+.siren.on { display: block; }
+.siren .sr-flash { position: fixed; inset: 0; background: #d0180c; mix-blend-mode: multiply; animation: srflash 0.9s steps(2, end) 2; opacity: 0; }
+@keyframes srflash { 0% { opacity: 0.85; } 50% { opacity: 0.1; } 100% { opacity: 0; } }
+.siren .sr-left { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: #0b0605; border-right: 4px solid #e8c21c; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center; padding: 0 5%; animation: srslide 0.25s cubic-bezier(.2,.9,.3,1); }
+@keyframes srslide { from { transform: translateX(-100%); } to { transform: none; } }
+.siren .sr-tag { font-family: 'Courier Prime', monospace; letter-spacing: 6px; color: #e8c21c; font-size: 14px; margin-bottom: 14px; }
+.siren .sr-code { font-family: 'Courier Prime', 'Courier 10 Pitch', monospace; font-size: clamp(18px, 2.4vw, 34px); color: #f3e6c8; line-height: 1.3; word-break: break-word; }
+.siren .sr-n { color: #e0442a; margin-right: 18px; }
+.siren .sr-mark { margin-top: 10px; color: #e0442a; font-family: 'Courier Prime', monospace; font-size: 18px; padding-left: 2.2em; }
+.siren .sr-cap { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; }
+.siren .sr-title { display: inline-block; background: #e8c21c; color: #0b0605; font-family: Anton, 'Inter Display Black', Impact, sans-serif; font-size: clamp(34px, 6vw, 80px);
+  letter-spacing: 3px; line-height: 1; padding: 8px 26px 4px; text-transform: uppercase; animation: srtitle 0.3s 0.2s both cubic-bezier(.2,1.5,.4,1); }
+@keyframes srtitle { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.siren .sr-sub { margin-top: 10px; font-family: 'Courier Prime', monospace; font-size: clamp(14px, 1.6vw, 20px); color: #f3e6c8; text-shadow: 2px 2px 0 #000; }
+.stamp.good { top: 74%; }
+.stamp.good .st-t { font-size: clamp(30px, 4.6vw, 64px); white-space: nowrap; }
+.stamp.long .st-t { font-size: clamp(28px, 4.2vw, 56px); }
+.stamp.info .st-t { color: #efe1c2; background: rgba(10,8,6,0.55); font-size: clamp(30px, 5vw, 64px); }
+body.jolt canvas { animation: jolt 0.4s; }
+@keyframes jolt { 0%,100% { transform: none; } 25% { transform: translate(-9px, 4px); } 50% { transform: translate(8px, -5px); } 75% { transform: translate(-4px, 2px); } }
 .nc-sub { margin-top: 10px; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace; font-size: clamp(14px, 1.6vw, 20px); color: #f3e6c8; text-shadow: 2px 2px 0 #000; max-width: 560px; }
 `;
 document.head.appendChild(css);

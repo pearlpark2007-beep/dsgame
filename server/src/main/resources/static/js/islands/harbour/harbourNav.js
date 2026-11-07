@@ -26,7 +26,15 @@ export function buildHarbourNav(trial) {
   // the King's law board and the harbour manifest
   box(-9.6, 4.6, 3.3, 0.35, 0.55);
   box(6.2, -0.4, 2.1, 0.7, -0.45);
-  // the trial piles and their gauge posts
-  for (const p of Object.values(trial.piles)) { box(p.x, p.z, 0.62, 0.48); circle(p.x - 0.78, p.z - 0.05, 0.22); }
+  setPileObstacles(nav, trial);
   return nav;
+}
+
+// the trial piles and their gauge posts (called again whenever a trial rebuilds its piles)
+export function setPileObstacles(nav, trial) {
+  for (const id of [...nav.obstacles.keys()]) if (id.startsWith("pile-")) nav.remove(id);
+  for (const p of Object.values(trial.piles)) {
+    nav.addBox("pile-" + p.name, p.x, p.z, 0.62, 0.48);
+    nav.addCircle("pile-" + p.name + "-gauge", p.x - 0.78, p.z - 0.05, 0.22);
+  }
 }

@@ -44,9 +44,18 @@ export function sprayText(g, text, x, y, font, color, { scatter = 1.6, passes = 
 // ---------- stencilled crate face: its value, and its type stamped like a customs mark.
 // (The index and memory address belong to the SLOT, not the crate, so they are painted on the
 //  gauge beside each slot: a value can move between stacks, a slot never moves.)
+// Harbour cargo: in C the crates are plain ints, but some numbers mean something on this island
+// (the same names Java uses in HarbourCargo.java)
+export const CARGO = { 1: "WATER", 2: "BREAD", 3: "WINE", 8: "ROCKS", 77: "AXE" };
 export function crateFaceTexture(value) {
-  const gold = value === 99;
+  const gold = value === 99, name = CARGO[value];
   return canvasTex(512, 256, (g, w, h) => {
+    if (name) {
+      const col = value === 77 ? "#f0a050" : value === 8 ? "#a9a49a" : "#efe3c6";
+      sprayText(g, name, w / 2, h * 0.42, `${name.length > 4 ? 118 : 140}px ${FONTS.stencil}`, col);
+      sprayText(g, "= " + value + "  \u00b7  INT", w / 2, h * 0.86, `34px ${FONTS.stencil}`, "#cdb88f", { scatter: 0.8, passes: 2 });
+      return;
+    }
     sprayText(g, String(value), w / 2, h * 0.45, `150px ${FONTS.stencil}`, gold ? "#2a1606" : "#efe3c6");
     sprayText(g, "INT \u00b7 4 BYTES", w / 2, h * 0.86, `30px ${FONTS.stencil}`, gold ? "#3d2208" : "#cdb88f", { scatter: 0.8, passes: 2 });
   });
@@ -94,25 +103,41 @@ export class StackGauge {
       }), roughness: 0.85 }));
     board.position.set(0, postH + 0.18, 0.02);
     g.add(board);
-    // the TOP pointer: a bronze arrow on a sliding clamp, with a red cloth tag
-    const ptr = this.pointer = new THREE.Group();
-    const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.26), brass);
-    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.32, 4), brass);
-    arrow.rotation.z = side * Math.PI / 2;
-    arrow.position.x = -side * 0.3;
-    const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.2), new THREE.MeshStandardMaterial({
-      map: canvasTex(128, 64, (c, w, h) => { c.fillStyle = "#9c1e14"; c.fillRect(0, 0, w, h); sprayText(c, "TOP", w / 2, h / 2 + 2, `40px ${FONTS.stencil}`, "#f6e7c8", { passes: 3 }); }),
-      side: THREE.DoubleSide, roughness: 0.9 }));
-    tag.position.set(side * 0.05, -0.2, 0.15);
-    tag.rotation.z = 0.12;
-    ptr.add(clamp, arrow, tag);
+    // the TOP pointer: a small cargo crane. Its arm reaches out over the pile, and the hook hangs just
+    // above the top crate with a tag clipped to the rope: "TOP [2]". A crane can only grab the crate
+    // on top, which is exactly the stack rule. The hook drops to the stones when the pile is empty.
+    const over = -side * 0.78;                       // the pile's centre, seen from this post
+    this.jibY = postH + 0.62; this.over = over;
+    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), wood); mast.position.y = postH + 0.3; g.add(mast);
+    const jib = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(over) + 0.3, 0.09, 0.09), wood);
+    jib.position.set(over / 2, this.jibY, 0); g.add(jib);
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.06), wood);
+    brace.position.set(over * 0.3, this.jibY - 0.2, 0); brace.rotation.z = side * 0.75; g.add(brace);
+    const pulley = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.05, 16), brass);
+    pulley.rotation.x = Math.PI / 2; pulley.position.set(over, this.jibY - 0.07, 0); g.add(pulley);
+    const ropeGeo = new THREE.CylinderGeometry(0.011, 0.011, 1, 6); ropeGeo.translate(0, -0.5, 0);
+    this.rope = new THREE.Mesh(ropeGeo, new THREE.MeshStandardMaterial({ color: 0xb59a6a, roughness: 1 }));
+    this.rope.position.set(over, this.jibY - 0.07, 0); g.add(this.rope);
+    const ptr = this.pointer = new THREE.Group();          // the hook and its tag; moves up and down
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.016, 8, 16, Math.PI * 1.4), brass);
+    hook.rotation.z = Math.PI * 0.8; hook.position.y = -0.04;
+    const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8), brass); shank.position.y = 0.04;
+    this.tagCanvas = document.createElement("canvas"); this.tagCanvas.width = 256; this.tagCanvas.height = 160;
+    this.tagTex = new THREE.CanvasTexture(this.tagCanvas); this.tagTex.colorSpace = THREE.SRGBColorSpace;
+    this.tagMat = new THREE.MeshStandardMaterial({ map: this.tagTex, roughness: 0.8, emissive: 0xffffff, emissiveMap: this.tagTex, emissiveIntensity: 0.35, side: THREE.DoubleSide });
+    const tag = this.tag = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.35, 0.02), this.tagMat);
+    tag.position.set(0, 0.32, 0.02);
+    ptr.add(hook, shank, tag);
+    ptr.position.x = over;
     g.add(ptr);
+    this.side = side; this.swing = 0; this.stowed = false;
     g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(g);
     this.top = -1;
     this.setTop(-1, true);
   }
-  yFor(top) { return top < 0 ? 0.16 : (top + 0.5) * this.h; }
+  // the hook rests just above the top crate (crates sit with their base on the slot)
+  yFor(top) { return (top + 1) * this.h + 0.14; }
   // light a slot's brass notch: "check" (gold, a comparison is being made), "full" (red: overflow),
   // "empty" (red at the -1 mark: underflow). It fades by itself.
   flash(kind, index = this.top) {
@@ -123,19 +148,41 @@ export class StackGauge {
   }
   // move the pointer; returns a promise-friendly target so callers can animate it
   setTop(top, instant = false) {
+    const moved = top !== this.top;
     this.top = top;
     this.target = this.yFor(top);
+    this._drawTag();
     if (instant) this.pointer.position.y = this.target;
+    else if (moved) this.swing = 0.35;                // the hook swings a little after it moves
+  }
+  // raise the hook out of the way (while he climbs the pile), or lower it back
+  stow(on) { this.stowed = on; }
+  // hoist the hook a little so a crate can go on, or come off, under it
+  makeRoom(on) { this.room = on; }
+  _drawTag() {
+    const c = this.tagCanvas.getContext("2d"), w = c.canvas.width, h = c.canvas.height, empty = this.top < 0;
+    c.fillStyle = "#2b1d14"; c.fillRect(0, 0, w, h);
+    c.strokeStyle = empty ? "#c8261a" : "#f0c33c"; c.lineWidth = 10; c.strokeRect(5, 5, w - 10, h - 10);
+    sprayText(c, "TOP", w / 2, h * 0.36, `66px ${FONTS.stencil}`, empty ? "#f2a07a" : "#f0c33c", { passes: 3 });
+    sprayText(c, empty ? "-1  empty" : "[" + this.top + "]", w / 2, h * 0.76, `48px ${FONTS.type}`, empty ? "#f2a07a" : "#efe1c2", { passes: 2 });
+    this.tagTex.needsUpdate = true;
   }
   update(dt) {
-    this.pointer.position.y += (this.target - this.pointer.position.y) * Math.min(1, dt * 8);
+    const want = this.stowed ? this.jibY - 0.45 : this.target + (this.room ? 0.62 : 0);   // hoisted while he works the pile
+    this.pointer.position.y += (want - this.pointer.position.y) * Math.min(1, dt * 6);
+    this.rope.scale.y = Math.max(0.02, this.jibY - 0.07 - (this.pointer.position.y + 0.09));
+    if (this.swing > 0) this.swing = Math.max(0, this.swing - dt * 0.35);
+    this.pointer.rotation.z = Math.sin(performance.now() * 0.006) * this.swing * 0.5;
     for (const f of this.flashes || []) {
       f.t += dt;
       const k = Math.max(0, 1 - f.t / f.d) * (0.6 + 0.4 * Math.sin(f.t * 22));
       f.plate.material.emissive.copy(f.color).multiplyScalar(k * 2.2);
     }
     this.flashes = (this.flashes || []).filter(f => f.t < f.d || (f.plate.material.emissive.setRGB(0, 0, 0), false));
-    if (this.shake > 0) { this.shake -= dt; this.pointer.position.x = Math.sin(this.shake * 60) * 0.03 * this.shake; } else this.pointer.position.x = 0;
+    if (this.shake > 0) { this.shake -= dt; this.pointer.position.x = this.over + Math.sin(this.shake * 60) * 0.04 * this.shake; } else this.pointer.position.x = this.over;
+    // a red tag while a check fails (overflow / underflow), gold otherwise
+    const red = (this.flashes || []).some(f => f.color.r > 0.9 && f.color.g < 0.5);
+    this.tagMat.emissive.setRGB(1, red ? 0.25 : 1, red ? 0.15 : 1); this.tagMat.emissiveIntensity = red ? 0.9 : 0.35;
   }
 }
 
@@ -200,3 +247,4 @@ export class Manifest {
     this.tex.needsUpdate = true;
   }
 }
+

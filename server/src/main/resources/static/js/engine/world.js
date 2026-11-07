@@ -125,7 +125,7 @@ export class World {
 
   // One frame: move everything forward by `raw` seconds, then draw.
   step(raw, draw = true) {
-    const dt = raw * this.timeScale;
+    const dt = raw * this.timeScale * (this.pace || 1);      // pace: the player's chosen speed
     this.time += dt;
     for (const u of [...this.updaters]) u.update && u.update(dt, this.time, raw);   // a copy: updaters may remove themselves
     if (this.onFrame) this.onFrame(dt, this.time, raw);

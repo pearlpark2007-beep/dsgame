@@ -1,8 +1,7 @@
 package com.dsgame.server.game;
 
-// the three difficulty tiers every island offers
+// the part a level plays on its island
 public enum Tier {
-    NOVICE,   // fill in a line or two, with a hint
-    ADEPT,    // write the whole solution from a starter
-    HERO      // tighter rules: no hint, fewer resources, a move limit
+    PRACTICE,   // a warm-up that uses every operation once, for a real reason in the story
+    FINALE      // the island's last challenge: solving it plays the ending
 }

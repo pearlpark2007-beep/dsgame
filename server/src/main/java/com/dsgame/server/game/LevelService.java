@@ -1,8 +1,7 @@
 package com.dsgame.server.game;
 
-import com.dsgame.server.game.levels.harbour.AmphoraLevel;
-import com.dsgame.server.game.levels.harbour.BuriedAmphoraLevel;
-import com.dsgame.server.game.levels.harbour.NarrowDockLevel;
+import com.dsgame.server.game.levels.harbour.LoadTheShipLevel;
+import com.dsgame.server.game.levels.harbour.TheChainLevel;
 import com.dsgame.server.lang.CodeRunner;
 import com.dsgame.server.lang.Interpreter;
 import com.dsgame.server.lang.Outcome;
@@ -22,9 +21,8 @@ public class LevelService {
 
     public LevelService() {
         // the Laestrygonian Harbour (stack)
-        register(new AmphoraLevel());
-        register(new BuriedAmphoraLevel());
-        register(new NarrowDockLevel());
+        register(new LoadTheShipLevel());   // practice
+        register(new TheChainLevel());      // finale
     }
 
     private void register(Level level) {
@@ -71,12 +69,12 @@ public class LevelService {
             return new RunResult(Outcome.GOAL_NOT_MET, goal.message(), -1, result.steps());
         }
 
-        // Hero tier: the goal was reached, but was it reached within the move limit?
+        // a level with a move limit: the goal was reached, but was it reached within the limit?
         int moves = Level.countMoves(result.steps());
         if (level.getMaxMoves() > 0 && moves > level.getMaxMoves()) {
             return new RunResult(Outcome.GOAL_NOT_MET,
-                    "The amphora is on top, but it took " + moves + " moves. The tide allows only "
-                            + level.getMaxMoves() + ".", -1, result.steps());
+                    "The goal was reached, but it took " + moves + " moves. Only "
+                            + level.getMaxMoves() + " are allowed.", -1, result.steps());
         }
         return new RunResult(Outcome.SUCCESS, goal.message(), -1, result.steps());
     }

@@ -26,7 +26,10 @@ const css = `
 #athena-learn .cell { width: 52px; text-align: center; border: 1px solid #4a3826; padding: 3px 0; font-size: 12px; }
 #athena-learn .cell .v { font-size: 15px; color: #efe1c2; min-height: 18px; } #athena-learn .cell .i { color: #8c7c66; font-size: 11px; }
 #athena-learn .cell.top { border-color: #e0644a; box-shadow: 0 0 0 1px #e0644a inset; }
-#athena-learn .out { margin: 10px 14px 0; font-size: 13px; color: #e0644a; min-height: 18px; }
+#athena-learn .out { margin: 10px 14px 0; padding: 6px 10px; background: #050403; border: 1px solid #2f2116; font-size: 13px; min-height: 22px; max-height: 92px; overflow: auto; }
+#athena-learn .out .h { color: #8c7c66; font-size: 11px; letter-spacing: 2px; }
+#athena-learn .out .l { color: #cfe8b8; } #athena-learn .out .l.err { color: #ff6a50; font-weight: 700; } #athena-learn .out .l.new { animation: blink 0.5s 3; }
+@keyframes blink { 50% { background: rgba(242,194,48,0.25); } }
 #athena-learn .say { margin: 12px 14px 0; padding: 12px 14px; background: #efe1c2; color: #1d140c; font-size: 15px; line-height: 1.45; border-radius: 2px; min-height: 64px; }
 #athena-learn .quiz { margin: 10px 14px 0; display: none; flex-direction: column; gap: 6px; }
 #athena-learn .quiz.on { display: flex; }
@@ -79,6 +82,15 @@ export class LessonPlayer {
     this.onKey = e => { if (e.key === "ArrowRight" || e.key === "Enter") this.next(); };
   }
 
+  // the program's output: everything printf() prints and every value a call returns, kept in order
+  print(line, { err = false } = {}) {
+    const box = this.el.querySelector(".out");
+    if (!box.children.length) box.innerHTML = `<div class="h">STDOUT</div>`;
+    box.querySelectorAll(".new").forEach(n => n.classList.remove("new"));
+    const d = document.createElement("div"); d.className = "l new" + (err ? " err" : ""); d.textContent = "> " + line;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+  }
+
   open() { requestAnimationFrame(() => this.el.classList.add("on")); addEventListener("keydown", this.onKey); return this.done; }
 
   setVars(v) {
@@ -103,7 +115,8 @@ export class LessonPlayer {
     this.lines.forEach((l, k) => l.classList.toggle("on", k + 1 === st.line));
     if (st.line) this.lines[st.line - 1].scrollIntoView({ block: "nearest", behavior: "smooth" });
     this.el.querySelector(".say").innerHTML = st.say || "";
-    this.el.querySelector(".out").textContent = st.out ? "> " + st.out : "";
+    if (st.out) this.print(st.out, { err: /flow/i.test(st.out) });
+    if (st.ret) this.print(st.ret);
     this.el.querySelector(".prog").textContent = `step ${this.i + 1} of ${this.steps.length}`;
     this.setVars(st.vars);
     if (st.act) await st.act();

@@ -31,6 +31,7 @@
   #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
           font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
   #fast.on { display: flex; }
+  @media (min-width: 901px) { body.side-panel #line { right: calc(460px + 3%); } body.side-panel #skip { right: 480px; } }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
@@ -56,8 +57,11 @@ import { loadFonts } from "./js/islands/harbour/dsProps.js";
 import { TrialSet, CRATE_H } from "./js/islands/harbour/trialSet.js";
 import { buildTechProps } from "./js/islands/harbour/techProps.js";
 import { buildHarbourNav } from "./js/islands/harbour/harbourNav.js";
+import { TrialMode } from "./js/islands/harbour/trialMode.js";
 import { TAGS } from "./js/story/tags.js";
 import { stackLesson } from "./js/islands/harbour/stackLesson.js";
+import { ReturnBench } from "./js/islands/harbour/returnBench.js";
+import { Pace } from "./js/engine/pace.js";
 
 const params = new URLSearchParams(location.search);
 manager.onProgress = (url, done, total) => { document.getElementById("bar").style.width = (done / total * 100) + "%"; };
@@ -69,11 +73,19 @@ const harbour = await buildHarbour(world);
 buildTechProps(world, harbour);
 
 // ---------- the trial area: three stacks, exactly as Java would describe them
+// every crate numbered 99 carries the golden amphora
+function withAmphora(c, value) {
+  if (value !== 99) return;
+  const amph = goldenAmphora(harbour.models.amphora);
+  amph.scale.set(1.25 / 0.51, 1.25 / 1.1, 1.25 / 0.85);      // undo the crate's stretch so the jar keeps its shape
+  amph.position.y = CRATE_H / 1.1;
+  c.add(amph);
+}
 const trial = new TrialSet(world, harbour.models.crate, [
   { name: "s", capacity: 3, initial: [4, 7] },
   { name: "t", capacity: 3, initial: [3] },
   { name: "u", capacity: 1, initial: [] }
-]);
+], { decorate: withAmphora });
 const { s, t, u } = trial.piles;
 // two low wooden trestles: where loose crates rest (he cannot lift from the bare ground)
 const TRESTLE_H = 0.35;
@@ -86,25 +98,24 @@ function trestle(x, z) {
   return new THREE.Vector3(x, QUAY_TOP + TRESTLE_H, z);
 }
 const HEAP = trestle(-3.0, 1.55);      // the golden crate waits here
-const DROP = trestle(1.5, 1.45);       // where "x" is set down
+// the Return Bench: popped values are set here, under a slate naming the variable
+const bench = new ReturnBench(world, { x: 1.3, z: 1.5, slots: 4 });
 // the golden amphora's crate
 const prize = trial.newCrate(99);
-const amph = goldenAmphora(harbour.models.amphora);
-amph.scale.set(1.25 / 0.51, 1.25 / 1.1, 1.25 / 0.85);      // undo the crate's stretch so the jar keeps its shape
-amph.position.y = CRATE_H / 1.1;
-prize.add(amph);
 prize.position.copy(HEAP);
 
 // ---------- Odysseus, who walks only where the harbour lets him
 const nav = buildHarbourNav(trial);
 nav.addBox("trestle-heap", HEAP.x, HEAP.z, 0.8, 0.6);
-nav.addBox("trestle-drop", DROP.x, DROP.z, 0.8, 0.6);
+nav.addBox("bench", 1.3, 1.5, 4 * 0.78 + 0.2, 0.62);
 const hero = await new Hero(world, { nav, groundY: QUAY_TOP }).load();
+trial.hero = hero;                    // the cranes watch him, to hoist their hooks out of his way
 const START = new THREE.Vector3(13.5, QUAY_TOP, -15);
 hero.group.position.copy(START);
 
 // ---------- camera
 const director = new Director(world);
+const pace = new Pace(world);          // the player's speed control for Odysseus (+/- or the [ and ] keys)
 const controls = new OrbitControls(world.camera, world.renderer.domElement);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.495; controls.enabled = false;
 const free = on => { controls.enabled = on; director.mode = null; director.paused = on; if (on) controls.target.copy(director.look); };
@@ -164,8 +175,9 @@ async function play() {
   await hero.lift(top);
   trial.popped(s);
   director.follow(hero.group, { side: 2.4, up: 1.5, back: 4.4, lookUp: 1.1, lag: 2.2, fov: 40 });
-  P.copy(front(DROP, 0.78)); await hero.walkTo(P.x, P.z);
-  await hero.place(DROP.clone());
+  P.copy(bench.front(0)); await hero.walkTo(P.x, P.z);
+  await hero.place(bench.slot(0), 0);
+  bench.tag(0, "x = 99");
   // 6. push(&u, x): lift it again and set it on u, the narrow pile
   codeLine("push(&u, x);");
   await hero.lift(top);
@@ -173,10 +185,12 @@ async function play() {
   trial.pushed(u, await hero.place(trial.slot(u, 0)));
   await hero.wait(0.6);
   // 7. he climbs s for a better look, and slips (a taste of the failure cinematics)
+  skipper.land();                                  // skip lands here, just before the climb
   codeLine("// climb s ... the tower is too short");
   P.copy(trial.climbSpot(s)); await hero.walkTo(P.x, P.z);
   director.mode = null;
   director.glide([s.x + 2.8, 1.6, 2.6], [s.x, 2.3, s.z], 40, 1.0);
+  s.gauge.stow(true);                              // the crane hook swings up out of his way
   await hero.climb(s.crates.length * CRATE_H, new THREE.Vector3(s.x, 0, s.z));
   await hero.wait(0.5);
   world.timeScale = skipping ? 40 : 0.45;          // slow motion for the fall (unless skipping)
@@ -200,22 +214,33 @@ addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
 // ---------- HUD
 const hud = document.getElementById("hud");
 const pb = document.createElement("button"); pb.textContent = "▶ play scene"; pb.className = "play"; pb.onclick = () => { if (!busy) location.search = ""; }; hud.appendChild(pb);
-const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) lesson(); }; hud.appendChild(lb);
+const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) { trials.close(); lesson(); } }; hud.appendChild(lb);
+const tb = document.createElement("button"); tb.textContent = "the trials"; tb.onclick = () => { if (!busy && !inLesson) trialsOpen(); }; hud.appendChild(tb);
 Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
 const qb = document.createElement("button");
 const showQ = () => qb.textContent = "quality: " + world.quality;
 qb.onclick = () => { world.autoQuality = false; world.quality = world.quality === "high" ? "low" : "high"; world.applyQuality(); showQ(); };
 hud.appendChild(qb);
 let busy = false;
-async function run() {
-  busy = true; skipBtn.classList.add("on");
-  try { await play(); }
-  finally {
+const skipper = {
+  begin() { busy = true; skipBtn.classList.add("on"); },
+  // stop fast-forwarding here (skip jumps to the moment before an ending, the ending itself plays)
+  land() {
+    if (!skipping) return;
+    skipping = false; director.skipping = false; world.timeScale = 1;
+    fastEl.classList.remove("on");
+  },
+  end() {
     busy = false; skipping = false; director.skipping = false; world.timeScale = 1;
     fastEl.classList.remove("on"); skipBtn.classList.remove("on");
     document.getElementById("chapter").style.opacity = 0;
     director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
   }
+};
+async function run() {
+  skipper.begin();
+  try { await play(); }
+  finally { skipper.end(); }
   await lesson();
 }
 
@@ -233,23 +258,39 @@ async function lesson() {
   const sp = trial.standSpot(s);
   hero.teleport(sp.x + 1.2, sp.z + 1.0, Math.PI);
   // the panel covers the right of the screen, so shift the picture's centre to the left
-  const shift = () => { const w = innerWidth, h = innerHeight; if (w > 900) world.camera.setViewOffset(w, h, 230, 0, w, h); else world.camera.clearViewOffset(); };
+  const shift = () => { const w = innerWidth, h = innerHeight; document.body.classList.add("side-panel"); if (w > 900) world.camera.setViewOffset(w, h, 230, 0, w, h); else world.camera.clearViewOffset(); };
   shift(); addEventListener("resize", shift);
   director.cut([s.x + 1.7, 2.25, 4.6], [s.x + 0.2, 1.2, -1.5], 44);
   document.getElementById("chapter").style.opacity = 0;
   fastEl.classList.remove("on"); fastEl.textContent = "▸▸";
-  const player = stackLesson({ hero, trial, director, HEAP, DROP, newCrate: v => trial.newCrate(v) });
+  bench.clear();
+  const player = stackLesson({ hero, trial, director, HEAP, bench, newCrate: v => trial.newCrate(v) });
   await player.open();
-  removeEventListener("resize", shift); world.camera.clearViewOffset();
-  trial.write("// the trials come next");
-  director.glide([1.2, 3.0, 7.6], [0.2, 2.0, -1.6], 40, 1.2);
+  removeEventListener("resize", shift); world.camera.clearViewOffset(); document.body.classList.remove("side-panel");
   inLesson = false;
+  await trialsOpen();                    // "Now the harbour will test you."
+}
+
+// ---------- the trials: the player's C code, run by Java, acted out by Odysseus
+const shiftForPanel = () => { document.body.classList.add("side-panel"); const w = innerWidth, h = innerHeight; if (w > 900) world.camera.setViewOffset(w, h, 230, 0, w, h); else world.camera.clearViewOffset(); };
+const trials = new TrialMode({
+  world, hero, trial, nav, director, bench, HEAP, codeLine, skipper,
+  skipping: () => skipping,
+  panelView: on => { if (on) shiftForPanel(); else { document.body.classList.remove("side-panel"); world.camera.clearViewOffset(); } },
+  onLesson: () => { trials.close(); removeEventListener("resize", shiftForPanel); lesson(); }
+});
+async function trialsOpen() {
+  free(false);
+  document.getElementById("chapter").style.opacity = 0;
+  [prize].forEach(c => c.parent && c.parent.remove(c));
+  shiftForPanel(); addEventListener("resize", shiftForPanel);
+  await trials.open();
 }
 
 world.onFrame = () => { if (controls.enabled) controls.update(); showQ(); };
 const origUpdate = director.update.bind(director);
 director.update = (dt, time, raw) => { if (!director.paused) origUpdate(dt, time, raw); };
-window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__world = world; window.__hero = hero; window.__director = director;
+window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__trials = () => trialsOpen(); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
 window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
 
 const loading = document.getElementById("loading");
