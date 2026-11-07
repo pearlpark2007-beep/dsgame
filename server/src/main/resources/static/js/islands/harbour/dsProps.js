@@ -41,22 +41,23 @@ export function sprayText(g, text, x, y, font, color, { scatter = 1.6, passes = 
   g.globalAlpha = 1;
 }
 
-// ---------- stencilled crate face: value, index and the slot's memory address
-export function crateFaceTexture(value, index, address) {
+// ---------- stencilled crate face: its value, and its type stamped like a customs mark.
+// (The index and memory address belong to the SLOT, not the crate, so they are painted on the
+//  gauge beside each slot: a value can move between stacks, a slot never moves.)
+export function crateFaceTexture(value) {
   const gold = value === 99;
   return canvasTex(512, 256, (g, w, h) => {
-    sprayText(g, String(value), w / 2, h * 0.44, `140px ${FONTS.stencil}`, gold ? "#2a1606" : "#efe3c6");
-    sprayText(g, "[" + index + "]", w * 0.16, h * 0.82, `44px ${FONTS.stencil}`, gold ? "#3d2208" : "#d8c49a", { scatter: 1, passes: 3 });
-    sprayText(g, address, w * 0.8, h * 0.84, `30px ${FONTS.type}`, gold ? "#3d2208" : "#cdb88f", { scatter: 0.6, passes: 2 });
+    sprayText(g, String(value), w / 2, h * 0.45, `150px ${FONTS.stencil}`, gold ? "#2a1606" : "#efe3c6");
+    sprayText(g, "INT \u00b7 4 BYTES", w / 2, h * 0.86, `30px ${FONTS.stencil}`, gold ? "#3d2208" : "#cdb88f", { scatter: 0.8, passes: 2 });
   });
 }
 
 // ---------- the gauge post + top pointer for one pile
 export class StackGauge {
-  constructor(scene, { x, y, z, capacity, crateHeight, name, side = -1 }) {
+  constructor(scene, { x, y, z, capacity, crateHeight, name, side = -1, base = 0x2A0 }) {
     this.scene = scene; this.capacity = capacity; this.h = crateHeight; this.y0 = y;
     const g = this.group = new THREE.Group();
-    g.position.set(x + side * 1.18, y, z - 0.05);
+    g.position.set(x + side * 0.78, y, z - 0.05);
     const wood = new THREE.MeshStandardMaterial({ color: 0x4b3424, roughness: 0.9 });
     const brass = new THREE.MeshStandardMaterial({ color: 0xb08a3e, metalness: 0.85, roughness: 0.35 });
     const postH = capacity * crateHeight + 0.75;
@@ -67,13 +68,16 @@ export class StackGauge {
     // one brass notch per slot, with its index painted beside it
     for (let i = 0; i < capacity; i++) {
       const cy = (i + 0.5) * crateHeight;
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.2), brass);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.2), brass.clone());
       plate.position.set(0, cy, 0);
       g.add(plate);
-      const label = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.17), new THREE.MeshStandardMaterial({
-        map: canvasTex(128, 64, (c, w, h) => sprayText(c, "[" + i + "]", w / 2, h / 2, `38px ${FONTS.stencil}`, "#e8d7b0", { passes: 3 })),
+      (this.plates ||= []).push(plate);
+      // the slot's index and its memory address (4 bytes per int, so addresses go up by 4)
+      const addr = "0x" + (base + i * 4).toString(16).toUpperCase();
+      const label = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.25), new THREE.MeshStandardMaterial({
+        map: canvasTex(192, 96, (c, w, h) => { sprayText(c, "[" + i + "]", w / 2, h * 0.36, `40px ${FONTS.stencil}`, "#e8d7b0", { passes: 3 }); sprayText(c, addr, w / 2, h * 0.8, `24px ${FONTS.type}`, "#cdb88f", { passes: 2, scatter: 0.6 }); }),
         transparent: true, roughness: 0.9 }));
-      label.position.set(0, cy + 0.11, 0.085);
+      label.position.set(side * 0.04, cy + 0.14, 0.085);
       g.add(label);
     }
     // the slot below [0]: where TOP points when the stack is empty
@@ -109,13 +113,30 @@ export class StackGauge {
     this.setTop(-1, true);
   }
   yFor(top) { return top < 0 ? 0.16 : (top + 0.5) * this.h; }
+  // light a slot's brass notch: "check" (gold, a comparison is being made), "full" (red: overflow),
+  // "empty" (red at the -1 mark: underflow). It fades by itself.
+  flash(kind, index = this.top) {
+    const red = kind !== "check";
+    const i = kind === "full" ? this.capacity - 1 : Math.max(0, index);
+    this.flashes = (this.flashes || []).concat({ plate: this.plates[i], t: 0, d: red ? 1.6 : 1.0, color: new THREE.Color(red ? 0xff3a1a : 0xffc23a) });
+    if (red) this.shake = 0.5;
+  }
   // move the pointer; returns a promise-friendly target so callers can animate it
   setTop(top, instant = false) {
     this.top = top;
     this.target = this.yFor(top);
     if (instant) this.pointer.position.y = this.target;
   }
-  update(dt) { this.pointer.position.y += (this.target - this.pointer.position.y) * Math.min(1, dt * 8); }
+  update(dt) {
+    this.pointer.position.y += (this.target - this.pointer.position.y) * Math.min(1, dt * 8);
+    for (const f of this.flashes || []) {
+      f.t += dt;
+      const k = Math.max(0, 1 - f.t / f.d) * (0.6 + 0.4 * Math.sin(f.t * 22));
+      f.plate.material.emissive.copy(f.color).multiplyScalar(k * 2.2);
+    }
+    this.flashes = (this.flashes || []).filter(f => f.t < f.d || (f.plate.material.emissive.setRGB(0, 0, 0), false));
+    if (this.shake > 0) { this.shake -= dt; this.pointer.position.x = Math.sin(this.shake * 60) * 0.03 * this.shake; } else this.pointer.position.x = 0;
+  }
 }
 
 // ---------- a spray-painted stack name on the stones in front of a pile

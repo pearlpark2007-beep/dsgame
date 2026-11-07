@@ -9,38 +9,55 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #06090c; color: #e9e4da; font-family: 'Spectral', Georgia, serif; }
   canvas { display: block; }
   #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-             background: #06090c; z-index: 20; transition: opacity 1.2s; }
-  #loading h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 400; letter-spacing: 8px; font-size: 22px; }
+             background: #06090c; z-index: 40; transition: opacity 1.2s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 30px; color: #f2c230; }
   #loading .bar { width: 260px; height: 2px; background: #1c2429; }
   #loading .bar div { height: 100%; width: 0; background: #c9a227; transition: width 0.3s; }
-  #loading p { margin: 0; font-style: italic; color: #8a979b; font-size: 15px; }
+  #loading p { margin: 0; font-family: 'Courier Prime', monospace; color: #8a979b; font-size: 15px; }
   #hud { position: fixed; left: 16px; bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 10; }
-  #hud button { min-height: 40px; padding: 0 14px; background: rgba(8, 12, 15, 0.7); color: #e9e4da; border: 1px solid #3a4448; border-radius: 6px;
-                font-family: 'Cinzel', serif; font-size: 12px; letter-spacing: 1.5px; cursor: pointer; }
-  #hud button.on { border-color: #c9a227; color: #e8c766; }
+  #hud button { min-height: 40px; padding: 0 14px; background: rgba(8, 12, 15, 0.75); color: #efe1c2; border: 1px solid #4a3a28; border-radius: 4px;
+                font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
+  #hud button.on, #hud button.play { border-color: #f2c230; color: #f2c230; }
   #chapter { position: fixed; left: 6%; top: 15%; pointer-events: none; z-index: 10; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace;
-             font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; }
+             font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; transition: opacity 1.2s; }
   #chapter b { display: block; margin-top: 2px; font-family: Anton, 'Inter Display Black', Impact, sans-serif; font-weight: 400; font-size: 46px;
                letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f, 0 0 24px rgba(0,0,0,0.6); }
-  #title { position: fixed; top: 26px; left: 0; right: 0; text-align: center; font-family: 'Cinzel', serif; letter-spacing: 10px; font-size: 15px;
-           color: rgba(233, 228, 218, 0.75); text-shadow: 0 0 12px #000; pointer-events: none; z-index: 10; }
+  #line { position: fixed; right: 5%; top: 14%; z-index: 10; pointer-events: none; font-family: 'Courier Prime', monospace; font-size: 20px; color: #efe1c2;
+          background: rgba(10, 8, 6, 0.72); border-left: 4px solid #f2c230; padding: 10px 16px; opacity: 0; transition: opacity 0.3s; }
+  #line.on { opacity: 1; }
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 12, 15, 0.75); color: #efe1c2;
+          border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
+  #skip.on { display: block; }
+  #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
+  #fast.on { display: flex; }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
 </script>
 </head>
 <body>
-<div id="loading"><h1>THE LAESTRYGONIAN HARBOUR</h1><div class="bar"><div id="bar"></div></div><p id="loadText">The storm gathers…</p></div>
+<div id="loading"><h1>THE LAESTRYGONIAN HARBOUR</h1><div class="bar"><div id="bar"></div></div><p>loading the harbour…</p></div>
 <div id="chapter">CHAPTER ONE<b>THE LAESTRYGONIAN HARBOUR</b></div>
+<div id="line"></div>
 <div id="hud"></div>
+<button id="skip">SKIP SCENE ▸▸ (Esc)</button>
+<div id="fast">▸▸</div>
 
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { World } from "./js/engine/world.js";
 import { manager } from "./js/engine/assets.js";
-import { buildHarbour, makeStackCrate, goldenAmphora, QUAY_TOP } from "./js/islands/harbour/harbourScene.js";
-import { StackGauge, floorStencil, Manifest, loadFonts } from "./js/islands/harbour/dsProps.js";
+import { Hero } from "./js/engine/hero.js";
+import { Director } from "./js/engine/director.js";
+import { buildHarbour, goldenAmphora, QUAY_TOP } from "./js/islands/harbour/harbourScene.js";
+import { loadFonts } from "./js/islands/harbour/dsProps.js";
+import { TrialSet, CRATE_H } from "./js/islands/harbour/trialSet.js";
+import { buildTechProps } from "./js/islands/harbour/techProps.js";
+import { buildHarbourNav } from "./js/islands/harbour/harbourNav.js";
+import { TAGS } from "./js/story/tags.js";
+import { stackLesson } from "./js/islands/harbour/stackLesson.js";
 
 const params = new URLSearchParams(location.search);
 manager.onProgress = (url, done, total) => { document.getElementById("bar").style.width = (done / total * 100) + "%"; };
@@ -49,32 +66,50 @@ const world = new World({ quality: params.get("q") || "auto" });
 world.renderer.localClippingEnabled = true;
 await loadFonts();
 const harbour = await buildHarbour(world);
+buildTechProps(world, harbour);
 
-// sample trial piles: each pile is a stack, with its gauge, TOP pointer and floor stencil
-const PILE_Z = -1.6;
-const piles = [{ name: "s", x: -3, values: [4, 7, 99], cap: 3, base: 0x2A0 }, { name: "t", x: 0, values: [3], cap: 3, base: 0x2C0 }, { name: "u", x: 3, values: [], cap: 3, base: 0x2E0 }];
-const gauges = [];
-for (const p of piles) {
-  let y = QUAY_TOP, h = 0.69;
-  p.values.forEach((v, i) => {
-    const c = makeStackCrate(harbour.models.crate, v, i, "0x" + (p.base + i * 4).toString(16).toUpperCase());
-    c.position.set(p.x, y, PILE_Z);
-    c.rotation.y = (Math.random() - 0.5) * 0.05;
-    world.scene.add(c);
-    y += c.userData.height; h = c.userData.height;
-  });
-  if (p.values.includes(99)) { const a = goldenAmphora(harbour.models.amphora); a.position.set(p.x, y, PILE_Z); world.scene.add(a); }
-  const gauge = new StackGauge(world.scene, { x: p.x, y: QUAY_TOP, z: PILE_Z, capacity: p.cap, crateHeight: 0.69, name: p.name });
-  gauge.setTop(p.values.length - 1, true);
-  gauges.push(world.add(gauge));
-  floorStencil(world.scene, p.x, QUAY_TOP, PILE_Z + 1.05, p.name);
+// ---------- the trial area: three stacks, exactly as Java would describe them
+const trial = new TrialSet(world, harbour.models.crate, [
+  { name: "s", capacity: 3, initial: [4, 7] },
+  { name: "t", capacity: 3, initial: [3] },
+  { name: "u", capacity: 1, initial: [] }
+]);
+const { s, t, u } = trial.piles;
+// two low wooden trestles: where loose crates rest (he cannot lift from the bare ground)
+const TRESTLE_H = 0.35;
+function trestle(x, z) {
+  const g = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x4e3524, roughness: 0.9 });
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.6), wood); top.position.y = TRESTLE_H - 0.04; g.add(top);
+  for (const [lx, lz] of [[-0.33, -0.23], [0.33, -0.23], [-0.33, 0.23], [0.33, 0.23]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.07, TRESTLE_H - 0.08, 0.07), wood); l.position.set(lx, (TRESTLE_H - 0.08) / 2, lz); g.add(l); }
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.position.set(x, QUAY_TOP, z); world.scene.add(g);
+  return new THREE.Vector3(x, QUAY_TOP + TRESTLE_H, z);
 }
-const manifest = new Manifest(world.scene, { x: 6.2, y: QUAY_TOP, z: -0.4, rotationY: -0.45 });
-manifest.write(piles.map(p => ({ name: p.name, capacity: p.cap, items: p.values })), "// get the 99 on top of s");
+const HEAP = trestle(-3.0, 1.55);      // the golden crate waits here
+const DROP = trestle(1.5, 1.45);       // where "x" is set down
+// the golden amphora's crate
+const prize = trial.newCrate(99);
+const amph = goldenAmphora(harbour.models.amphora);
+amph.scale.set(1.25 / 0.51, 1.25 / 1.1, 1.25 / 0.85);      // undo the crate's stretch so the jar keeps its shape
+amph.position.y = CRATE_H / 1.1;
+prize.add(amph);
+prize.position.copy(HEAP);
 
-// ---------- camera shots
+// ---------- Odysseus, who walks only where the harbour lets him
+const nav = buildHarbourNav(trial);
+nav.addBox("trestle-heap", HEAP.x, HEAP.z, 0.8, 0.6);
+nav.addBox("trestle-drop", DROP.x, DROP.z, 0.8, 0.6);
+const hero = await new Hero(world, { nav, groundY: QUAY_TOP }).load();
+const START = new THREE.Vector3(13.5, QUAY_TOP, -15);
+hero.group.position.copy(START);
+
+// ---------- camera
+const director = new Director(world);
+const controls = new OrbitControls(world.camera, world.renderer.domElement);
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.495; controls.enabled = false;
+const free = on => { controls.enabled = on; director.mode = null; director.paused = on; if (on) controls.target.copy(director.look); };
 const SHOTS = {
-  trial:   { pos: [1.4, 3.1, 8.4], look: [0.8, 2.2, -1.6], fov: 40 },
+  trial:   { pos: [1.2, 3.0, 7.6], look: [0.2, 2.0, -1.6], fov: 40 },
   manifest: { pos: [4.4, 2.85, 2.3], look: [6.2, 2.9, -0.4], fov: 40 },
   arrival: { pos: [-9, 9, -42], look: [3, 2, 0], fov: 46 },
   giants:  { pos: [-3, 2.3, 4], look: [6, 40, -200], fov: 52 },
@@ -83,55 +118,153 @@ const SHOTS = {
   harbour: { pos: [0, 60, 40], look: [0, 0, -240], fov: 50 },
   queen:   { pos: [-8, 6, -20], look: [-140, 70, -460], fov: 40 }
 };
-const controls = new OrbitControls(world.camera, world.renderer.domElement);
-controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI * 0.495;
-let drift = params.get("still") ? 0 : 1;
-controls.addEventListener("start", () => drift = 0);
+function shot(name) { free(true); const v = SHOTS[name]; world.camera.position.set(...v.pos); controls.target.set(...v.look); world.camera.fov = v.fov; world.camera.updateProjectionMatrix(); controls.update(); }
 
-function shot(name) {
-  const s = SHOTS[name];
-  world.camera.position.set(...s.pos);
-  controls.target.set(...s.look);
-  world.camera.fov = s.fov; world.camera.updateProjectionMatrix();
-  controls.update();
-  document.querySelectorAll("#hud button[data-shot]").forEach(b => b.classList.toggle("on", b.dataset.shot === name));
+// ---------- what the code is doing right now (shown top right, and chalked on the manifest)
+const lineEl = document.getElementById("line");
+function codeLine(text) { lineEl.textContent = text; lineEl.classList.toggle("on", !!text); trial.write(text ? "> " + text : ""); }
+
+// ---------- the Harbour's opening scene: arrival, name card, then real stack operations
+const P = new THREE.Vector3();
+const front = (spot, dz) => new THREE.Vector3(spot.x, spot.y, spot.z + dz);     // where he stands to reach something
+async function play() {
+  free(false);
+  document.getElementById("chapter").style.opacity = 1;
+  // 1. establishing: from high over the water down to the pier
+  director.cut([30, 14, -40], [13.5, 2, -12], 50);
+  const glide = director.glide([18.5, 2.2, -3.5], [13.5, 2.4, -12], 38, 4.5);
+  await hero.wait(1.0);
+  // 2. he walks down the pier toward a low camera: the "trunk shot", looking up at him
+  const walk1 = hero.walkTo(13.5, -5.4);
+  await glide;
+  director.cut([13.0, 1.75, -1.9], [13.5, 3.0, -6.5], 34);
+  await walk1;
+  document.getElementById("chapter").style.opacity = 0;
+  // 3. freeze-frame: crash zoom, colour drains, the name card for this chapter of his story
+  await hero.wait(0.25);
+  await director.crashZoom(24, 0.18);
+  await director.freeze(TAGS.harbour.name, TAGS.harbour.sub, 2.8);
+  director.setFov(34);
+  // 4. push(&s, 99): lift the golden crate off its trestle, set it on top of s
+  director.follow(hero.group, { side: 2.6, up: 1.6, back: 4.6, lookUp: 1.1, lag: 2.2, fov: 40 });
+  codeLine("push(&s, 99);");
+  P.copy(front(HEAP, 0.78)); await hero.walkTo(P.x, P.z);
+  await hero.lift(prize);
+  P.copy(trial.standSpot(s)); await hero.walkTo(P.x, P.z);
+  director.mode = null;
+  director.glide([s.x + 2.4, 2.1, 2.6], [s.x - 0.1, 2.3, s.z], 38, 0.9);
+  const placed = await hero.place(trial.slot(s, s.crates.length));
+  trial.pushed(s, placed);
+  await director.crashZoom(30, 0.16);
+  await hero.wait(1.0);
+  director.setFov(38);
+  // 5. int x = pop(&s): he lifts the top crate off and sets it on the other trestle
+  codeLine("int x = pop(&s);");
+  const top = trial.top(s);
+  await hero.lift(top);
+  trial.popped(s);
+  director.follow(hero.group, { side: 2.4, up: 1.5, back: 4.4, lookUp: 1.1, lag: 2.2, fov: 40 });
+  P.copy(front(DROP, 0.78)); await hero.walkTo(P.x, P.z);
+  await hero.place(DROP.clone());
+  // 6. push(&u, x): lift it again and set it on u, the narrow pile
+  codeLine("push(&u, x);");
+  await hero.lift(top);
+  P.copy(trial.standSpot(u)); await hero.walkTo(P.x, P.z);
+  trial.pushed(u, await hero.place(trial.slot(u, 0)));
+  await hero.wait(0.6);
+  // 7. he climbs s for a better look, and slips (a taste of the failure cinematics)
+  codeLine("// climb s ... the tower is too short");
+  P.copy(trial.climbSpot(s)); await hero.walkTo(P.x, P.z);
+  director.mode = null;
+  director.glide([s.x + 2.8, 1.6, 2.6], [s.x, 2.3, s.z], 40, 1.0);
+  await hero.climb(s.crates.length * CRATE_H, new THREE.Vector3(s.x, 0, s.z));
+  await hero.wait(0.5);
+  world.timeScale = skipping ? 40 : 0.45;          // slow motion for the fall (unless skipping)
+  await hero.fall("slip", { groundY: QUAY_TOP, back: 1.4 });
+  world.timeScale = skipping ? 40 : 1;
+  await hero.wait(1.0);
+  codeLine("");
 }
-window.__shot = shot;
-window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
 
+// ---------- skipping a cutscene: fast-forward behind a black card, so the world ends in the right state
+let skipping = false;
+const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast");
+function skip() {
+  if (!busy || skipping) return;
+  skipping = true; director.skipping = true;
+  world.timeScale = 40; fastEl.classList.add("on");
+}
+skipBtn.onclick = skip;
+addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
+
+// ---------- HUD
 const hud = document.getElementById("hud");
-Object.keys(SHOTS).forEach(name => {
-  const b = document.createElement("button");
-  b.textContent = name; b.dataset.shot = name;
-  b.onclick = () => shot(name);
-  hud.appendChild(b);
-});
+const pb = document.createElement("button"); pb.textContent = "▶ play scene"; pb.className = "play"; pb.onclick = () => { if (!busy) location.search = ""; }; hud.appendChild(pb);
+const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) lesson(); }; hud.appendChild(lb);
+Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
 const qb = document.createElement("button");
 const showQ = () => qb.textContent = "quality: " + world.quality;
 qb.onclick = () => { world.autoQuality = false; world.quality = world.quality === "high" ? "low" : "high"; world.applyQuality(); showQ(); };
 hud.appendChild(qb);
+let busy = false;
+async function run() {
+  busy = true; skipBtn.classList.add("on");
+  try { await play(); }
+  finally {
+    busy = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    fastEl.classList.remove("on"); skipBtn.classList.remove("on");
+    document.getElementById("chapter").style.opacity = 0;
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
+  }
+  await lesson();
+}
 
-shot(params.get("shot") || "trial");
-let t0 = 0;
-const onFrame = (dt, time, raw) => {
-  // a slow, breathing camera drift until the player grabs the camera
-  if (drift) { t0 += raw; world.camera.position.x += Math.sin(t0 * 0.15) * 0.004; world.camera.position.y += Math.sin(t0 * 0.21) * 0.002; }
-  controls.update();
-  showQ();
-};
+// ---------- Athena's Learn mode: the stack, line by line
+let inLesson = false;
+async function lesson() {
+  if (inLesson) return;
+  inLesson = true;
+  free(false);
+  // cut to black, reset the trial area, stand him up by the pile
+  fastEl.textContent = ""; fastEl.classList.add("on");
+  await hero.wait(0.4);
+  trial.clearAll();
+  [prize].forEach(c => c.parent && c.parent.remove(c));
+  const sp = trial.standSpot(s);
+  hero.teleport(sp.x + 1.2, sp.z + 1.0, Math.PI);
+  // the panel covers the right of the screen, so shift the picture's centre to the left
+  const shift = () => { const w = innerWidth, h = innerHeight; if (w > 900) world.camera.setViewOffset(w, h, 230, 0, w, h); else world.camera.clearViewOffset(); };
+  shift(); addEventListener("resize", shift);
+  director.cut([s.x + 1.7, 2.25, 4.6], [s.x + 0.2, 1.2, -1.5], 44);
+  document.getElementById("chapter").style.opacity = 0;
+  fastEl.classList.remove("on"); fastEl.textContent = "▸▸";
+  const player = stackLesson({ hero, trial, director, HEAP, DROP, newCrate: v => trial.newCrate(v) });
+  await player.open();
+  removeEventListener("resize", shift); world.camera.clearViewOffset();
+  trial.write("// the trials come next");
+  director.glide([1.2, 3.0, 7.6], [0.2, 2.0, -1.6], 40, 1.2);
+  inLesson = false;
+}
+
+world.onFrame = () => { if (controls.enabled) controls.update(); showQ(); };
+const origUpdate = director.update.bind(director);
+director.update = (dt, time, raw) => { if (!director.paused) origUpdate(dt, time, raw); };
+window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__world = world; window.__hero = hero; window.__director = director;
+window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
+
 const loading = document.getElementById("loading");
 if (params.get("capture")) {
-  // test mode: no live loop, frames are drawn on request (used for checking screenshots)
-  world.onFrame = onFrame;
-  window.__frames = (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) world.step(dt, i === n - 1); };
+  // test mode: frames are stepped on request so the scene can be checked frame by frame
+  window.__advance = async (seconds, dt = 1 / 30) => { const n = Math.round(seconds / dt); for (let i = 0; i < n; i++) { world.step(dt, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
   loading.remove();
+  shot("trial");
 } else {
-  world.start(onFrame);
+  world.start(world.onFrame);
   loading.style.opacity = 0;
   setTimeout(() => loading.remove(), 1300);
+  if (params.get("free")) shot("trial"); else run();
 }
-window.__ready = true; window.__world = world;
+window.__ready = true;
 </script>
 </body>
 </html>

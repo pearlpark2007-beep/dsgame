@@ -14,11 +14,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1280, 720) },
-    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }
+    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength;
+    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze;
     varying vec2 vUv;
     float rand(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     float luma(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
@@ -53,6 +53,7 @@ const GradeShader = {
       float edge = smoothstep(0.38, 0.85, length(d * vec2(1.25, 1.0)));                    // burned edges
       c = mix(c, c * vec3(0.55, 0.32, 0.2), edge * 0.85 * strength);
       c += vec3(0.85, 0.8, 0.95) * flash * 0.2;
+      c = mix(c, vec3(luma(c)) * vec3(1.08, 0.96, 0.78), freeze * 0.75);                       // freeze-frame: colour drains to sepia
       if (letterbox > 0.5 && abs(vUv.y - 0.5) > 0.5 * min(1.0, (res.x / res.y) / 2.39)) c = vec3(0.012, 0.01, 0.01);   // 2.39:1 cinema bars
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`
@@ -126,7 +127,7 @@ export class World {
   step(raw, draw = true) {
     const dt = raw * this.timeScale;
     this.time += dt;
-    for (const u of this.updaters) u.update && u.update(dt, this.time, raw);
+    for (const u of [...this.updaters]) u.update && u.update(dt, this.time, raw);   // a copy: updaters may remove themselves
     if (this.onFrame) this.onFrame(dt, this.time, raw);
     this.grade.uniforms.time.value = this.time;
     if (draw) this.composer.render();

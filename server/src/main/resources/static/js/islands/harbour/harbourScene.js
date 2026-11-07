@@ -250,14 +250,17 @@ function buildTowers(scene, models) {
   const tops = new THREE.InstancedMesh(crateGeo, goldMat, towers.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion();
   let k = 0;
+  const levels = [];                         // every giant crate's place, so labels can be painted on them
   towers.forEach(([x, z, n], t) => {
     let lean = 0;
+    levels[t] = [];
     for (let i = 0; i < n; i++) {
       lean += rand(-0.25, 0.25);
       const yaw = rand(-0.06, 0.06) + (i % 2) * 0.03;
-      q.setFromEuler(new THREE.Euler(0, yaw + t, 0));
+      q.setFromEuler(new THREE.Euler(0, yaw + (t % 3 - 1) * 0.18, 0));
       const p = new THREE.Vector3(x + lean + rand(-0.5, 0.5), -2 + i * h * S, z + rand(-0.5, 0.5));
       m.compose(p, q, new THREE.Vector3(S, S, S));
+      levels[t].push({ p: p.clone(), yaw: yaw + (t % 3 - 1) * 0.18 });
       if (i === n - 1) tops.setMatrixAt(t, m); else im.setMatrixAt(k++, m);
     }
   });
@@ -269,7 +272,7 @@ function buildTowers(scene, models) {
     r.scale.set(14, 4, 14); r.position.set(x, -1.5, z); r.rotation.y = rand(0, 6);
     scene.add(r);
   });
-  return { towers, crateHeight: h };
+  return { towers, crateHeight: h, levels, size: { w: 1.17 * S, h: h * S, front: 0.265 * S } };
 }
 
 function buildColonnade(scene) {
@@ -397,16 +400,17 @@ function ropes(scene, ship) {
 }
 
 // ---------- the trial's crates: a chest with its number and index painted on the front
-export function makeStackCrate(crateModel, value, index, address = "") {
+export function makeStackCrate(crateModel, value) {
   const gold = value === 99;
   const crate = centreOnGround(copyOf(crateModel));
-  crate.scale.setScalar(1.5);
+  crate.scale.set(0.51, 1.1, 0.85);            // a box 0.6 m wide, 0.5 m tall, 0.45 m deep: a load one man can carry
   const box = new THREE.Box3().setFromObject(crate);
-  const label = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.65), new THREE.MeshStandardMaterial({
-    map: crateFaceTexture(value, index, address), transparent: true, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2 }));
-  label.position.set(0, (box.max.y - box.min.y) * 0.5, box.max.z + 0.005);
+  // label sizes are divided by the crate's scale so the painted face stays 0.56 x 0.3 m
+  const label = new THREE.Mesh(new THREE.PlaneGeometry(0.56 / 0.51, 0.3 / 1.1), new THREE.MeshStandardMaterial({
+    map: crateFaceTexture(value), transparent: true, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2 }));
+  label.position.set(0, (box.max.y - box.min.y) * 0.5 / 1.1, box.max.z / 0.85 + 0.006);
   crate.add(label);
-  crate.userData = { value, index, height: box.max.y - box.min.y };
+  crate.userData = { value, height: box.max.y - box.min.y, width: box.max.x - box.min.x, depth: box.max.z - box.min.z };
   if (gold) crate.traverse(o => {
     if (o.isMesh && o !== label) {
       o.material = o.material.clone();
