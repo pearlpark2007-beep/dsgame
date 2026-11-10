@@ -11,7 +11,9 @@ public class Lexer {
             "if", TokenType.IF,
             "else", TokenType.ELSE,
             "while", TokenType.WHILE,
-            "for", TokenType.FOR
+            "for", TokenType.FOR,
+            "break", TokenType.BREAK,
+            "continue", TokenType.CONTINUE
     );
 
     private final String source;
@@ -97,6 +99,8 @@ public class Lexer {
             case "||" -> TokenType.OR_OR;
             case "++" -> TokenType.PLUS_PLUS;
             case "--" -> TokenType.MINUS_MINUS;
+            case "+=" -> TokenType.PLUS_EQUAL;
+            case "-=" -> TokenType.MINUS_EQUAL;
             default -> null;
         };
         if (twoType != null) {
@@ -110,6 +114,8 @@ public class Lexer {
             case ')' -> TokenType.RIGHT_PAREN;
             case '{' -> TokenType.LEFT_BRACE;
             case '}' -> TokenType.RIGHT_BRACE;
+            case '[' -> TokenType.LEFT_BRACKET;
+            case ']' -> TokenType.RIGHT_BRACKET;
             case ',' -> TokenType.COMMA;
             case ';' -> TokenType.SEMICOLON;
             case '+' -> TokenType.PLUS;

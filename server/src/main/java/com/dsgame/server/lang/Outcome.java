@@ -8,5 +8,6 @@ public enum Outcome {
     OVERFLOW,
     UNDERFLOW,
     INFINITE_LOOP,
+    OUT_OF_BOUNDS,
     GOAL_NOT_MET
 }

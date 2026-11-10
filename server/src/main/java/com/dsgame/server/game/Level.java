@@ -9,7 +9,7 @@ import java.util.Set;
 // the template every level follows; each concrete level only decides what "winning" means
 public abstract class Level {
     // actions that count as a "move" (looking with peek is free)
-    private static final Set<String> MOVES = Set.of("PUSH", "POP", "ENQUEUE", "DEQUEUE");
+    private static final Set<String> MOVES = Set.of("PUSH", "POP", "ENQUEUE", "DEQUEUE", "WRITE");
 
     private final String id;
     private final String island;
@@ -44,6 +44,9 @@ public abstract class Level {
     public void setup(Interpreter interpreter) {
         for (StructureSpec spec : structures) {
             interpreter.addStructure(spec.name(), spec.build());
+            if (spec.lengthVar() != null) {
+                interpreter.bindLength(spec.name(), spec.lengthVar(), spec.initial().size());
+            }
         }
     }
 

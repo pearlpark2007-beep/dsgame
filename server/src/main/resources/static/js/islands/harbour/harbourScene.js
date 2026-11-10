@@ -38,7 +38,7 @@ export async function buildHarbour(world) {
   const sky = world.add(new StormSky(world, { glowDir: new THREE.Vector3(-0.15, 0.06, -1) }));
   const lightning = world.add(new Lightning(world, sky, { area: [[-260, 260], [-650, -180]] }));
   world.add(new Sea(world, { sunDir: new THREE.Vector3(-0.15, 0.25, -1) }));
-  world.add(new Rain(world));
+  const rain = world.add(new Rain(world));
     useSkyAsReflections(world, sky);
 
   // ---------- light
@@ -153,7 +153,7 @@ export async function buildHarbour(world) {
   cliffFires(world, [[-60, 72, -250], [-52, 70, -420], [58, 76, -230], [50, 74, -380], [-118, 110, -40]]);
   const queen = giantess(world, models.statue, lightning);
 
-  return { sky, lightning, ship, towers, key, models, queen };
+  return { sky, lightning, ship, farShip, towers, key, rim, models, queen, rain };
 }
 
 // Lights the scene's shiny surfaces (wet stone, bronze) with reflections of the storm sky.

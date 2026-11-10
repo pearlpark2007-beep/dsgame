@@ -26,6 +26,9 @@ const css = `
 #athena-learn .cell { width: 52px; text-align: center; border: 1px solid #4a3826; padding: 3px 0; font-size: 12px; }
 #athena-learn .cell .v { font-size: 15px; color: #efe1c2; min-height: 18px; } #athena-learn .cell .i { color: #8c7c66; font-size: 11px; }
 #athena-learn .cell.top { border-color: #e0644a; box-shadow: 0 0 0 1px #e0644a inset; }
+#athena-learn .arr.many { gap: 3px; } #athena-learn .arr.many .cell { width: 37px; } #athena-learn .arr.many .cell .v { font-size: 13px; }
+#athena-learn .arr.many .cell .i { font-size: 9.5px; line-height: 1.15; } #athena-learn .arr.many .cell .i small { display: block; font-size: 8px; color: #6c5c48; }
+#athena-learn .vars, #athena-learn .say, #athena-learn .quiz, #athena-learn .out { flex: none; }
 #athena-learn .out { margin: 10px 14px 0; padding: 6px 10px; background: #050403; border: 1px solid #2f2116; font-size: 13px; min-height: 22px; max-height: 92px; overflow: auto; }
 #athena-learn .out .h { color: #8c7c66; font-size: 11px; letter-spacing: 2px; }
 #athena-learn .out .l { color: #cfe8b8; } #athena-learn .out .l.err { color: #ff6a50; font-weight: 700; } #athena-learn .out .l.new { animation: blink 0.5s 3; }
@@ -56,7 +59,9 @@ function highlight(line) {
 }
 
 export class LessonPlayer {
-  constructor({ title, subtitle, code, steps }) {
+  // varsAfter: show the variables once the line's action has played (the values it produced), not before
+  constructor({ title, subtitle, code, steps, varsAfter = false }) {
+    this.varsAfter = varsAfter;
     if (!document.getElementById("athena-learn-css")) { const s = document.createElement("style"); s.id = "athena-learn-css"; s.textContent = css; document.head.appendChild(s); }
     this.steps = steps; this.i = -1; this.auto = false; this.busy = false;
     const el = this.el = document.createElement("aside");
@@ -100,7 +105,8 @@ export class LessonPlayer {
     for (const [k, val] of Object.entries(v)) {
       const d = document.createElement("div"); d.className = "var" + (JSON.stringify(before[k]) !== JSON.stringify(val) ? " changed" : "");
       if (Array.isArray(val?.items)) {
-        d.innerHTML = `<div>${k}[ ]</div><div class="arr">${val.items.map((x, i) => `<div class="cell${i === val.top ? " top" : ""}"><div class="v">${x ?? ""}</div><div class="i">[${i}] ${val.addr ? val.addr[i] : ""}</div></div>`).join("")}</div>`;
+        const many = val.items.length > 6;      // a long array: narrower cells, the address on its own small line
+        d.innerHTML = `<div>${k}[ ]</div><div class="arr${many ? " many" : ""}">${val.items.map((x, i) => `<div class="cell${i === val.top ? " top" : ""}"><div class="v">${x ?? ""}</div><div class="i">[${i}]${many ? `<small>${val.addr ? val.addr[i].replace("0x", "") : ""}</small>` : " " + (val.addr ? val.addr[i] : "")}</div></div>`).join("")}</div>`;
       } else d.innerHTML = `${k} = <b>${val}</b>`;
       box.appendChild(d);
     }
@@ -118,8 +124,9 @@ export class LessonPlayer {
     if (st.out) this.print(st.out, { err: /flow/i.test(st.out) });
     if (st.ret) this.print(st.ret);
     this.el.querySelector(".prog").textContent = `step ${this.i + 1} of ${this.steps.length}`;
-    this.setVars(st.vars);
+    if (!this.varsAfter) this.setVars(st.vars);
     if (st.act) await st.act();
+    if (this.varsAfter) this.setVars(st.vars);
     if (st.quiz) await this.ask(st.quiz);
     this.busy = false; this.nextBtn.disabled = false;
     if (this.auto && !this.finished) setTimeout(() => this.auto && this.next(), st.quiz ? 400 : 1300);

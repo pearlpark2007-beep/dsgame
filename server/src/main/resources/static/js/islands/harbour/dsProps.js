@@ -22,9 +22,19 @@ function canvasTex(w, h, draw) {
   return t;
 }
 
+// shrink a font until the text fits the width it has (long names like "tower" must not run off a board)
+export function fitFont(g, text, font, maxWidth) {
+  const m = /(\d+(?:\.\d+)?)px/.exec(font); if (!m) return font;
+  g.font = font;
+  const w = g.measureText(text).width;
+  if (w <= maxWidth || w === 0) return font;
+  return font.replace(m[0], Math.floor(parseFloat(m[1]) * maxWidth / w) + "px");
+}
+
 // paint-sprayed text: drawn several times with a slight scatter, then speckled at the edges
-export function sprayText(g, text, x, y, font, color, { scatter = 1.6, passes = 6 } = {}) {
-  g.font = font; g.textAlign = "center"; g.textBaseline = "middle";
+export function sprayText(g, text, x, y, font, color, { scatter = 1.6, passes = 6, maxWidth } = {}) {
+  g.font = fitFont(g, text, font, maxWidth ?? (x > 0 && x < g.canvas.width ? 2 * Math.min(x, g.canvas.width - x) * 0.92 : Infinity));   // x <= 0: a transformed canvas, leave it
+  g.textAlign = "center"; g.textBaseline = "middle";
   for (let i = 0; i < passes; i++) {
     g.globalAlpha = 0.22; g.fillStyle = color;
     g.fillText(text, x + (Math.random() - 0.5) * scatter * 2, y + (Math.random() - 0.5) * scatter * 2);
@@ -108,7 +118,7 @@ export class StackGauge {
     // on top, which is exactly the stack rule. The hook drops to the stones when the pile is empty.
     const over = -side * 0.78;                       // the pile's centre, seen from this post
     this.jibY = postH + 0.62; this.over = over;
-    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), wood); mast.position.y = postH + 0.3; g.add(mast);
+    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), wood); mast.position.set(0, postH + 0.3, -0.1); g.add(mast);       // behind the name board, so it never covers the name
     const jib = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(over) + 0.3, 0.09, 0.09), wood);
     jib.position.set(over / 2, this.jibY, 0); g.add(jib);
     const brace = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.06), wood);
@@ -164,7 +174,7 @@ export class StackGauge {
     c.fillStyle = "#2b1d14"; c.fillRect(0, 0, w, h);
     c.strokeStyle = empty ? "#c8261a" : "#f0c33c"; c.lineWidth = 10; c.strokeRect(5, 5, w - 10, h - 10);
     sprayText(c, "TOP", w / 2, h * 0.36, `66px ${FONTS.stencil}`, empty ? "#f2a07a" : "#f0c33c", { passes: 3 });
-    sprayText(c, empty ? "-1  empty" : "[" + this.top + "]", w / 2, h * 0.76, `48px ${FONTS.type}`, empty ? "#f2a07a" : "#efe1c2", { passes: 2 });
+    sprayText(c, empty ? "-1  empty" : "[" + this.top + "]", w / 2, h * 0.76, `48px ${FONTS.type}`, empty ? "#f2a07a" : "#efe1c2", { passes: 2, maxWidth: w * 0.8 });
     this.tagTex.needsUpdate = true;
   }
   update(dt) {
@@ -190,7 +200,7 @@ export class StackGauge {
 export function floorStencil(scene, x, y, z, name) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.85), new THREE.MeshStandardMaterial({
     map: canvasTex(256, 128, (c, w, h) => {
-      sprayText(c, name, w * 0.3, h * 0.55, `92px ${FONTS.stencil}`, "#f0c33c", { scatter: 2.5 });
+      sprayText(c, name, w / 2, h * 0.55, `92px ${FONTS.stencil}`, "#f0c33c", { scatter: 2.5, maxWidth: w * 0.84 });
       c.strokeStyle = "rgba(240,195,60,0.85)"; c.lineWidth = 6; c.setLineDash([14, 10]);
       c.strokeRect(8, 8, w - 16, h - 16);
     }), transparent: true, roughness: 1, polygonOffset: true, polygonOffsetFactor: -4 }));

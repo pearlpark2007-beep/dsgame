@@ -3,7 +3,7 @@
 // call stays on screen, in the world, in order.
 import * as THREE from "three";
 import { QUAY_TOP } from "./harbourScene.js";
-import { FONTS } from "./dsProps.js";
+import { FONTS, fitFont } from "./dsProps.js";
 
 export const BENCH_H = 0.35;
 
@@ -53,7 +53,7 @@ export class ReturnBench {
     g.fillStyle = "#1f2622"; g.fillRect(0, 0, w, h);
     for (let k = 0; k < 600; k++) { g.fillStyle = `rgba(220,220,210,${Math.random() * 0.05})`; g.fillRect(Math.random() * w, Math.random() * h, 3 + Math.random() * 20, 1 + Math.random() * 2); }
     if (text) {
-      g.font = `64px ${FONTS.chalk}`; g.textAlign = "center"; g.textBaseline = "middle";
+      g.font = fitFont(g, text, `64px ${FONTS.chalk}`, w * 0.9); g.textAlign = "center"; g.textBaseline = "middle";
       for (let k = 0; k < 3; k++) { g.globalAlpha = 0.4; g.fillStyle = bad ? "#f2a07a" : "#ece6d6"; g.fillText(text, w / 2 + (Math.random() - 0.5) * 2, h / 2 + (Math.random() - 0.5) * 2); }
       g.globalAlpha = 1;
       for (let k = 0; k < 1500; k++) { g.fillStyle = "rgba(31,38,34,0.5)"; g.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); }

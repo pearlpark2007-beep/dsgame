@@ -17,7 +17,7 @@ const WALK_CLIP_SPEED = 1.72;                // metres per second the walk clip 
 const CARRY = new THREE.Vector3(0, 0.66, 0.42);  // where a held crate's base sits, in his own frame (in front of the belly)
 const ease = k => k * k * (3 - 2 * k);
 
-function cut(clip, name, from, to, keep = () => true) {
+export function cut(clip, name, from, to, keep = () => true) {
   const tracks = [];
   for (const t of clip.tracks) {
     if (!keep(t.name)) continue;
@@ -41,7 +41,7 @@ function pose(clip, name, t, keep) {
   }
   return new THREE.AnimationClip(name, 1, tracks);
 }
-function pinRoot(clip, axes) {
+export function pinRoot(clip, axes) {
   const tr = clip.tracks.find(t => /Hips\.position$/.test(t.name));
   if (!tr) return clip;
   for (const a of axes) { const k = { x: 0, y: 1, z: 2 }[a], first = tr.values[k]; for (let i = k; i < tr.values.length; i += 3) tr.values[i] = first; }
@@ -129,6 +129,28 @@ export class Hero {
     this.base = null; this.layer = null;
     this.play("idle", 0);
     this.world.add(this);
+    return this;
+  }
+
+  // the action-hero clips (only the cinematics need them, so they load on demand):
+  // jump (crouch and take-off), airborne (arms and legs in the wind), land (a hard landing from high up),
+  // swing (a two-handed overhead blow) and dive (a leap off a ledge)
+  async loadHeroics(dir = "assets/odysseus/") {
+    if (this.clips.swing) return this;
+    const L = new FBXLoader();
+    const [jump, air, land, swing, dive] = await Promise.all(["jump", "airborne", "land", "swing", "dive"].map(n => L.loadAsync(dir + n + ".fbx")));
+    const c = {
+      jump: cut(jump.animations[0], "jump", 0, 0.8),          // crouch (0.33 s), take-off (0.7 s)
+      airborne: air.animations[0],
+      land: cut(land.animations[0], "land", 0.62, 2.5),       // from just before impact (0.75 s) to standing
+      swing: cut(swing.animations[0], "swing", 0, 2.6),       // the blade comes down about 1.45 s in
+      dive: cut(dive.animations[0], "dive", 0, 0.85)          // the leap out
+    };
+    for (const k of ["jump", "airborne", "land", "swing", "dive"]) pinRoot(c[k], ["x", "z"]);   // we move him; the clips only move his body
+    for (const [k, clip] of Object.entries(c)) {
+      this.clips[k] = clip; this.actions[k] = this.mixer.clipAction(clip);
+      if (k !== "airborne") { this.actions[k].setLoop(THREE.LoopOnce); this.actions[k].clampWhenFinished = true; }
+    }
     return this;
   }
 
@@ -317,6 +339,16 @@ export class Hero {
       // elbows point outward and down
       solveArm(this.bones.lArm, this.bones.lFore, this.bones.lHand, mid.clone().addScaledVector(left, half), g.w, bodyLeft.clone().add(down));
       solveArm(this.bones.rArm, this.bones.rFore, this.bones.rHand, mid.clone().addScaledVector(left, -half), g.w, bodyLeft.clone().negate().add(down));
+    }
+    // the right hand held up (a torch, in the cave): an offset from his right shoulder { side (+ = his left), up, fwd, w }
+    const r = this.raise;
+    if (r && r.w > 0 && !g.crate) {
+      this.body.updateMatrixWorld(true);
+      const yaw = this.group.rotation.y;
+      const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+      // measured from his right shoulder, so the pose is the same whatever the legs are doing
+      const at = this.bones.rArm.getWorldPosition(new THREE.Vector3()).addScaledVector(left, r.side).addScaledVector(fwd, r.fwd); at.y += r.up;
+      solveArm(this.bones.rArm, this.bones.rFore, this.bones.rHand, at, r.w, left.clone().negate().multiplyScalar(0.4).add(new THREE.Vector3(0, -1, 0)));
     }
   }
 }

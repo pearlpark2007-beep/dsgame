@@ -7,6 +7,7 @@ import { QUAY_TOP } from "./harbourScene.js";
 import { CRATE_H } from "./trialSet.js";
 import { setPileObstacles } from "./harbourNav.js";
 import { CARGO } from "./dsProps.js";
+import { sound } from "../../engine/sound.js";
 
 const STORE = "odyssey.harbour.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -148,8 +149,10 @@ export class TrialMode {
       res = await r.json();
     } catch (e) { this.status("Can't reach the server (" + e.message + ").", "bad"); this.busy = false; this.$(".run").disabled = false; return; }
     this.ctx.skipper.begin();
+    const finale = this.level.tier === "FINALE";
+    if (finale) sound.drums(true, { bpm: 88 });         // the finale is played against the giants' war drums
     try { await this.play(res, code.split("\n")); }
-    finally { this.ctx.skipper.end(); this.busy = false; this.$(".run").disabled = false; this.ctx.codeLine(""); }
+    finally { sound.drums(false); this.ctx.skipper.end(); this.busy = false; this.$(".run").disabled = false; this.ctx.codeLine(""); }
   }
 
   // ---------- acting out Java's steps
@@ -302,6 +305,7 @@ export class TrialMode {
     this.el.classList.add("on"); this.ctx.panelView(true);
   }
   // the finale's win: for now he climbs the tower with the axe on top (the full ending cinematic comes next)
+  // the finale's win: he climbs the tower with the AXE on top, and the comic climax takes over
   async endFinale(res) {
     const { hero, trial, director } = this.ctx;
     const s = Object.values(trial.piles)[0];
@@ -312,10 +316,9 @@ export class TrialMode {
     director.glide([s.x - 2.4, 1.8, s.z + 4.6], [s.x, topY - 0.5, s.z], 46, 1.0);
     s.gauge.stow(true);                         // the crane hook swings up out of his way
     await hero.climb(s.crates.length * CRATE_H, new THREE.Vector3(s.x, 0, s.z - 0.15));
-    director.glide([s.x - 3.8, topY - 0.2, s.z + 7.4], [s.x, topY + 0.5, s.z], 42, 2.0);
     markDone(this.level.id); this.renderTabs();
     this.status(res.message, "good");
-    await director.stamp("THE AXE IS HIS", res.message, { kind: "good", seconds: 3.0 });
+    await this.ctx.climax();
     this.el.classList.add("on"); this.ctx.panelView(true);
   }
   async endGoalNotMet(res) {

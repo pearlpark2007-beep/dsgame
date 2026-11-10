@@ -1,6 +1,7 @@
 // director.js — the camera, directed like a film: tracking shots, low "trunk" angles,
 // crash zooms and freeze-frames with a name card (the Tarantino grammar of the game).
 import * as THREE from "three";
+import { sound } from "./sound.js";
 
 export class Director {
   constructor(world, { cardRoot = document.body } = {}) {
@@ -116,6 +117,7 @@ export class Director {
   }
   // a two-note siren wail made on the spot (no sound file); quiet, and silent if audio is not allowed yet
   _whistle() {
+    if (sound.muted) return;              // all sound is off for now (it comes back with the music)
     try {
       const A = this.audio ||= new (window.AudioContext || window.webkitAudioContext)();
       if (A.state === "suspended") A.resume();

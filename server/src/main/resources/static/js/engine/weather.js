@@ -89,6 +89,11 @@ export class Fire {
     return o;
   }
   update(dt, time) {
+    // level: 1 burning, 0 out (a scene can douse and relight its fires)
+    const L = this.level ?? 1;
+    this.points.visible = L > 0.02;
+    if (this.embers) this.embers.points.visible = L > 0.3;
+    if (L <= 0.02) { if (this.light) this.light.intensity = 0; return; }
     const pos = this.points.geometry.attributes.position.array, col = this.points.geometry.attributes.color.array;
     for (let i = 0; i < this.count; i++) {
       const o = this.p[i];
@@ -108,7 +113,7 @@ export class Fire {
     this.points.geometry.attributes.color.needsUpdate = true;
     if (this.light) {
       const t = time + this.seed;
-      this.light.intensity = 30 * this.size * (0.82 + 0.12 * Math.sin(t * 13) + 0.08 * Math.sin(t * 29.7) + 0.05 * Math.sin(t * 5.3));
+      this.light.intensity = L * 30 * this.size * (0.82 + 0.12 * Math.sin(t * 13) + 0.08 * Math.sin(t * 29.7) + 0.05 * Math.sin(t * 5.3));
     }
     if (this.embers) this.embers.update(dt, time);
   }

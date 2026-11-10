@@ -21,6 +21,43 @@ public interface Stmt {
         }
     }
 
+    // flock[i] = 5;   (also flock[i]++, flock[i] += 5: the parser turns those into this)
+    record IndexAssignStmt(String name, Expr index, Expr value, int line) implements Stmt {
+        public void execute(Interpreter in) {
+            int i = index.evaluate(in);
+            in.writeIndex(name, i, value.evaluate(in), line);
+        }
+    }
+
+    // int pens[10];   int a[5] = {3, 1, 4};   int b[] = {2, 7};
+    record DeclareArrayStmt(String name, Expr size, List<Expr> initial, int line) implements Stmt {
+        public void execute(Interpreter in) {
+            int n = (size != null) ? size.evaluate(in) : initial.size();
+            int[] values = null;
+            if (initial != null) {
+                values = new int[initial.size()];
+                for (int k = 0; k < values.length; k++) values[k] = initial.get(k).evaluate(in);
+            }
+            in.declareArray(name, n, values, line);
+        }
+    }
+
+    // int l = 0, r = 9;   several declarations in one line (no new scope, unlike a block)
+    record ListStmt(List<Stmt> statements) implements Stmt {
+        public void execute(Interpreter in) {
+            for (Stmt s : statements) s.execute(in);
+        }
+    }
+
+    // break;  continue;   they jump out of the loop they are in (the loops below catch them)
+    record BreakStmt(int line) implements Stmt {
+        public void execute(Interpreter in) { throw LoopSignal.BREAK; }
+    }
+
+    record ContinueStmt(int line) implements Stmt {
+        public void execute(Interpreter in) { throw LoopSignal.CONTINUE; }
+    }
+
     // i++;   i--;
     record IncrementStmt(String name, int delta, int line) implements Stmt {
         public void execute(Interpreter in) {
@@ -65,7 +102,11 @@ public interface Stmt {
         public void execute(Interpreter in) {
             while (condition.evaluate(in) != 0) {
                 in.tick(line);   // counts loop rounds to catch infinite loops
-                body.execute(in);
+                try {
+                    body.execute(in);
+                } catch (LoopSignal signal) {
+                    if (signal == LoopSignal.BREAK) break;
+                }
             }
         }
     }
@@ -78,8 +119,12 @@ public interface Stmt {
                 if (init != null) init.execute(in);
                 while (condition == null || condition.evaluate(in) != 0) {
                     in.tick(line);
-                    body.execute(in);
-                    if (update != null) update.execute(in);
+                    try {
+                        body.execute(in);
+                    } catch (LoopSignal signal) {
+                        if (signal == LoopSignal.BREAK) break;
+                    }
+                    if (update != null) update.execute(in);   // continue still runs the update, as in C
                 }
             } finally {
                 in.popScope();

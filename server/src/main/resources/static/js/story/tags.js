@@ -1,12 +1,26 @@
-// tags.js — Odysseus's freeze-frame name card, one per place.
-// The card is how the player notices he is changing: the boasts shrink, the titles grow simpler,
-// and the last card mirrors the first. Nothing ever says "he has grown"; the player reads it.
-export const TAGS = {
-  harbour:    { name: "Odysseus", sub: "King of Ithaca. Sacker of Troy.<br>Ten years late. Bad at directions." },
-  cyclops:    { name: "Odysseus", sub: "Told the giant his name was Nobody.<br>Starting to wonder if it was a lie." },
-  underworld: { name: "Odysseus", sub: "A visitor. Not a resident. Yet.<br>Asks the dead for directions now." },
-  scheria:    { name: "Odysseus", sub: "Shipwrecked. Washed up. Welcomed anyway.<br>Lets someone else steer, for once." },
-  voyage:     { name: "Odysseus", sub: "Sailor. Husband. Father.<br>Knows the way now." },
-  order:      { name: "Odysseus", sub: "Taking the long way round.<br>On purpose, this time." },
-  ithaca:     { name: "Odysseus", sub: "King of Ithaca.<br>Home." }
+// tags.js — Odysseus's freeze-frame name card. It opens and closes every chapter.
+// The card is how the player sees him change: every challenge he overcomes is added to it,
+// so the card at the end of a chapter carries one more line than the card at its start.
+export const TITLES = ["King of Ithaca.", "Sacker of Troy."];
+
+// what he did, chapter by chapter, in the order he does it
+export const CHAPTERS = ["harbour", "cyclops", "underworld", "scheria", "voyage", "order", "ithaca"];
+export const DEEDS = {
+  harbour:    "Got one ship out of Telepylos.",
+  cyclops:    "Told the Cyclops his name was Nobody.",
+  underworld: "Went down to the dead and came back.",
+  scheria:    "Washed up with nothing. Left with a ship.",
+  voyage:     "Found the way home.",
+  order:      "Put the islands in order.",
+  ithaca:     "Home."
 };
+
+// the card for a chapter: his titles plus every deed before it (and this chapter's, once it is done)
+export function nameCard(chapter, { done = false } = {}) {
+  const i = CHAPTERS.indexOf(chapter);
+  const deeds = CHAPTERS.slice(0, done ? i + 1 : i).map(c => DEEDS[c]);
+  return { name: "ODYSSEUS", sub: [TITLES.join(" "), ...deeds].join("<br>") };
+}
+
+// kept for pages written before nameCard: the card at the start of each chapter
+export const TAGS = Object.fromEntries(CHAPTERS.map(c => [c, nameCard(c)]));

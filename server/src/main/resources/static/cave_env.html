@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Cave of Polyphemus</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: #e9e4da; font-family: 'Courier Prime', monospace; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #050403; z-index: 40; transition: opacity 1s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 30px; color: #f2c230; }
+  #loading p { margin: 0; color: #8a979b; font-size: 15px; }
+  #menu { position: fixed; left: 16px; bottom: 16px; z-index: 10; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); }
+  #menu .grp { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #menu .lbl { font-size: 11px; letter-spacing: 2px; color: #8c7c66; min-width: 64px; }
+  #menu button { min-height: 40px; padding: 0 14px; background: rgba(8, 6, 4, 0.8); color: #efe1c2; border: 1px solid #4a3a28; border-radius: 4px;
+                 font: inherit; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
+  #menu button:hover, #menu button:focus-visible { border-color: #f2c230; color: #f2c230; outline: none; }
+  #menu button.done { border-color: #6a8a58; color: #9fd08a; }
+  #chapter { position: fixed; left: 6%; top: 12%; pointer-events: none; z-index: 10; font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; transition: opacity 1s; }
+  #chapter b { display: block; margin-top: 2px; font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 46px; letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f; }
+  body.busy #menu, body.busy #chapter { opacity: 0; pointer-events: none; }
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.75); color: #efe1c2;
+          border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
+  #skip.on { display: block; }
+  body.cinematic #menu, body.cinematic #chapter { display: none; }
+  #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
+  #fast.on { display: flex; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="loading"><h1>THE CAVE OF POLYPHEMUS</h1><p>carving the pens…</p></div>
+<div id="chapter">CHAPTER TWO<b>THE CAVE OF POLYPHEMUS</b></div>
+<button id="skip">SKIP SCENE ▸▸ (Esc)</button>
+<div id="fast">▸▸</div>
+<div id="menu">
+  <div class="grp"><span class="lbl">FILM</span><button id="open-btn">▶ Opening</button><button id="climax-btn">▶ Climax</button></div>
+  <div class="grp"><span class="lbl">LESSON</span>
+    <button data-part="1">1 · Pens</button><button data-part="2">2 · Walking</button><button data-part="3">3 · Room &amp; gaps</button><button data-part="4">4 · Turning around</button></div>
+  <div class="grp"><span class="lbl">ARRANGE</span>
+    <button data-arrange="traverse">Sum</button><button data-arrange="insert">Insert</button><button data-arrange="delete">Delete</button><button data-arrange="reverse">Reverse</button></div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { World } from "./js/engine/world.js";
+import { Director } from "./js/engine/director.js";
+import { sound } from "./js/engine/sound.js";
+import { PenRow, PEN_W } from "./js/islands/cave/penRow.js";
+import { caveLesson } from "./js/islands/cave/caveLesson.js";
+import { Parsons, CAVE_PARSONS } from "./js/learn/parsons.js";
+import { buildCave, GIANT_AT } from "./js/islands/cave/caveScene.js";
+import { Cyclops } from "./js/islands/cave/cyclops.js";
+import { Hero } from "./js/engine/hero.js";
+import { Comic } from "./js/engine/comic.js";
+import { playCaveOpening } from "./js/islands/cave/caveOpening.js";
+import { playCaveClimax } from "./js/islands/cave/caveClimax.js";
+import { nameCard } from "./js/story/tags.js";
+import { FIRE_AT } from "./js/islands/cave/caveScene.js";
+
+sound.muted = true;                         // no music or sound effects for now
+const params = new URLSearchParams(location.search);
+const world = new World({ quality: params.get("q") || "auto" });
+world.grade.uniforms.letterbox.value = 0;   // no cinema bars while learning
+
+// ---------- the cave itself (caveScene.js), and Polyphemus dozing at the back by his cheeses
+const scene = world.scene;
+const cave = await buildCave(world);
+const giant = new Cyclops(world, { height: 11 });
+await giant.load();
+giant.place(GIANT_AT.x, 0, GIANT_AT.z, 8, 4); giant.play("idle", 0); giant.open(0.25);   // dozing: one eye, barely open
+
+const pens = new PenRow(world, { pens: 10 });
+pens.set([34, 52, 18, 77, 45, 60, 23, 81]);
+const director = new Director(world);
+const comic = new Comic(world, director);
+// Odysseus: by the fire while Athena teaches (the opening walks him in)
+const hero = await new Hero(world, { groundY: 0 }).load();
+hero.teleport(FIRE_AT.x + 1.7, FIRE_AT.z + 1.9, 2.4);
+
+// ---------- the opening film (caveOpening.js), and skipping it: fast-forward behind a black card
+let skipping = false, filming = false;
+const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast");
+function skip() { if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; fastEl.classList.add("on"); }
+skipBtn.onclick = skip;
+addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
+async function opening() {
+  if (filming) return;
+  filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy");
+  try { await playCaveOpening({ world, hero, director, comic, giant, cave, pens, card: nameCard("cyclops"), noCrawl: !!params.get("nocrawl") }); }
+  finally {
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy");
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
+    director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
+  }
+}
+document.getElementById("open-btn").onclick = () => opening();
+async function climax() {
+  if (filming) return;
+  filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy");
+  try { await playCaveClimax({ world, hero, director, comic, giant, cave, pens, cardAfter: nameCard("cyclops", { done: true }) }); }
+  finally {
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy");
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
+    director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
+  }
+}
+document.getElementById("climax-btn").onclick = () => climax();
+director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
+
+// ---------- the menu: each lesson part and each warm-up can be opened on its own
+const done = new Set();
+async function busy(fn, btn) {
+  document.body.classList.add("busy");
+  try { await fn(); } finally {
+    document.body.classList.remove("busy");
+    if (btn) btn.classList.add("done");
+    director.glide([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44, 1);
+  }
+}
+async function lesson(part, btn) {
+  await busy(async () => {
+    const player = caveLesson(part, { pens, director });
+    window.__lesson = player;
+    await player.open();
+  }, btn);
+}
+async function arrange(name, btn) {
+  await busy(async () => {
+    const p = new Parsons({ title: "Arrange the lines · " + name, ...CAVE_PARSONS[name] });
+    window.__parsons = p;
+    await p.open();
+  }, btn);
+}
+document.querySelectorAll("#menu [data-part]").forEach(b => b.onclick = () => lesson(+b.dataset.part, b));
+document.querySelectorAll("#menu [data-arrange]").forEach(b => b.onclick = () => arrange(b.dataset.arrange, b));
+
+// ---------- start: the world runs on the real clock, or (capture=1) only when a test steps it
+const loading = document.getElementById("loading");
+if (params.get("capture")) {
+  loading.remove();
+  world.resize();
+  world.step(0.016);
+  window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  window.__world = world; window.__pens = pens; window.__cave = cave; window.__giant = giant; window.__director = director; window.__lessonPart = lesson; window.__arrange = arrange; window.__opening = opening; window.__climax = climax; window.__hero = hero; window.__skip = skip;
+  window.__ready = true;
+} else {
+  world.start();
+  loading.style.opacity = 0; setTimeout(() => loading.remove(), 1000);
+  const part = params.get("part"); if (part) lesson(+part);
+  if (params.get("opening")) opening();
+  if (params.get("climax")) climax();
+}
+</script>
+</body>

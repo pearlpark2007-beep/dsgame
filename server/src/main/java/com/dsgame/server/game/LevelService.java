@@ -1,5 +1,6 @@
 package com.dsgame.server.game;
 
+import com.dsgame.server.game.levels.cave.*;
 import com.dsgame.server.game.levels.harbour.LoadTheShipLevel;
 import com.dsgame.server.game.levels.harbour.TheChainLevel;
 import com.dsgame.server.lang.CodeRunner;
@@ -23,6 +24,18 @@ public class LevelService {
         // the Laestrygonian Harbour (stack)
         register(new LoadTheShipLevel());   // practice
         register(new TheChainLevel());      // finale
+
+        // the Cave of Polyphemus (array): eight trials, a bonus, then the finale
+        register(new CountTheFlockLevel());  // traverse
+        register(new BlackRamLevel());       // linear search
+        register(new BiggestRamLevel());     // max
+        register(new TooThinLevel());        // count with a test
+        register(new TwoLambsLevel());       // insert at the end
+        register(new FirstOutLevel());       // insert at a position
+        register(new SupperLevel());         // delete at a position
+        register(new BackToFrontLevel());    // swap, reverse
+        register(new SortedLineLevel());     // bonus: binary search
+        register(new DawnLevel());           // finale
     }
 
     private void register(Level level) {

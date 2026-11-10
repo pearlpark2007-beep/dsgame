@@ -12,6 +12,7 @@ import static com.dsgame.server.lang.TokenType.*;
 public class Parser {
     private final List<Token> tokens;
     private int current = 0;
+    private int loopDepth = 0;   // so 'break' and 'continue' can only be used inside a loop
 
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
@@ -29,9 +30,17 @@ public class Parser {
 
     private Stmt statement() {
         if (match(INT)) {
-            Stmt declaration = declarationRest();
+            Stmt declaration = declarationList();
             consume(SEMICOLON, "Missing ';' after the declaration");
             return declaration;
+        }
+        if (match(BREAK, CONTINUE)) {
+            Token word = previous();
+            if (loopDepth == 0) {
+                throw new CompileError("'" + word.text() + "' can only be used inside a loop", word.line());
+            }
+            consume(SEMICOLON, "Missing ';' after '" + word.text() + "'");
+            return (word.type() == BREAK) ? new BreakStmt(word.line()) : new ContinueStmt(word.line());
         }
         if (match(IF))         return ifStatement();
         if (match(WHILE))      return whileStatement();
@@ -43,9 +52,41 @@ public class Parser {
         return simple;
     }
 
-    // after 'int':   x = 5
+    // after 'int':   x = 5   or   l = 0, r = 9   (several, separated by commas)
+    private Stmt declarationList() {
+        Stmt first = declarationRest();
+        if (!check(COMMA)) return first;
+        List<Stmt> all = new ArrayList<>();
+        all.add(first);
+        while (match(COMMA)) {
+            all.add(declarationRest());
+        }
+        return new ListStmt(all);
+    }
+
+    // one declaration:   x = 5   |   pens[10]   |   a[5] = {3, 1, 4}   |   b[] = {2, 7}
     private Stmt declarationRest() {
         Token name = consume(IDENTIFIER, "Expected a variable name after 'int'");
+        if (match(LEFT_BRACKET)) {
+            Expr size = check(RIGHT_BRACKET) ? null : expression();
+            consume(RIGHT_BRACKET, "Missing ']' after the size of " + name.text());
+            List<Expr> initial = null;
+            if (match(EQUAL)) {
+                consume(LEFT_BRACE, "An array starts with '{', like {3, 1, 4}");
+                initial = new ArrayList<>();
+                if (!check(RIGHT_BRACE)) {
+                    do {
+                        initial.add(expression());
+                    } while (match(COMMA));
+                }
+                consume(RIGHT_BRACE, "Missing '}' to close the list of values");
+            }
+            if (size == null && initial == null) {
+                throw new CompileError("The array " + name.text() + "[] needs a size, like "
+                        + name.text() + "[10]", name.line());
+            }
+            return new DeclareArrayStmt(name.text(), size, initial, name.line());
+        }
         Expr initializer = null;
         if (match(EQUAL)) {
             initializer = expression();
@@ -53,7 +94,7 @@ public class Parser {
         return new DeclareStmt(name.text(), initializer, name.line());
     }
 
-    // x = 5   |   i++   |   i--   |   push(&s, 10)
+    // x = 5   |   x += 2   |   i++   |   flock[i] = 5   |   flock[i]++   |   push(&s, 10)
     private Stmt simpleStatement() {
         if (check(IDENTIFIER)) {
             TokenType next = peekType(1);
@@ -61,6 +102,35 @@ public class Parser {
                 Token name = advance();   // the name
                 advance();                // the '='
                 return new AssignStmt(name.text(), expression(), name.line());
+            }
+            if (next == PLUS_EQUAL || next == MINUS_EQUAL) {
+                // x += 2  is just  x = x + 2
+                Token name = advance();
+                TokenType op = (advance().type() == PLUS_EQUAL) ? PLUS : MINUS;
+                Expr old = new VarExpr(name.text(), name.line());
+                return new AssignStmt(name.text(), new BinaryExpr(old, op, expression(), name.line()), name.line());
+            }
+            if (next == LEFT_BRACKET) {
+                int start = current;
+                Token name = advance();
+                advance();                // the '['
+                Expr index = expression();
+                consume(RIGHT_BRACKET, "Missing ']' after the index");
+                Expr cell = new IndexExpr(name.text(), index, name.line());
+                if (match(EQUAL)) {
+                    return new IndexAssignStmt(name.text(), index, expression(), name.line());
+                }
+                if (match(PLUS_EQUAL, MINUS_EQUAL)) {
+                    TokenType op = (previous().type() == PLUS_EQUAL) ? PLUS : MINUS;
+                    return new IndexAssignStmt(name.text(), index,
+                            new BinaryExpr(cell, op, expression(), name.line()), name.line());
+                }
+                if (match(PLUS_PLUS, MINUS_MINUS)) {
+                    TokenType op = (previous().type() == PLUS_PLUS) ? PLUS : MINUS;
+                    return new IndexAssignStmt(name.text(), index,
+                            new BinaryExpr(cell, op, new NumberExpr(1), name.line()), name.line());
+                }
+                current = start;          // just reading a cell, e.g.  flock[i];  : treat it as an expression
             }
             if (next == PLUS_PLUS || next == MINUS_MINUS) {
                 Token name = advance();
@@ -88,8 +158,18 @@ public class Parser {
         consume(LEFT_PAREN, "Expected '(' after 'while'");
         Expr condition = expression();
         consume(RIGHT_PAREN, "Expected ')' after the while condition");
-        Stmt body = statement();
+        Stmt body = loopBody();
         return new WhileStmt(condition, body, line);
+    }
+
+    // a loop's body: the only place 'break' and 'continue' are allowed
+    private Stmt loopBody() {
+        loopDepth++;
+        try {
+            return statement();
+        } finally {
+            loopDepth--;
+        }
     }
 
     private Stmt forStatement() {
@@ -98,7 +178,7 @@ public class Parser {
 
         Stmt init = null;
         if (match(INT)) {
-            init = declarationRest();
+            init = declarationList();
         } else if (!check(SEMICOLON)) {
             init = simpleStatement();
         }
@@ -107,10 +187,19 @@ public class Parser {
         Expr condition = check(SEMICOLON) ? null : expression();
         consume(SEMICOLON, "Expected ';' after the for-loop condition");
 
-        Stmt update = check(RIGHT_PAREN) ? null : simpleStatement();
+        Stmt update = null;
+        if (!check(RIGHT_PAREN)) {
+            update = simpleStatement();
+            if (check(COMMA)) {                    // for (...; ...; l++, r--)
+                List<Stmt> updates = new ArrayList<>();
+                updates.add(update);
+                while (match(COMMA)) updates.add(simpleStatement());
+                update = new ListStmt(updates);
+            }
+        }
         consume(RIGHT_PAREN, "Expected ')' to close the for loop");
 
-        Stmt body = statement();
+        Stmt body = loopBody();
         return new ForStmt(init, condition, update, body, line);
     }
 
@@ -214,6 +303,11 @@ public class Parser {
                 }
                 consume(RIGHT_PAREN, "Missing ')' after the arguments of " + name.text() + "()");
                 return new CallExpr(name.text(), args, name.line());
+            }
+            if (match(LEFT_BRACKET)) {
+                Expr index = expression();
+                consume(RIGHT_BRACKET, "Missing ']' after the index");
+                return new IndexExpr(name.text(), index, name.line());
             }
             return new VarExpr(name.text(), name.line());
         }

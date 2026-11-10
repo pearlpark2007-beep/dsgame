@@ -68,6 +68,13 @@ public interface Expr {
         }
     }
 
+    // flock[i]   reading one cell of an array
+    record IndexExpr(String name, Expr index, int line) implements Expr {
+        public int evaluate(Interpreter in) {
+            return in.readIndex(name, index.evaluate(in), line);
+        }
+    }
+
     // push(&s, 10),  pop(&s),  isEmpty(&q), ...
     record CallExpr(String name, List<Expr> args, int line) implements Expr {
         public int evaluate(Interpreter in) {

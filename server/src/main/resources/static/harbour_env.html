@@ -32,6 +32,7 @@
           font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
   #fast.on { display: flex; }
   @media (min-width: 901px) { body.side-panel #line { right: calc(460px + 3%); } body.side-panel #skip { right: 480px; } }
+  body.cinematic #hud, body.cinematic #pace, body.cinematic #line, body.cinematic #skip { visibility: hidden; }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
@@ -56,9 +57,16 @@ import { buildHarbour, goldenAmphora, QUAY_TOP } from "./js/islands/harbour/harb
 import { loadFonts } from "./js/islands/harbour/dsProps.js";
 import { TrialSet, CRATE_H } from "./js/islands/harbour/trialSet.js";
 import { buildTechProps } from "./js/islands/harbour/techProps.js";
-import { buildHarbourNav } from "./js/islands/harbour/harbourNav.js";
+import { buildHarbourNav, setPileObstacles } from "./js/islands/harbour/harbourNav.js";
 import { TrialMode } from "./js/islands/harbour/trialMode.js";
-import { TAGS } from "./js/story/tags.js";
+import { Comic } from "./js/engine/comic.js";
+import { Giant, CLIFF_GIANTS } from "./js/islands/harbour/giant.js";
+import { ChainTower } from "./js/islands/harbour/chainTower.js";
+import { playClimax } from "./js/islands/harbour/climax.js";
+import { playOpening } from "./js/islands/harbour/opening.js";
+import { Mood } from "./js/islands/harbour/mood.js";
+import { sound } from "./js/engine/sound.js";
+import { nameCard } from "./js/story/tags.js";
 import { stackLesson } from "./js/islands/harbour/stackLesson.js";
 import { ReturnBench } from "./js/islands/harbour/returnBench.js";
 import { Pace } from "./js/engine/pace.js";
@@ -104,6 +112,12 @@ const bench = new ReturnBench(world, { x: 1.3, z: 1.5, slots: 4 });
 const prize = trial.newCrate(99);
 prize.position.copy(HEAP);
 
+// ---------- the Chain Tower out in the water, and the harbour chain that traps the ship
+const chain = new ChainTower(world, harbour.models.crate, { x: -6, z: -52 });
+const mood = new Mood(world, harbour);
+// the Laestrygonians on the cliffs (made while loading, used by the opening and the ending)
+let crowd = [];
+
 // ---------- Odysseus, who walks only where the harbour lets him
 const nav = buildHarbourNav(trial);
 nav.addBox("trestle-heap", HEAP.x, HEAP.z, 0.8, 0.6);
@@ -115,6 +129,11 @@ hero.group.position.copy(START);
 
 // ---------- camera
 const director = new Director(world);
+const comic = new Comic(world, director);
+// Antiphates is big (three 12 MB files), so he loads quietly in the background
+// 34 m: on the quay among the ruined columns, they reach his shins
+const giant = new Giant(world, { height: 34 });
+const giantReady = giant.load().catch(e => console.warn("giant failed to load", e));
 const pace = new Pace(world);          // the player's speed control for Odysseus (+/- or the [ and ] keys)
 const controls = new OrbitControls(world.camera, world.renderer.domElement);
 controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.495; controls.enabled = false;
@@ -138,66 +157,19 @@ function codeLine(text) { lineEl.textContent = text; lineEl.classList.toggle("on
 // ---------- the Harbour's opening scene: arrival, name card, then real stack operations
 const P = new THREE.Vector3();
 const front = (spot, dz) => new THREE.Vector3(spot.x, spot.y, spot.z + dz);     // where he stands to reach something
+// the trial piles the lesson starts from (the opening borrows the quay for a moment and puts them back)
+const START_PILES = [{ name: "s", capacity: 3, initial: [4, 7] }, { name: "t", capacity: 3, initial: [3] }, { name: "u", capacity: 1, initial: [] }];
+const piles = {
+  set(specs) { trial.clearAll(); trial.rebuild(specs); setPileObstacles(nav, trial); },
+  restore() { this.set(START_PILES); }
+};
+// ---------- the Harbour's opening: the film that sets up the whole chapter (opening.js)
 async function play() {
   free(false);
-  document.getElementById("chapter").style.opacity = 1;
-  // 1. establishing: from high over the water down to the pier
-  director.cut([30, 14, -40], [13.5, 2, -12], 50);
-  const glide = director.glide([18.5, 2.2, -3.5], [13.5, 2.4, -12], 38, 4.5);
-  await hero.wait(1.0);
-  // 2. he walks down the pier toward a low camera: the "trunk shot", looking up at him
-  const walk1 = hero.walkTo(13.5, -5.4);
-  await glide;
-  director.cut([13.0, 1.75, -1.9], [13.5, 3.0, -6.5], 34);
-  await walk1;
   document.getElementById("chapter").style.opacity = 0;
-  // 3. freeze-frame: crash zoom, colour drains, the name card for this chapter of his story
-  await hero.wait(0.25);
-  await director.crashZoom(24, 0.18);
-  await director.freeze(TAGS.harbour.name, TAGS.harbour.sub, 2.8);
-  director.setFov(34);
-  // 4. push(&s, 99): lift the golden crate off its trestle, set it on top of s
-  director.follow(hero.group, { side: 2.6, up: 1.6, back: 4.6, lookUp: 1.1, lag: 2.2, fov: 40 });
-  codeLine("push(&s, 99);");
-  P.copy(front(HEAP, 0.78)); await hero.walkTo(P.x, P.z);
-  await hero.lift(prize);
-  P.copy(trial.standSpot(s)); await hero.walkTo(P.x, P.z);
-  director.mode = null;
-  director.glide([s.x + 2.4, 2.1, 2.6], [s.x - 0.1, 2.3, s.z], 38, 0.9);
-  const placed = await hero.place(trial.slot(s, s.crates.length));
-  trial.pushed(s, placed);
-  await director.crashZoom(30, 0.16);
-  await hero.wait(1.0);
-  director.setFov(38);
-  // 5. int x = pop(&s): he lifts the top crate off and sets it on the other trestle
-  codeLine("int x = pop(&s);");
-  const top = trial.top(s);
-  await hero.lift(top);
-  trial.popped(s);
-  director.follow(hero.group, { side: 2.4, up: 1.5, back: 4.4, lookUp: 1.1, lag: 2.2, fov: 40 });
-  P.copy(bench.front(0)); await hero.walkTo(P.x, P.z);
-  await hero.place(bench.slot(0), 0);
-  bench.tag(0, "x = 99");
-  // 6. push(&u, x): lift it again and set it on u, the narrow pile
-  codeLine("push(&u, x);");
-  await hero.lift(top);
-  P.copy(trial.standSpot(u)); await hero.walkTo(P.x, P.z);
-  trial.pushed(u, await hero.place(trial.slot(u, 0)));
-  await hero.wait(0.6);
-  // 7. he climbs s for a better look, and slips (a taste of the failure cinematics)
-  skipper.land();                                  // skip lands here, just before the climb
-  codeLine("// climb s ... the tower is too short");
-  P.copy(trial.climbSpot(s)); await hero.walkTo(P.x, P.z);
-  director.mode = null;
-  director.glide([s.x + 2.8, 1.6, 2.6], [s.x, 2.3, s.z], 40, 1.0);
-  s.gauge.stow(true);                              // the crane hook swings up out of his way
-  await hero.climb(s.crates.length * CRATE_H, new THREE.Vector3(s.x, 0, s.z));
-  await hero.wait(0.5);
-  world.timeScale = skipping ? 40 : 0.45;          // slow motion for the fall (unless skipping)
-  await hero.fall("slip", { groundY: QUAY_TOP, back: 1.4 });
-  world.timeScale = skipping ? 40 : 1;
-  await hero.wait(1.0);
-  codeLine("");
+  [prize].forEach(c => c.parent && c.parent.remove(c));
+  await giantReady;
+  await playOpening({ world, hero, director, comic, giant, chain, trial, harbour, card: nameCard("harbour"), piles, crowd });
 }
 
 // ---------- skipping a cutscene: fast-forward behind a black card, so the world ends in the right state
@@ -209,12 +181,17 @@ function skip() {
   world.timeScale = 40; fastEl.classList.add("on");
 }
 skipBtn.onclick = skip;
+// no music or sound effects for now: they come back once the whole theme is built
+sound.muted = true;
+addEventListener("pointerdown", () => sound.ctx, { once: true });
+addEventListener("keydown", () => sound.ctx, { once: true });
 addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
 
 // ---------- HUD
 const hud = document.getElementById("hud");
 const pb = document.createElement("button"); pb.textContent = "▶ play scene"; pb.className = "play"; pb.onclick = () => { if (!busy) location.search = ""; }; hud.appendChild(pb);
 const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) { trials.close(); lesson(); } }; hud.appendChild(lb);
+const cb = document.createElement("button"); cb.textContent = "climax (preview)"; cb.onclick = () => climaxPreview(); hud.appendChild(cb);
 const tb = document.createElement("button"); tb.textContent = "the trials"; tb.onclick = () => { if (!busy && !inLesson) trialsOpen(); }; hud.appendChild(tb);
 Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
 const qb = document.createElement("button");
@@ -276,9 +253,34 @@ const shiftForPanel = () => { document.body.classList.add("side-panel"); const w
 const trials = new TrialMode({
   world, hero, trial, nav, director, bench, HEAP, codeLine, skipper,
   skipping: () => skipping,
+  climax: () => climax(),
   panelView: on => { if (on) shiftForPanel(); else { document.body.classList.remove("side-panel"); world.camera.clearViewOffset(); } },
   onLesson: () => { trials.close(); removeEventListener("resize", shiftForPanel); lesson(); }
 });
+// the finale's ending: the comic climax (with the panel out of the way)
+async function climax() {
+  await giantReady;
+  free(false);
+  try { await playClimax({ world, hero, director, comic, giant, chain, trial, harbour, mood, crowd, cardAfter: nameCard("harbour", { done: true }) }); }
+  finally { world.timeScale = 1; }
+  // the chapter is over: start the harbour fresh, ready to play again
+  if (!params.get("capture")) location.search = "?free=1";
+}
+// preview: put the finale's end state on the quay and play the climax straight away
+async function climaxPreview() {
+  if (busy) return;
+  trials.close(); document.body.classList.remove("side-panel"); world.camera.clearViewOffset();
+  document.getElementById("chapter").style.opacity = 0;
+  trial.clearAll();
+  trial.rebuild([{ name: "tower", capacity: 6, initial: [12, 31, 45, 50, 63, 77] }, { name: "spare", capacity: 4, initial: [] }]);
+  setPileObstacles(nav, trial);
+  const tw = trial.piles.tower;
+  tw.gauge.stow(true);
+  hero.teleport(tw.x, tw.z - 0.15, 0, QUAY_TOP + tw.crates.length * CRATE_H);
+  skipper.begin();
+  try { await climax(); } finally { skipper.end(); }
+}
+
 async function trialsOpen() {
   free(false);
   document.getElementById("chapter").style.opacity = 0;
@@ -290,10 +292,44 @@ async function trialsOpen() {
 world.onFrame = () => { if (controls.enabled) controls.update(); showQ(); };
 const origUpdate = director.update.bind(director);
 director.update = (dt, time, raw) => { if (!director.paused) origUpdate(dt, time, raw); };
-window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__trials = () => trialsOpen(); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
+window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__climax = () => climaxPreview(); window.__trials = () => trialsOpen(); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
 window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
 
+// ---------- warm-up: the stutter at the start was the giants still unpacking (three 12 MB files) and their
+// textures going up to the graphics card on the first frames. So the loading screen stays until all of that is done.
+async function warmUp() {
+  await giantReady;
+  if (!giant.body) return;
+  crowd = CLIFF_GIANTS.map(([x, z, h]) => giant.clone({ height: h }));
+  // stand each one ON the cliff: find the rock under his feet (the highest of a few points round him), not a guessed height
+  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0);
+  const rock = [];
+  world.scene.traverse(o => { if (o.isMesh && !o.isInstancedMesh && o.visible && o.material && o.material.side !== THREE.BackSide && !o.isSkinnedMesh) rock.push(o); });
+  world.scene.updateMatrixWorld(true);
+  CLIFF_GIANTS.forEach(spot => {
+    const [x, z] = spot;
+    const ys = [];
+    for (const [dx, dz] of [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]]) {
+      ray.set(new THREE.Vector3(x + dx, 160, z + dz), down);
+      const hit = ray.intersectObjects(rock, false).find(h => h.point.y > 5 && h.point.y < 140);
+      if (hit) ys.push(hit.point.y);
+    }
+    if (ys.length) { ys.sort((a, b) => a - b); spot[3] = ys[Math.floor(ys.length / 2)] - 0.4; }
+  });
+  console.log("cliff giants stand at", JSON.stringify(CLIFF_GIANTS));
+  const all = [giant, ...crowd];
+  all.forEach(g => g.group.visible = true);
+  world.scene.traverse(o => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const m of ms) for (const k of ["map", "emissiveMap", "normalMap", "roughnessMap"]) if (m[k] && world.renderer.initTexture) world.renderer.initTexture(m[k]);
+  });
+  world.renderer.compile(world.scene, world.camera);
+  world.composer.render();
+  all.forEach(g => g.hide());
+}
 const loading = document.getElementById("loading");
+document.querySelector("#loading p").textContent = "waking the giants…";
+await warmUp();
 if (params.get("capture")) {
   // test mode: frames are stepped on request so the scene can be checked frame by frame
   window.__advance = async (seconds, dt = 1 / 30) => { const n = Math.round(seconds / dt); for (let i = 0; i < n; i++) { world.step(dt, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
