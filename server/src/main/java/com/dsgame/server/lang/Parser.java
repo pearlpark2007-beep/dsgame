@@ -29,6 +29,11 @@ public class Parser {
     // ---------- statements ----------
 
     private Stmt statement() {
+        if (isPointerType()) {
+            Stmt declaration = pointerDeclarationList();
+            consume(SEMICOLON, "Missing ';' after the declaration");
+            return declaration;
+        }
         if (match(INT)) {
             Stmt declaration = declarationList();
             consume(SEMICOLON, "Missing ';' after the declaration");
@@ -64,6 +69,74 @@ public class Parser {
         return new ListStmt(all);
     }
 
+    // ---------- pointers (Chapter 3) ----------
+
+    // does a pointer type start here?   Node* p   |   Node *p   |   struct Node* p
+    private boolean isPointerType() {
+        int k = 0;
+        if (check(IDENTIFIER) && peek().text().equals("struct")) k = 1;
+        Token t = tokens.get(Math.min(current + k, tokens.size() - 1));
+        return t.type() == IDENTIFIER && t.text().equals("Node") && peekType(k + 1) == STAR;
+    }
+
+    // after the type:   p = head   or   prev = NULL, *next = NULL   (several, separated by commas)
+    private Stmt pointerDeclarationList() {
+        if (peek().text().equals("struct")) advance();
+        advance();                         // Node
+        List<Stmt> all = new ArrayList<>();
+        do {
+            match(STAR);                   // Node* p   or   Node *p   or the *q in  Node *p, *q
+            Token name = consume(IDENTIFIER, "Expected a pointer name, like  Node* p = head;");
+            if (name.text().equals("NULL") || name.text().equals("Node")) {
+                throw new CompileError("'" + name.text() + "' can't be a pointer's name", name.line());
+            }
+            Expr init = match(EQUAL) ? expression() : null;
+            all.add(new DeclarePointerStmt(name.text(), init, name.line()));
+        } while (match(COMMA));
+        return all.size() == 1 ? all.get(0) : new ListStmt(all);
+    }
+
+    // p->next = q;   p->data = 5;   p->data++;   p->data += 2;   or null if this isn't one
+    private Stmt fieldAssignment() {
+        int start = current;
+        Expr target = postfix(primary());
+        if (target instanceof FieldExpr f) {
+            int line = f.line();
+            if (match(EQUAL)) return new FieldAssignStmt(f.pointer(), f.field(), f.who(), expression(), line);
+            if (match(PLUS_EQUAL, MINUS_EQUAL)) {
+                TokenType op = (previous().type() == PLUS_EQUAL) ? PLUS : MINUS;
+                return new FieldAssignStmt(f.pointer(), f.field(), f.who(), new BinaryExpr(f, op, expression(), line), line);
+            }
+            if (match(PLUS_PLUS, MINUS_MINUS)) {
+                TokenType op = (previous().type() == PLUS_PLUS) ? PLUS : MINUS;
+                return new FieldAssignStmt(f.pointer(), f.field(), f.who(), new BinaryExpr(f, op, new NumberExpr(1), line), line);
+            }
+        }
+        current = start;                   // only reading, e.g.  p->data;  : an expression after all
+        return null;
+    }
+
+    // after any value: follow  ->data  /  ->next  as many times as written
+    private Expr postfix(Expr expr) {
+        while (match(ARROW)) {
+            Token arrow = previous();
+            Token field = consume(IDENTIFIER, "After '->' write data or next, like p->next");
+            if (!field.text().equals("data") && !field.text().equals("next")) {
+                throw new CompileError("A node has only two parts: data and next (not '" + field.text() + "')", field.line());
+            }
+            expr = new FieldExpr(expr, field.text(), describe(expr), arrow.line());
+        }
+        return expr;
+    }
+
+    // how the player wrote a pointer, for messages: p, p->next, head->next->next
+    private static String describe(Expr e) {
+        if (e instanceof VarExpr v) return v.name();
+        if (e instanceof FieldExpr f) return f.who() + "->" + f.field();
+        if (e instanceof CallExpr c) return c.name() + "(...)";
+        return "that pointer";
+    }
+
     // one declaration:   x = 5   |   pens[10]   |   a[5] = {3, 1, 4}   |   b[] = {2, 7}
     private Stmt declarationRest() {
         Token name = consume(IDENTIFIER, "Expected a variable name after 'int'");
@@ -96,6 +169,10 @@ public class Parser {
 
     // x = 5   |   x += 2   |   i++   |   flock[i] = 5   |   flock[i]++   |   push(&s, 10)
     private Stmt simpleStatement() {
+        if (check(IDENTIFIER) && peekType(1) == ARROW) {
+            Stmt field = fieldAssignment();
+            if (field != null) return field;
+        }
         if (check(IDENTIFIER)) {
             TokenType next = peekType(1);
             if (next == EQUAL) {
@@ -177,7 +254,9 @@ public class Parser {
         consume(LEFT_PAREN, "Expected '(' after 'for'");
 
         Stmt init = null;
-        if (match(INT)) {
+        if (isPointerType()) {
+            init = pointerDeclarationList();
+        } else if (match(INT)) {
             init = declarationList();
         } else if (!check(SEMICOLON)) {
             init = simpleStatement();
@@ -277,7 +356,7 @@ public class Parser {
             Token op = previous();
             return new UnaryExpr(op.type(), unary(), op.line());
         }
-        return primary();
+        return postfix(primary());
     }
 
     private Expr primary() {
@@ -294,6 +373,7 @@ public class Parser {
         }
         if (match(IDENTIFIER)) {
             Token name = previous();
+            if (name.text().equals("NULL")) return new NumberExpr(0);   // NULL is address 0: no node
             if (match(LEFT_PAREN)) {
                 List<Expr> args = new ArrayList<>();
                 if (!check(RIGHT_PAREN)) {

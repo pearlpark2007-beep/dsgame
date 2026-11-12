@@ -57,8 +57,10 @@ export function sprayText(g, text, x, y, font, color, { scatter = 1.6, passes = 
 // Harbour cargo: in C the crates are plain ints, but some numbers mean something on this island
 // (the same names Java uses in HarbourCargo.java)
 export const CARGO = { 1: "WATER", 2: "BREAD", 3: "WINE", 8: "ROCKS", 77: "AXE" };
+// in the Lab the numbers are just numbers: the cargo names are switched off
+export const cargoNames = { on: true };
 export function crateFaceTexture(value) {
-  const gold = value === 99, name = CARGO[value];
+  const gold = value === 99 && cargoNames.on, name = cargoNames.on ? CARGO[value] : null;
   return canvasTex(512, 256, (g, w, h) => {
     if (name) {
       const col = value === 77 ? "#f0a050" : value === 8 ? "#a9a49a" : "#efe3c6";

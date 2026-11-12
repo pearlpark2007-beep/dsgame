@@ -14,11 +14,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1280, 720) },
-    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }, keepBlue: { value: 0 }, halo: { value: 1 }
+    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }, keepBlue: { value: 0 }, halo: { value: 1 }, focusOn: { value: 0 }, focusAt: { value: new THREE.Vector2(0.5, 0.5) }
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze, keepBlue, halo;
+    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze, keepBlue, halo, focusOn; uniform vec2 focusAt;
     varying vec2 vUv;
     float rand(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     float luma(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
@@ -52,6 +52,9 @@ const GradeShader = {
       vec2 d = vUv - 0.5;
       float edge = smoothstep(0.38, 0.85, length(d * vec2(1.25, 1.0)));                    // burned edges
       c = mix(c, c * vec3(0.55, 0.32, 0.2), edge * 0.85 * strength);
+      // learning focus: everything away from the thing being taught sinks into shadow
+      float fd = length((vUv - focusAt) * vec2(res.x / res.y, 1.0));
+      c *= mix(1.0, 0.42, focusOn * smoothstep(0.22, 0.75, fd));
       c += vec3(0.85, 0.8, 0.95) * flash * 0.2;
       c = mix(c, vec3(luma(c)) * vec3(1.08, 0.96, 0.78), freeze * 0.75);                       // freeze-frame: colour drains to sepia
       if (letterbox > 0.5 && abs(vUv.y - 0.5) > 0.5 * min(1.0, (res.x / res.y) / 2.39)) c = vec3(0.012, 0.01, 0.01);   // 2.39:1 cinema bars

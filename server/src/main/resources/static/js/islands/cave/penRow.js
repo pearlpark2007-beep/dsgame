@@ -48,7 +48,7 @@ function fleece() {
 }
 function makeSheep(weight) {
   const g = new THREE.Group();
-  const s = 0.72 + Math.min(weight, 100) / 220;           // heavier sheep are a little bigger
+  const s = 0.72 + Math.max(0, Math.min(weight, 100)) / 220;           // heavier sheep are a little bigger
   const body = new THREE.Mesh(fleece(), WOOL.clone());
   body.position.y = 0.62; g.add(body);
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.32, 0.3), FACE);

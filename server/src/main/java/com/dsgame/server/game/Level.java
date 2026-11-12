@@ -1,5 +1,7 @@
 package com.dsgame.server.game;
 
+import com.dsgame.server.ds.DataStructures;
+import com.dsgame.server.ds.NodeChain;
 import com.dsgame.server.lang.Interpreter;
 import com.dsgame.server.lang.TimelineStep;
 
@@ -43,8 +45,11 @@ public abstract class Level {
     // build fresh structures for this run and give them to the interpreter
     public void setup(Interpreter interpreter) {
         for (StructureSpec spec : structures) {
-            interpreter.addStructure(spec.name(), spec.build());
-            if (spec.lengthVar() != null) {
+            DataStructures ds = spec.build();
+            interpreter.addStructure(spec.name(), ds);
+            if (ds instanceof NodeChain chain) {
+                interpreter.bindPointer(spec.lengthVar(), chain.firstAddress());   // Node* head = the first node
+            } else if (spec.lengthVar() != null) {
                 interpreter.bindLength(spec.name(), spec.lengthVar(), spec.initial().size());
             }
         }

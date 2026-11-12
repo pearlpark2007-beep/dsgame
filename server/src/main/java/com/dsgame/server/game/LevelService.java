@@ -1,6 +1,7 @@
 package com.dsgame.server.game;
 
 import com.dsgame.server.game.levels.cave.*;
+import com.dsgame.server.game.levels.circe.*;
 import com.dsgame.server.game.levels.harbour.LoadTheShipLevel;
 import com.dsgame.server.game.levels.harbour.TheChainLevel;
 import com.dsgame.server.lang.CodeRunner;
@@ -36,6 +37,13 @@ public class LevelService {
         register(new BackToFrontLevel());    // swap, reverse
         register(new SortedLineLevel());     // bonus: binary search
         register(new DawnLevel());           // finale
+
+        // Circe's island (linked list): four trials, then the finale
+        register(new CountThePigsLevel());   // traverse
+        register(new FindEurylochusLevel()); // search, keep a pointer
+        register(new NewPigLevel());         // insert at the head
+        register(new CutLooseLevel());       // delete from the middle
+        register(new TurnThemBackLevel());   // finale: reverse
     }
 
     private void register(Level level) {
@@ -67,8 +75,23 @@ public class LevelService {
 
     // the heart of the game: run the player's code, then judge it
     public RunResult play(String id, String code) {
-        Level level = findLevel(id);
+        return judge(findLevel(id), code);
+    }
 
+    // THE LAB: the player's own starting data and any code. SandboxLevel is just another Level,
+    // so it goes through exactly the same judge() as the story levels.
+    public RunResult sandbox(String island, String code, List<StructureSpec> structures) {
+        SandboxLevel level;
+        try {
+            level = SandboxLevel.create(island, structures);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+        return judge(level, code);
+    }
+
+    // run the code on a fresh copy of the level's structures, then ask the level if it was won
+    private RunResult judge(Level level, String code) {
         Interpreter interpreter = new Interpreter();
         level.setup(interpreter);
 

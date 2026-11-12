@@ -75,6 +75,14 @@ public interface Expr {
         }
     }
 
+    // p->data   p->next   p->next->data ...  following a pointer into its node
+    // (who is how the player wrote the pointer before the arrow, e.g. "p" or "p->next", so messages can name it)
+    record FieldExpr(Expr pointer, String field, String who, int line) implements Expr {
+        public int evaluate(Interpreter in) {
+            return in.readField(pointer.evaluate(in), field, who, line);
+        }
+    }
+
     // push(&s, 10),  pop(&s),  isEmpty(&q), ...
     record CallExpr(String name, List<Expr> args, int line) implements Expr {
         public int evaluate(Interpreter in) {

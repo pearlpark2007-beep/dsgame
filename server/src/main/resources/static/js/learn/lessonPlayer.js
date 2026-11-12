@@ -1,3 +1,4 @@
+import "./panelWidth.js";
 // lessonPlayer.js — Athena's Learn mode, the same for every island.
 // A lesson is real C code plus a list of steps. Each step lights one line, says one thing,
 // updates the variables panel, and makes the 3D world act out what that line does.
@@ -5,7 +6,7 @@
 // Next goes one step forward; Auto plays on its own; Skip ends the lesson.
 
 const css = `
-#athena-learn { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; z-index: 25; box-sizing: border-box; display: flex; flex-direction: column;
+#athena-learn { position: fixed; top: 0; right: 0; bottom: 0; width: var(--pw, 520px); z-index: 25; box-sizing: border-box; display: flex; flex-direction: column;
   background: rgba(14, 10, 7, 0.94); border-left: 3px solid #2a1c12; color: #efe1c2; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace;
   transform: translateX(100%); transition: transform 0.5s cubic-bezier(.2,.8,.2,1); }
 #athena-learn.on { transform: none; }
@@ -43,6 +44,18 @@ const css = `
 #athena-learn .ctrl button.main { background: #f2c230; color: #1d140c; border-color: #f2c230; font-weight: 700; }
 #athena-learn .ctrl button:disabled { opacity: 0.4; cursor: default; }
 #athena-learn .prog { font-size: 12px; color: #8c7c66; padding: 0 14px; margin-top: 8px; }
+/* the code always gets real room: it grows to fill the panel and never shrinks below 200px; if the
+   screen is short the whole panel scrolls instead, with the buttons pinned at the bottom */
+#athena-learn { overflow-y: auto; }
+#athena-learn .code { flex: 1 0 auto; min-height: 200px; max-height: 56vh; }
+#athena-learn .ctrl { position: sticky; bottom: 0; background: rgba(14, 10, 7, 0.98); }
+@media (max-height: 820px) {
+  #athena-learn .head { padding: 10px 18px 6px; } #athena-learn .who { font-size: 22px; } #athena-learn .what { font-size: 11px; }
+  #athena-learn .code { font-size: 12.5px; line-height: 18px; min-height: 190px; margin-top: 8px; padding: 6px 0; }
+  #athena-learn .vars, #athena-learn .say, #athena-learn .out { margin-top: 8px; }
+  #athena-learn .say { font-size: 13.5px; line-height: 1.4; padding: 8px 12px; min-height: 0; }
+  #athena-learn .ctrl { padding: 8px 14px 10px; } #athena-learn .ctrl button { min-height: 38px; }
+}
 @media (max-width: 900px) { #athena-learn { width: 100%; top: auto; height: 58%; border-left: none; border-top: 3px solid #2a1c12; } #athena-learn .code { max-height: 24vh; } }
 `;
 

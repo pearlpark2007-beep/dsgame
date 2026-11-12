@@ -4,60 +4,87 @@
 // ending that fits the outcome. The browser never decides if the code is right: Java does.
 import * as THREE from "three";
 import { QUAY_TOP } from "./harbourScene.js";
-import { CRATE_H } from "./trialSet.js";
+import { CRATE_H, stackFrame } from "./trialSet.js";
 import { setPileObstacles } from "./harbourNav.js";
-import { CARGO } from "./dsProps.js";
+import { CARGO, cargoNames } from "./dsProps.js";
 import { sound } from "../../engine/sound.js";
+import { TRIAL_CSS as css } from "../../learn/trialPanelCss.js";
+import { StackBoard } from "../../learn/stackBoard.js";
+import { Codex } from "../../learn/codex.js";
+import { HARBOUR_CODEX } from "../../learn/codexContent.js";
 
 const STORE = "odyssey.harbour.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
 const markDone = id => { try { const d = done(); if (!d.includes(id)) { d.push(id); localStorage.setItem(STORE, JSON.stringify(d)); } } catch { /* storage off */ } };
 
-const css = `
-#trial-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; z-index: 25; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
-  padding: 16px 18px; background: rgba(14, 10, 7, 0.95); border-left: 3px solid #2a1c12; color: #efe1c2; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace;
-  transform: translateX(100%); transition: transform 0.5s cubic-bezier(.2,.8,.2,1); overflow-y: auto; }
-#trial-panel.on { transform: none; }
-#trial-panel .who { font-family: Anton, 'Inter Display Black', Impact, sans-serif; font-size: 26px; letter-spacing: 2px; color: #f2c230; text-shadow: 2px 2px 0 #7e1a0f; }
-#trial-panel .tabs { display: flex; gap: 6px; }
-#trial-panel .tab { flex: 1; min-height: 42px; background: transparent; color: #b9a684; border: 1px solid #4a3a28; font: inherit; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
-#trial-panel .tab.on { border-color: #f2c230; color: #f2c230; background: rgba(242,194,48,0.08); }
-#trial-panel h2 { margin: 2px 0 0; font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 24px; letter-spacing: 1px; }
-#trial-panel .story { margin: 0; color: #b9a684; font-size: 14px; font-style: italic; }
-#trial-panel .goal { margin: 0; font-size: 14px; line-height: 1.45; }
-#trial-panel .goal b { color: #f2c230; letter-spacing: 2px; font-size: 12px; display: block; }
-#trial-panel .meta { display: flex; justify-content: space-between; font-size: 13px; color: #b9a684; }
-#trial-panel .meta .moves b { color: #f2c230; }
-#trial-panel .hint { font-size: 13px; color: #d8c49a; border: 1px dashed #5a4630; padding: 6px 8px; }
-#trial-panel .linkb { background: none; border: none; color: #f2c230; font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 0; text-align: left; }
-#trial-panel .editor { position: relative; display: flex; height: 220px; border: 1px solid #2f2116; background: #0a0705; border-radius: 3px; overflow: hidden; flex: none; }
-#trial-panel .gutter { width: 34px; padding: 10px 6px 10px 0; box-sizing: border-box; text-align: right; color: #5c4c3a; font-size: 13px; line-height: 20px; white-space: pre; overflow: hidden; user-select: none; }
-#trial-panel .wrap { position: relative; flex: 1; overflow: hidden; }
-#trial-panel .hl { position: absolute; left: 0; right: 0; height: 20px; background: rgba(242,194,48,0.16); border-left: 3px solid #f2c230; display: none; pointer-events: none; }
-#trial-panel .hl.err { background: rgba(224,68,42,0.22); border-left-color: #e0442a; }
-#trial-panel textarea { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; resize: none; border: none; outline: none; background: transparent;
-  color: #efe1c2; font-family: inherit; font-size: 13px; line-height: 20px; padding: 10px; white-space: pre; overflow: auto; tab-size: 4; }
-#trial-panel .run { min-height: 48px; background: #f2c230; color: #1d140c; border: none; font-family: Anton, Impact, sans-serif; font-size: 20px; letter-spacing: 3px; cursor: pointer; }
-#trial-panel .run:disabled { opacity: 0.5; cursor: wait; }
-#trial-panel .row { display: flex; gap: 8px; }
-#trial-panel .row button { flex: 1; min-height: 40px; background: transparent; color: #efe1c2; border: 1px solid #4a3a28; font: inherit; font-size: 13px; cursor: pointer; }
-#trial-panel .status { min-height: 40px; font-size: 14px; line-height: 1.45; }
-#trial-panel .status.bad { color: #f0a08c; } #trial-panel .status.good { color: #f2c230; }
-#trial-panel .words { font-size: 12px; color: #8c7c66; line-height: 1.6; border-top: 1px solid #3a2a1c; padding-top: 8px; }
-#trial-panel .words code { color: #efe1c2; }
-@media (max-width: 900px) { #trial-panel { width: 100%; top: auto; height: 60%; border-left: none; border-top: 3px solid #2a1c12; } }
-`;
-const TIER = { PRACTICE: "PRACTICE", FINALE: "FINALE" };
-const cargo = v => CARGO[v] || String(v);
+const TIER = { PRACTICE: "PRACTICE", FINALE: "FINALE", LAB: "⚗ LAB" };
+
+// THE LAB: the player builds the quay (up to 3 stacks, up to 6 crates high) and writes anything.
+// Java runs it (POST /api/sandbox); nothing to win. The examples are classic stack algorithms on s and t.
+const LAB_EXAMPLES = {
+  "Move all (it reverses)": `// pop everything off s onto t: the order flips
+while (!isEmpty(&s)) {
+    push(&t, pop(&s));
+}`,
+  "Sort a stack": `// sort s using t: t ends with the biggest on top
+while (!isEmpty(&s)) {
+    int x = pop(&s);
+    while (!isEmpty(&t) && peek(&t) > x) {
+        push(&s, pop(&t));
+    }
+    push(&t, x);
+}`,
+  "Find the biggest": `// look at every crate without losing any:
+// move them all to t, then back to s
+int big = peek(&s);
+while (!isEmpty(&s)) {
+    int x = pop(&s);
+    if (x > big) { big = x; }
+    push(&t, x);
+}
+while (!isEmpty(&t)) {
+    push(&s, pop(&t));
+}`,
+  "Bottom to top": `// bring the bottom crate of s to the top, using t
+while (size(&s) > 1) {
+    push(&t, pop(&s));
+}
+int bottom = pop(&s);
+while (!isEmpty(&t)) {
+    push(&s, pop(&t));
+}
+push(&s, bottom);`,
+  "Overflow": `// keep pushing until there is no slot left
+while (1) {
+    push(&s, 5);
+}`,
+  "Underflow": `// keep popping until there is nothing left
+while (1) {
+    pop(&s);
+}`
+};
+const LAB = {
+  id: "lab", tier: "LAB", title: "The Lab",
+  story: "No giants. No chain. Your quay, your code: Athena only watches.",
+  goal: "", hint: "The examples use stacks called s and t. Values are written bottom first: 3 7 means 7 is on top.",
+  starterCode: LAB_EXAMPLES["Sort a stack"], maxMoves: 0,
+  structures: [{ name: "s", kind: "stack", capacity: 5, initial: [34, 3, 77, 12] }, { name: "t", kind: "stack", capacity: 5, initial: [] }]
+};
+const NAME_OK = /^[a-z][a-z0-9_]{0,9}$/, RESERVED = new Set(["int", "if", "else", "while", "for", "break", "continue", "push", "pop", "peek", "isempty", "isfull", "size", "n", "flock", "return"]);
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const cargo = v => (cargoNames.on && CARGO[v]) || String(v);
 
 export class TrialMode {
   // ctx: { world, hero, trial, nav, director, bench, HEAP, codeLine(text), skipping(), skipper: { begin(), end() }, onLesson() }
   constructor(ctx) {
     this.ctx = ctx; this.levels = []; this.level = null; this.busy = false;
+    this.board = new StackBoard();
     if (!document.getElementById("trial-css")) { const s = document.createElement("style"); s.id = "trial-css"; s.textContent = css; document.head.appendChild(s); }
     const el = this.el = document.createElement("aside");
     el.id = "trial-panel"; el.setAttribute("aria-label", "Athena: the trials");
     el.innerHTML = `<div class="who">ATHENA · THE TRIALS</div><div class="tabs"></div><h2></h2><p class="story"></p><p class="goal"></p>
+      <div class="lab"><div class="labhead">YOUR QUAY <small>(values bottom first: <code>3 7</code> puts 7 on top)</small></div>
+        <div class="labrows"></div><div class="labbtns"></div><div class="labmsg" aria-live="polite"></div></div>
       <div class="meta"><span class="moves"></span><span class="hintArea"></span></div>
       <div class="editor"><div class="gutter">1</div><div class="wrap"><div class="hl"></div><label class="sr" style="position:absolute;left:-9999px" for="tcode">Your C code</label><textarea id="tcode" spellcheck="false" autocomplete="off"></textarea></div></div>
       <button class="run">GUIDE HIM</button>
@@ -73,7 +100,77 @@ export class TrialMode {
     this.$(".run").onclick = () => this.run();
     this.$(".reset").onclick = () => { if (!this.busy && this.level) this.select(this.level); };
     this.$(".lessonb").onclick = () => { if (!this.busy && ctx.onLesson) ctx.onLesson(); };
+    if (!document.getElementById("harbour-lab-css")) { const st = document.createElement("style"); st.id = "harbour-lab-css"; st.textContent = LAB_CSS; document.head.appendChild(st); }
+    this.buildLab();
+    this.codex = new Codex(el, HARBOUR_CODEX, part => this.runPart(part));
   }
+  // the Codex's "run this part": the part's steps, in the Lab, on its own stacks
+  async runPart(part) {
+    if (this.busy || !part.run) return;
+    if (!this.levels.length) await this.open();
+    LAB.structures = part.run.stacks.map(x => ({ name: x.name, kind: "stack", capacity: x.capacity, initial: x.initial.slice() }));
+    this.select(LAB);
+    this.code.value = part.run.code; this.updateGutter();
+    this.codex.say(part);
+    await this.run();
+    if (!this.busy) this.status(`${part.name}: that's the part from the whole program, run on the board.`, "good");
+  }
+
+  // ---------- the Lab's controls: one row per stack (name, size, crates), presets, examples
+  buildLab() {
+    const btns = this.$(".labbtns");
+    const add = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = () => { if (!this.busy) fn(); }; btns.appendChild(b); return b; };
+    this.addBtn = add("+ stack", () => { const used = new Set(LAB.structures.map(x => x.name)); const name = ["s", "t", "u", "v"].find(x => !used.has(x)); LAB.structures.push({ name, kind: "stack", capacity: 4, initial: [] }); this.labRows(); this.labApply(); });
+    add("Random", () => { for (const x of LAB.structures) x.initial = Array.from({ length: rnd(0, x.capacity - 1) }, () => rnd(1, 99)); this.labRows(); this.labApply(); });
+    add("Empty all", () => { for (const x of LAB.structures) x.initial = []; this.labRows(); this.labApply(); });
+    const sel = document.createElement("select"); sel.className = "examples"; sel.setAttribute("aria-label", "Load an example algorithm");
+    sel.innerHTML = `<option value="">Examples…</option>` + Object.keys(LAB_EXAMPLES).map(k => `<option>${k}</option>`).join("");
+    sel.onchange = () => { if (!sel.value || this.busy) return; this.code.value = LAB_EXAMPLES[sel.value]; this.updateGutter(); this.mark(0); this.status(`${sel.value} loaded. Press GUIDE HIM.`); sel.value = ""; };
+    btns.appendChild(sel);
+  }
+  // draw the rows from LAB.structures
+  labRows() {
+    const rows = this.$(".labrows"); rows.innerHTML = "";
+    LAB.structures.forEach((x, i) => {
+      const r = document.createElement("div"); r.className = "labrow";
+      r.innerHTML = `<input class="nm" aria-label="Stack ${i + 1} name" value="${x.name}" maxlength="10" spellcheck="false">
+        <select class="cap" aria-label="Stack ${i + 1} size">${[1, 2, 3, 4, 5, 6].map(c => `<option${c === x.capacity ? " selected" : ""}>${c}</option>`).join("")}</select>
+        <input class="vals" aria-label="Stack ${i + 1} crates, bottom first" value="${x.initial.join(" ")}" spellcheck="false" placeholder="empty">
+        <button class="rm" title="Remove this stack" aria-label="Remove stack ${x.name}">✕</button>`;
+      const read = () => this.labRead();
+      r.querySelector(".nm").oninput = read; r.querySelector(".vals").oninput = read; r.querySelector(".cap").onchange = read;
+      r.querySelector(".rm").onclick = () => { if (this.busy || LAB.structures.length <= 1) return; LAB.structures.splice(i, 1); this.labRows(); this.labApply(); };
+      rows.appendChild(r);
+    });
+    this.addBtn.disabled = LAB.structures.length >= 3;
+    rows.querySelectorAll(".rm").forEach(b => (b.disabled = LAB.structures.length <= 1));
+  }
+  // read the rows back; anything wrong is said in plain words and GUIDE HIM waits
+  labRead() {
+    const msg = this.$(".labmsg"), rows = [...this.$(".labrows").children], next = [], seen = new Set();
+    let error = "";
+    rows.forEach(r => r.querySelectorAll("input").forEach(x => x.classList.remove("bad")));
+    for (const r of rows) {
+      const nmEl = r.querySelector(".nm"), vEl = r.querySelector(".vals");
+      const name = nmEl.value.trim(), capacity = +r.querySelector(".cap").value;
+      if (!NAME_OK.test(name) || RESERVED.has(name.toLowerCase())) { error ||= `"${name}" can't be a stack's name: use small letters, like s or spare.`; nmEl.classList.add("bad"); }
+      else if (seen.has(name)) { error ||= `Two stacks are both called "${name}".`; nmEl.classList.add("bad"); }
+      seen.add(name);
+      const parts = vEl.value.split(/[\s,]+/).filter(Boolean), initial = [];
+      for (const p of parts) { if (!/^-?\d{1,3}$/.test(p)) { error ||= `"${p}" isn't a whole number from -999 to 999.`; vEl.classList.add("bad"); } else initial.push(parseInt(p, 10)); }
+      if (initial.length > capacity) { error ||= `${name} holds ${capacity}, but you gave it ${initial.length} crates.`; vEl.classList.add("bad"); }
+      next.push({ name, kind: "stack", capacity, initial });
+    }
+    msg.classList.toggle("bad", !!error); this.$(".run").disabled = !!error || this.busy;
+    if (error) { msg.textContent = error; return; }
+    msg.textContent = next.map(x => `${x.name}: ${x.initial.length ? "top = " + (x.initial.length - 1) : "empty"}`).join("   ·   ");
+    LAB.structures = next;
+    clearTimeout(this.labT); this.labT = setTimeout(() => this.labApply(), 450);   // rebuild the quay once typing pauses
+  }
+  labApply() { if (!this.busy && this.level === LAB) { this.select(LAB, true); this.labRead2(); } }
+  labRead2() { const msg = this.$(".labmsg"); if (!msg.classList.contains("bad")) msg.textContent = LAB.structures.map(x => `${x.name}: ${x.initial.length ? "top = " + (x.initial.length - 1) : "empty"}`).join("   ·   "); }
+  // open straight onto the Lab
+  async openLab() { await this.open(); if (this.levels.length) this.select(LAB); }
 
   async open() {
     this.el.classList.add("on");
@@ -81,12 +178,12 @@ export class TrialMode {
       try {
         const r = await fetch("/api/levels?island=harbour");
         this.levels = await r.json();
-      } catch (e) { this.status("Can't reach the server. Is Spring Boot running?", "bad"); return; }
+      } catch (e) { this.status("Can't reach the game server. Run the Spring Boot app in IntelliJ, then open http://localhost:8081/harbour_env.html (not IntelliJ's browser preview).", "bad"); return; }
     }
     const d = done();
     this.select(this.levels.find(l => !d.includes(l.id)) || this.levels[0]);
   }
-  close() { this.el.classList.remove("on"); }
+  close() { this.el.classList.remove("on"); this.board.close(); }
   // the finale opens once every practice level on the island is done
   locked(l) { const d = done(); return l.tier === "FINALE" && this.levels.some(p => p.tier === "PRACTICE" && !d.includes(p.id)); }
 
@@ -101,11 +198,12 @@ export class TrialMode {
 
   renderTabs() {
     const d = done(), tabs = this.$(".tabs"); tabs.innerHTML = "";
-    this.levels.forEach(l => {
+    [...this.levels, LAB].forEach(l => {
       const b = document.createElement("button");
       b.className = "tab" + (l === this.level ? " on" : "");
       const locked = this.locked(l);
-      b.textContent = (locked ? "🔒 " : "") + TIER[l.tier] + " · " + l.title + (d.includes(l.id) ? " ✓" : "");
+      b.textContent = l === LAB ? "⚗ THE LAB" : (locked ? "🔒 " : "") + TIER[l.tier] + " · " + l.title + (d.includes(l.id) ? " ✓" : "");
+      if (l === LAB) b.classList.add("labtab");
       b.setAttribute("aria-pressed", l === this.level);
       b.onclick = () => { if (this.busy) return; if (locked) { this.status("Finish the practice first: the crew won't row out with an empty hold.", "bad"); return; } this.select(l); };
       tabs.appendChild(b);
@@ -116,12 +214,17 @@ export class TrialMode {
   select(l, keepCode = false) {
     const { trial, nav, hero, bench, director } = this.ctx;
     this.level = l;
+    if (!keepCode) this.board.close();
     this.$("h2").textContent = l.title;
     this.$(".story").textContent = l.story;
     this.$(".goal").innerHTML = "<b>THE TRIAL</b>"; this.$(".goal").append(l.goal);
+    const lab = l === LAB;
+    cargoNames.on = !lab;                 // Lab crates are plain numbers (3 is 3, not WINE)
+    this.$(".lab").classList.toggle("on", lab); this.$(".goal").style.display = lab ? "none" : "";
+    if (lab && !keepCode) { this.labRows(); this.labRead2(); }
     const ha = this.$(".hintArea"); ha.innerHTML = "";
     if (l.hint) { const b = document.createElement("button"); b.className = "linkb"; b.textContent = "ask for a hint"; b.onclick = () => this.status(l.hint); ha.appendChild(b); }
-    if (!keepCode) this.code.value = l.starterCode;
+    if (!keepCode) { this.code.value = l.starterCode; if (this.codex) this.codex.say(null); }
     this.updateGutter(); this.mark(0);
     this.moves(0); this.status("");
     trial.clearAll();                      // every crate from before leaves the quay
@@ -129,9 +232,11 @@ export class TrialMode {
     bench.clear();
     const first = Object.values(trial.piles)[0];
     hero.teleport(first.x + 1.6, first.z + 2.2, Math.PI * 0.85);
-    director.cut(...this.wideShot());
+    this.focus = null; this.stackView(true);
     this.renderTabs();
   }
+  // the stack camera: the pile in use (or every pile, between runs) and Odysseus, as big as they fit
+  stackView(snap = false) { const { trial, hero, director } = this.ctx; stackFrame(director, trial, hero, () => (this.focus ? [this.focus] : Object.values(trial.piles)), { snap }); }
   // high enough to see over the Return Values bench
   wideShot() { const ps = Object.values(this.ctx.trial.piles), cx = ps.reduce((a, p) => a + p.x, 0) / ps.length; return [[cx + 0.8, 5.0, 7.4 + ps.length * 0.5], [cx, 1.5, -1.5], 44]; }
 
@@ -144,74 +249,140 @@ export class TrialMode {
     this.status("Athena speaks…");
     let res;
     try {
-      const r = await fetch(`/api/levels/${this.level.id}/play`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+      const lab = this.level === LAB;
+      const r = lab
+        ? await fetch("/api/sandbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ island: "harbour", code, structures: LAB.structures }) })
+        : await fetch(`/api/levels/${this.level.id}/play`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+      if (lab && r.status === 400) {          // the quay the player built was refused: say why, in Java's words
+        let why = "The server refused this quay."; try { why = (await r.json()).message || why; } catch { /* no body */ }
+        this.status(why.replace(/^\d+ BAD_REQUEST\s*"?|^BAD_REQUEST:\s*|"$/g, ""), "bad"); this.busy = false; this.$(".run").disabled = false; return;
+      }
       if (!r.ok) throw new Error("server answered " + r.status);
       res = await r.json();
-    } catch (e) { this.status("Can't reach the server (" + e.message + ").", "bad"); this.busy = false; this.$(".run").disabled = false; return; }
+    } catch (e) { this.status("Can't reach the game server (" + e.message + "). Run the Spring Boot app in IntelliJ, then open http://localhost:8081/harbour_env.html.", "bad"); this.busy = false; this.$(".run").disabled = false; return; }
     this.ctx.skipper.begin();
     const finale = this.level.tier === "FINALE";
     if (finale) sound.drums(true, { bpm: 88 });         // the finale is played against the giants' war drums
     try { await this.play(res, code.split("\n")); }
-    finally { sound.drums(false); this.ctx.skipper.end(); this.busy = false; this.$(".run").disabled = false; this.ctx.codeLine(""); }
+    finally { sound.drums(false); this.ctx.skipper.end(); this.busy = false; this.$(".run").disabled = false; this.ctx.codeLine(""); if (!finale) { this.focus = null; this.stackView(); } }
   }
 
   // ---------- acting out Java's steps
   async play(res, lines) {
     this.lines = lines;
-    const { trial, hero, director, bench, HEAP, codeLine } = this.ctx;
-    const steps = res.steps || [];
-    let moves = 0;
+    const { trial, hero, director, bench, HEAP, codeLine, world } = this.ctx;
     if (res.outcome === "COMPILE_ERROR") return this.endCompile(res);
-    for (let i = 0; i < steps.length; i++) {
-      const st = steps[i], pile = trial.piles[st.target];
-      this.mark(st.line); codeLine((lines[st.line - 1] || "").trim());
-      this.status(`line ${st.line}: ${st.message}`);
-      if (!pile) continue;
-      if (st.action === "PUSH") {
-        const c = await this.obtain(st.value);
-        await this.goTo(pile);
-        trial.pushed(pile, await hero.place(trial.slot(pile, st.index), 0));
-        this.moves(++moves);
-      } else if (st.action === "POP") {
-        await this.freeHands();
-        await this.goTo(pile);
-        const c = trial.top(pile);
-        await hero.lift(c);
-        trial.popped(pile);
-        this.moves(++moves);
-        // does the very next step push this same value? then he keeps it in his hands
-        const nx = steps[i + 1];
-        if (!(nx && (nx.action === "PUSH" || nx.action === "OVERFLOW") && nx.value === st.value)) await this.stash(c, lines[st.line - 1]);
-      } else if (st.action === "PEEK") {
-        await this.freeHands();
-        await this.goTo(pile);
-        pile.gauge.flash("check", pile.crates.length - 1);
-        const top = trial.top(pile), y0 = top ? top.position.y : 0;
-        if (top) await hero.over(0.6, k => top.position.y = y0 + Math.sin(Math.PI * k) * 0.06);   // the top crate gives a little hop: "this one"
-        codeLine(`peek(&${pile.name}) → ${st.value}`);
-        await hero.wait(0.5);
-      } else if (st.action === "OVERFLOW") {
-        await this.obtain(st.value);
-        this.ctx.skipper.land();                   // a skip stops here: the failure itself is always watched
-        await this.goTo(pile);
-        await this.overflow(pile, res);
-        return this.endFail(res, "STACK OVERFLOW", `${pile.name} is full (${pile.crates.length}/${pile.capacity}). push(${st.value}) has nowhere to go.`, { pile });
-      } else if (st.action === "UNDERFLOW") {
-        await this.freeHands();
-        await this.goTo(pile);
-        this.ctx.skipper.land();
-        pile.gauge.flash("empty", 0);
-        await hero.reachFor(trial.slot(pile, 0));
-        return this.endFail(res, "STACK UNDERFLOW", `${pile.name} is empty (top = -1). pop() has nothing to take.`, { fall: true, pile });
+    let all = res.steps || [];
+    if (res.outcome === "INFINITE_LOOP") all = all.slice(0, 40);   // the same moment a few times is enough
+    const acting = s => s.action !== "VAR";
+    // the 2D board under the harbour: every frame built up front; the 3D acts them out one by one
+    const board = this.board;
+    board.load({ piles: this.level.structures, steps: all, label: v => (cargoNames.on && CARGO[v]) || "" });
+    board.open();
+    const P = this.player = { k: 0, playing: true, once: false, wake: null, view: null, speed: 1, ended: false, auto: null };
+    const rate = () => { if (!this.ctx.skipping()) world.timeScale = P.speed; };
+    const resume = () => { if (P.wake) { const w = P.wake; P.wake = null; w(); } };
+    const sync = () => board.setEnabled(board.k > 0, P.ended ? board.k < all.length : true);
+    const stopAuto = () => { if (P.auto) { clearInterval(P.auto); P.auto = null; } };
+    board.setPlaying(true); board.setLive(0); sync();
+    board.cb.onPlay = () => {
+      if (P.ended) {
+        // after the run: replay the board on its own (the harbour has already acted it all out)
+        if (board.k >= all.length) board.show(0);
+        board.setPlaying(true); stopAuto();
+        P.auto = setInterval(() => { board.show(board.k + 1); sync(); if (board.k >= all.length) { stopAuto(); board.setPlaying(false); } }, 650 / P.speed);
+        return;
       }
-    }
-    this.mark(0);
-    await this.freeHands();
-    this.ctx.skipper.land();                       // skip lands here: right before the ending
-    if (res.outcome === "SUCCESS") return this.endSuccess(res);
-    if (res.outcome === "GOAL_NOT_MET") return this.endGoalNotMet(res);
-    if (res.outcome === "INFINITE_LOOP") return this.endLoop(res);
-    return this.endFail(res, "SOMETHING WENT WRONG", res.message, { line: res.line });
+      P.playing = true; P.view = null; board.show(P.k); board.setPlaying(true); sync(); resume();
+    };
+    board.cb.onPause = () => { stopAuto(); P.playing = false; board.setPlaying(false); };
+    board.cb.onSpeed = v => { P.speed = v; rate(); };
+    board.cb.onStep = dir => {
+      stopAuto(); P.playing = false; board.setPlaying(false);
+      if (dir === "fwd") {
+        if (P.ended || (P.view != null && P.view < P.k)) { P.view = Math.min(P.ended ? all.length : P.k, board.k + 1); board.show(P.view); if (!P.ended && P.view >= P.k) P.view = null; }
+        else { P.once = true; resume(); }
+      } else if (dir === "last") {
+        if (P.ended) board.show(all.length);
+        else { P.view = null; P.playing = true; board.setPlaying(true); board.show(P.k); if (!this.ctx.skipping()) world.timeScale = 6; resume(); }
+      } else {
+        // back / first: the board steps back on its own; the 3D harbour stays where it is
+        P.view = dir === "first" ? 0 : Math.max(0, board.k - 1); board.show(P.view);
+      }
+      sync();
+    };
+    const advanceBoard = k => { P.k = k; board.setLive(P.ended ? null : k); if (P.view == null) board.show(k); sync(); };
+
+    let moves = 0;
+    try {
+      for (let i = 0; i < all.length; i++) {
+        const st = all[i];
+        if (!acting(st)) { advanceBoard(i + 1); continue; }
+        if (!P.playing && !P.once) { await new Promise(r => (P.wake = r)); }
+        P.once = false;
+        const pile = trial.piles[st.target];
+        if (pile) this.focus = pile;
+        this.mark(st.line); codeLine((lines[st.line - 1] || "").trim());
+        this.status(`line ${st.line}: ${st.message}`);
+        if (P.view == null) board.show(i + 1);           // the board shows the step as it starts, the 3D catches up
+        if (!pile) { advanceBoard(i + 1); continue; }
+        if (st.action === "PUSH") {
+          await this.obtain(st.value);
+          await this.goTo(pile);
+          trial.pushed(pile, await hero.place(trial.slot(pile, st.index), 0));
+          this.moves(++moves);
+        } else if (st.action === "POP") {
+          await this.freeHands();
+          await this.goTo(pile);
+          const c = trial.top(pile);
+          await hero.lift(c);
+          trial.popped(pile);
+          this.moves(++moves);
+          // does the very next stack step push this same value? then he keeps it in his hands
+          const nx = all.slice(i + 1).find(acting);
+          if (!(nx && (nx.action === "PUSH" || nx.action === "OVERFLOW") && nx.value === st.value)) await this.stash(c, lines[st.line - 1]);
+        } else if (st.action === "PEEK") {
+          await this.freeHands();
+          await this.goTo(pile);
+          pile.gauge.flash("check", pile.crates.length - 1);
+          const top = trial.top(pile), y0 = top ? top.position.y : 0;
+          if (top) await hero.over(0.6, k => top.position.y = y0 + Math.sin(Math.PI * k) * 0.06);   // the top crate gives a little hop: "this one"
+          codeLine(`peek(&${pile.name}) → ${st.value}`);
+          await hero.wait(0.5);
+        } else if (st.action === "OVERFLOW") {
+          await this.obtain(st.value);
+          this.ctx.skipper.land();                   // a skip stops here: the failure itself is always watched
+          await this.goTo(pile);
+          this.end(i + 1);
+          await this.overflow(pile, res);
+          return this.endFail(res, "STACK OVERFLOW", `${pile.name} is full (${pile.crates.length}/${pile.capacity}). push(${st.value}) has nowhere to go.`, { pile });
+        } else if (st.action === "UNDERFLOW") {
+          await this.freeHands();
+          await this.goTo(pile);
+          this.ctx.skipper.land();
+          this.end(i + 1);
+          pile.gauge.flash("empty", 0);
+          await hero.reachFor(trial.slot(pile, 0));
+          return this.endFail(res, "STACK UNDERFLOW", `${pile.name} is empty (top = -1). pop() has nothing to take.`, { fall: true, pile });
+        }
+        advanceBoard(i + 1);
+      }
+      this.end(all.length);
+      this.mark(0);
+      await this.freeHands();
+      this.ctx.skipper.land();                       // skip lands here: right before the ending
+      if (res.outcome === "SUCCESS") return this.endSuccess(res);
+      if (res.outcome === "GOAL_NOT_MET") return this.endGoalNotMet(res);
+      if (res.outcome === "INFINITE_LOOP") return this.endLoop(res);
+      return this.endFail(res, "SOMETHING WENT WRONG", res.message, { line: res.line });
+    } finally { if (!this.ctx.skipping()) world.timeScale = 1; }
+  }
+  // the run is over: from here the board can be stepped freely (it only redraws; the harbour stays put)
+  end(k) {
+    const P = this.player; if (!P) return;
+    P.ended = true; P.k = k; P.playing = false; P.view = null;
+    if (!this.ctx.skipping()) this.ctx.world.timeScale = 1;
+    this.board.setLive(null); this.board.show(k); this.board.setPlaying(false); this.board.setEnabled(k > 0, false);
   }
 
   async goTo(pile) {
@@ -249,7 +420,7 @@ export class TrialMode {
     await hero.walkTo(f.x, f.z);
     await hero.place(bench.slot(i), 0);
     bench.put(i, c, `${name} = ${cargo(c.userData.value)}`);
-    this.ctx.codeLine(`${name} = ${c.userData.value}` + (CARGO[c.userData.value] ? `  (${cargo(c.userData.value)})` : ""));
+    this.ctx.codeLine(`${name} = ${c.userData.value}` + (cargoNames.on && CARGO[c.userData.value] ? `  (${cargo(c.userData.value)})` : ""));
   }
   // pop() without keeping the value: he heaves the crate off the quay into the sea
   async overboard(c) {
@@ -290,11 +461,16 @@ export class TrialMode {
   // (away from the Return Values bench), he climbs, and the card lands. Then the panel comes back.
   async endSuccess(res) {
     if (this.level.tier === "FINALE") return this.endFinale(res);
+    if (this.level === LAB) {                 // nothing to win in the Lab: say how the quay ended up
+      this.status(res.message, "good");
+      await this.ctx.director.stamp("DONE", "step back through it on the board", { kind: "good", seconds: 1.6 });
+      return;
+    }
     // practice: the hold is stocked. He checks the top crate, and the card lands.
     const { hero, trial, director } = this.ctx;
     const p = Object.values(trial.piles)[0], f = trial.sideSpot(p);
     await hero.walkTo(f.x, f.z); await hero.face(p.x, p.z);
-    this.el.classList.remove("on"); this.ctx.panelView(false);
+    this.el.classList.remove("on"); this.board.close(); this.ctx.panelView(false);
     const topY = QUAY_TOP + p.crates.length * CRATE_H;
     director.glide([p.x - 2.2, topY + 0.3, p.z + 4.4], [p.x, topY - 0.6, p.z], 40, 1.2);
     const top = trial.top(p), y0 = top.position.y;
@@ -302,7 +478,7 @@ export class TrialMode {
     markDone(this.level.id); this.renderTabs();
     this.status(res.message + " The finale is open.", "good");
     await director.stamp("THE SHIP IS LOADED", res.message, { kind: "good", seconds: 3.0 });
-    this.el.classList.add("on"); this.ctx.panelView(true);
+    this.el.classList.add("on"); this.board.open(); this.ctx.panelView(true);
   }
   // the finale's win: for now he climbs the tower with the axe on top (the full ending cinematic comes next)
   // the finale's win: he climbs the tower with the AXE on top, and the comic climax takes over
@@ -311,7 +487,7 @@ export class TrialMode {
     const s = Object.values(trial.piles)[0];
     const front = new THREE.Vector3(s.x, QUAY_TOP, s.z + 0.62);
     await hero.walkTo(front.x, front.z);
-    this.el.classList.remove("on"); this.ctx.panelView(false);
+    this.el.classList.remove("on"); this.board.close(); this.ctx.panelView(false);
     const topY = QUAY_TOP + s.crates.length * CRATE_H;
     director.glide([s.x - 2.4, 1.8, s.z + 4.6], [s.x, topY - 0.5, s.z], 46, 1.0);
     s.gauge.stow(true);                         // the crane hook swings up out of his way
@@ -364,3 +540,20 @@ export class TrialMode {
   }
 
 }
+
+const LAB_CSS = `
+#trial-panel .lab { display: none; border: 1px solid #5a4422; border-radius: 4px; padding: 8px 10px; background: #1a130c; }
+#trial-panel .lab.on { display: block; }
+#trial-panel .lab .labhead { font-size: 12.5px; color: #f2c230; letter-spacing: 1px; margin-bottom: 4px; }
+#trial-panel .lab .labhead small { color: #9c8a6c; letter-spacing: 0; }
+#trial-panel .lab .labrow { display: flex; gap: 4px; margin-top: 4px; }
+#trial-panel .lab input, #trial-panel .lab select { background: #0d0a07; color: #f4ead2; border: 1px solid #6b5432; border-radius: 3px; padding: 4px 6px; font: 14px 'Courier Prime', monospace; min-height: 28px; box-sizing: border-box; }
+#trial-panel .lab input.nm { width: 74px; } #trial-panel .lab input.vals { flex: 1; min-width: 0; }
+#trial-panel .lab input.bad { border-color: #e0442a; }
+#trial-panel .lab .labbtns { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; align-items: center; }
+#trial-panel .lab button { background: #241a10; color: #efe1c2; border: 1px solid #5a4422; border-radius: 3px; font: 12.5px 'Courier Prime', monospace; padding: 3px 8px; min-height: 28px; cursor: pointer; }
+#trial-panel .lab button:hover:not(:disabled) { border-color: #f2c230; } #trial-panel .lab button:disabled { opacity: 0.4; cursor: default; }
+#trial-panel .lab .labmsg { font-size: 12.5px; margin-top: 5px; color: #9c8a6c; min-height: 16px; }
+#trial-panel .lab .labmsg.bad { color: #ff7a5c; }
+#trial-panel .tab.labtab { border-color: #3f7a52; color: #8fe3a0; }
+`;

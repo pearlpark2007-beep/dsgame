@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// opened from IntelliJ's built-in preview (port 63342)? That server has no game API (every call answers 404).
+// Jump to the same page on Spring Boot instead.
+if (location.port === "63342") { const page = location.pathname.split("/static/")[1] || ""; location.replace("http://localhost:8081/" + page + location.search); }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Laestrygonian Harbour</title>
@@ -28,10 +33,13 @@
   #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 12, 15, 0.75); color: #efe1c2;
           border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
   #skip.on { display: block; }
+  body.board-on #hud { visibility: hidden; }
+  body.side-panel #hud { right: calc(var(--pw, 520px) + 20px); }
+  @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
   #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
           font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
   #fast.on { display: flex; }
-  @media (min-width: 901px) { body.side-panel #line { right: calc(460px + 3%); } body.side-panel #skip { right: 480px; } }
+  @media (min-width: 901px) { body.side-panel #line { right: calc(var(--pw, 520px) + 3%); } body.side-panel #skip { right: calc(var(--pw, 520px) + 20px); } }
   body.cinematic #hud, body.cinematic #pace, body.cinematic #line, body.cinematic #skip { visibility: hidden; }
 </style>
 <script type="importmap">
@@ -50,12 +58,13 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { World } from "./js/engine/world.js";
+import { panelW } from "./js/learn/panelWidth.js";
 import { manager } from "./js/engine/assets.js";
 import { Hero } from "./js/engine/hero.js";
 import { Director } from "./js/engine/director.js";
 import { buildHarbour, goldenAmphora, QUAY_TOP } from "./js/islands/harbour/harbourScene.js";
-import { loadFonts } from "./js/islands/harbour/dsProps.js";
-import { TrialSet, CRATE_H } from "./js/islands/harbour/trialSet.js";
+import { loadFonts, cargoNames } from "./js/islands/harbour/dsProps.js";
+import { TrialSet, CRATE_H, stackFrame } from "./js/islands/harbour/trialSet.js";
 import { buildTechProps } from "./js/islands/harbour/techProps.js";
 import { buildHarbourNav, setPileObstacles } from "./js/islands/harbour/harbourNav.js";
 import { TrialMode } from "./js/islands/harbour/trialMode.js";
@@ -83,7 +92,7 @@ buildTechProps(world, harbour);
 // ---------- the trial area: three stacks, exactly as Java would describe them
 // every crate numbered 99 carries the golden amphora
 function withAmphora(c, value) {
-  if (value !== 99) return;
+  if (value !== 99 || !cargoNames.on) return;      // the Lab has plain numbers: no gold
   const amph = goldenAmphora(harbour.models.amphora);
   amph.scale.set(1.25 / 0.51, 1.25 / 1.1, 1.25 / 0.85);      // undo the crate's stretch so the jar keeps its shape
   amph.position.y = CRATE_H / 1.1;
@@ -193,6 +202,8 @@ const pb = document.createElement("button"); pb.textContent = "▶ play scene"; 
 const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) { trials.close(); lesson(); } }; hud.appendChild(lb);
 const cb = document.createElement("button"); cb.textContent = "climax (preview)"; cb.onclick = () => climaxPreview(); hud.appendChild(cb);
 const tb = document.createElement("button"); tb.textContent = "the trials"; tb.onclick = () => { if (!busy && !inLesson) trialsOpen(); }; hud.appendChild(tb);
+for (const [t, href] of [["2 · the cave ▸", "cave_env.html"], ["3 · circe ▸", "circe_env.html"]]) { const b = document.createElement("button"); b.textContent = t; b.onclick = () => (location.href = href); hud.appendChild(b); }
+const labBtn = document.createElement("button"); labBtn.textContent = "⚗ the lab"; labBtn.onclick = () => { if (!busy && !inLesson) trialsOpen(true); }; hud.appendChild(labBtn);
 Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
 const qb = document.createElement("button");
 const showQ = () => qb.textContent = "quality: " + world.quality;
@@ -235,9 +246,9 @@ async function lesson() {
   const sp = trial.standSpot(s);
   hero.teleport(sp.x + 1.2, sp.z + 1.0, Math.PI);
   // the panel covers the right of the screen, so shift the picture's centre to the left
-  const shift = () => { const w = innerWidth, h = innerHeight; document.body.classList.add("side-panel"); if (w > 900) world.camera.setViewOffset(w, h, 230, 0, w, h); else world.camera.clearViewOffset(); };
+  const shift = () => { const w = innerWidth, h = innerHeight; document.body.classList.add("side-panel"); if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, 0, w, h); else world.camera.clearViewOffset(); };
   shift(); addEventListener("resize", shift);
-  director.cut([s.x + 1.7, 2.25, 4.6], [s.x + 0.2, 1.2, -1.5], 44);
+  stackFrame(director, trial, hero, () => [s], { snap: true });
   document.getElementById("chapter").style.opacity = 0;
   fastEl.classList.remove("on"); fastEl.textContent = "▸▸";
   bench.clear();
@@ -249,7 +260,12 @@ async function lesson() {
 }
 
 // ---------- the trials: the player's C code, run by Java, acted out by Odysseus
-const shiftForPanel = () => { document.body.classList.add("side-panel"); const w = innerWidth, h = innerHeight; if (w > 900) world.camera.setViewOffset(w, h, 230, 0, w, h); else world.camera.clearViewOffset(); };
+// the picture slides left for Athena's panel, and up for the stack board under it (half the board's height)
+const shiftForPanel = () => {
+  document.body.classList.add("side-panel"); const w = innerWidth, h = innerHeight;
+  const sb = document.body.classList.contains("board-on") && document.getElementById("stack-board");
+  if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, sb ? Math.round((sb.offsetHeight + 12) / 2) : 0, w, h); else world.camera.clearViewOffset();
+};
 const trials = new TrialMode({
   world, hero, trial, nav, director, bench, HEAP, codeLine, skipper,
   skipping: () => skipping,
@@ -281,18 +297,18 @@ async function climaxPreview() {
   try { await climax(); } finally { skipper.end(); }
 }
 
-async function trialsOpen() {
+async function trialsOpen(lab = false) {
   free(false);
   document.getElementById("chapter").style.opacity = 0;
   [prize].forEach(c => c.parent && c.parent.remove(c));
   shiftForPanel(); addEventListener("resize", shiftForPanel);
-  await trials.open();
+  await (lab ? trials.openLab() : trials.open());
 }
 
 world.onFrame = () => { if (controls.enabled) controls.update(); showQ(); };
 const origUpdate = director.update.bind(director);
 director.update = (dt, time, raw) => { if (!director.paused) origUpdate(dt, time, raw); };
-window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__climax = () => climaxPreview(); window.__trials = () => trialsOpen(); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
+window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__climax = () => climaxPreview(); window.__trials = lab => trialsOpen(lab); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
 window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
 
 // ---------- warm-up: the stutter at the start was the giants still unpacking (three 12 MB files) and their

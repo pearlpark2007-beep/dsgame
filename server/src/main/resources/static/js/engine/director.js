@@ -2,6 +2,7 @@
 // crash zooms and freeze-frames with a name card (the Tarantino grammar of the game).
 import * as THREE from "three";
 import { sound } from "./sound.js";
+import { panelW } from "../learn/panelWidth.js";
 
 export class Director {
   constructor(world, { cardRoot = document.body } = {}) {
@@ -30,13 +31,42 @@ export class Director {
     this.mode = null;
     const p0 = this.cam.position.clone(), l0 = this.look.clone(), f0 = this.cam.fov;
     const p1 = new THREE.Vector3(...pos), l1 = new THREE.Vector3(...look);
-    return this._move(seconds, k => { const e = k * k * (3 - 2 * k); this.cam.position.lerpVectors(p0, p1, e); this.look.lerpVectors(l0, l1, e); this.setFov(f0 + (fov - f0) * e); });
+    const p = this._move(seconds, k => { const e = k * k * (3 - 2 * k); this.cam.position.lerpVectors(p0, p1, e); this.look.lerpVectors(l0, l1, e); this.setFov(f0 + (fov - f0) * e); });
+    this.moves[this.moves.length - 1].cam = true;
+    return p;
   }
 
   // follow a moving thing: camera keeps an offset in the target's own frame (side, up, behind)
   follow(target, { side = 2.2, up = 1.1, back = 4.2, lookUp = 1.3, lag = 3.5, fov } = {}) {
     this.mode = { target, side, up, back, lookUp, lag };
     if (fov) this.setFov(fov);
+  }
+
+  // keep a set of points in frame (a pile, Odysseus, the crate he carries), always seen from the same
+  // direction. The camera comes as close as it can while everything still fits, and slides smoothly
+  // as the points move: the stack stays the biggest thing on screen, and the action never leaves it.
+  //   director.frame(() => [p1, p2, ...], { dir: [-0.35, 0.3, 1], fov: 40, margin: 1.2, minDist: 3 })
+  frame(points, { dir = [-0.35, 0.3, 1], fov = 40, margin = 1.18, minDist = 2.8, lag = 2.6, snap = false } = {}) {
+    // stop any camera glide (and let whoever awaits it carry on); timed waits (cards, stamps) keep running
+    this.moves = this.moves.filter(m => { if (m.cam) { m.res(); return false; } return true; });
+    this.mode = { points, dir: new THREE.Vector3(...dir).normalize(), margin, minDist, lag, snap };
+    this.setFov(fov);
+  }
+  // where the camera wants to be for a frame mode right now
+  _framing(m) {
+    const pts = m.points(); if (!pts.length) return null;
+    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
+    const f = m.dir.clone().negate(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, f);
+    // the part of the screen not covered by a side panel (the picture's centre is already shifted into it)
+    const v = this.cam.view, visible = v && v.enabled ? Math.max(0.4, 1 - 2 * v.offsetX / v.fullWidth) : 1;
+    const visV = v && v.enabled ? Math.max(0.4, 1 - 2 * v.offsetY / v.fullHeight) : 1;      // a board docked at the bottom
+    const tv = Math.tan(THREE.MathUtils.degToRad(this.cam.fov) / 2) * visV, th = Math.tan(THREE.MathUtils.degToRad(this.cam.fov) / 2) * this.cam.aspect * visible;
+    let d = m.minDist;
+    for (const p of pts) {
+      const rel = p.clone().sub(c), x = Math.abs(rel.dot(r)), y = Math.abs(rel.dot(u)), z = rel.dot(f);
+      d = Math.max(d, x * m.margin / th - z, y * m.margin / tv - z);
+    }
+    return { pos: c.clone().addScaledVector(m.dir, d), look: c };
   }
 
   // a sudden push-in of the lens (the 70s crash zoom)
@@ -98,7 +128,7 @@ export class Director {
     el.querySelector(".sr-sub").textContent = sub;
     // remember the shot, then frame the pile in the right half of the picture
     const before = { pos: cam.position.clone(), look: this.look.clone(), fov: cam.fov, view: cam.view ? { ...cam.view } : null, mode: this.mode };
-    const panel = document.body.classList.contains("side-panel") && innerWidth > 900 ? 460 : 0;
+    const panel = document.body.classList.contains("side-panel") && innerWidth > 900 ? panelW() : 0;
     const W = innerWidth - panel, H = innerHeight;
     el.style.width = W + "px";
     if (focus) {
@@ -141,7 +171,14 @@ export class Director {
       m.fn(k);
       if (k >= 1) { this.moves.splice(i, 1); m.res(); }
     }
-    if (this.mode) {
+    if (this.mode && this.mode.points) {
+      const want = this._framing(this.mode);
+      if (want) {
+        const k = this.mode.snap ? 1 : 1 - Math.exp(-this.mode.lag * raw);
+        this.mode.snap = false;
+        this.cam.position.lerp(want.pos, k); this.look.lerp(want.look, k);
+      }
+    } else if (this.mode) {
       const { target, side, up, back, lookUp, lag } = this.mode;
       const yaw = target.rotation.y;
       const want = new THREE.Vector3(side, up, -back).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).add(target.position);
@@ -163,7 +200,7 @@ css.textContent = `
 .stamp { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(1.6) rotate(-4deg); z-index: 31; pointer-events: none; opacity: 0;
          text-align: center; transition: opacity 0.15s, transform 0.22s cubic-bezier(.2,1.6,.4,1); max-width: 80vw; }
 .stamp.on { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-4deg); }
-@media (min-width: 901px) { body.side-panel .stamp { left: calc(50% - 230px); max-width: calc(90vw - 460px); } }
+@media (min-width: 901px) { body.side-panel .stamp { left: calc(50% - var(--pw, 520px) / 2); max-width: calc(90vw - var(--pw, 520px)); } }
 .st-t { font-family: 'Allerta Stencil', Anton, Impact, sans-serif; font-size: clamp(40px, 7vw, 92px); letter-spacing: 3px; line-height: 1;
         padding: 6px 22px; border: 6px solid currentColor; display: inline-block; }
 .st-s { margin-top: 12px; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace; font-size: clamp(14px, 1.6vw, 20px); color: #f3e6c8; text-shadow: 2px 2px 0 #000; }

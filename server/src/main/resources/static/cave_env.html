@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// opened from IntelliJ's built-in preview (port 63342)? That server has no game API (every call answers 404).
+// Jump to the same page on Spring Boot instead.
+if (location.port === "63342") { const page = location.pathname.split("/static/")[1] || ""; location.replace("http://localhost:8081/" + page + location.search); }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Cave of Polyphemus</title>
@@ -24,6 +29,7 @@
   #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.75); color: #efe1c2;
           border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
   #skip.on { display: block; }
+  @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
   body.cinematic #menu, body.cinematic #chapter { display: none; }
   #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
           font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
@@ -42,6 +48,8 @@
   <div class="grp"><span class="lbl">FILM</span><button id="open-btn">▶ Opening</button><button id="climax-btn">▶ Climax</button></div>
   <div class="grp"><span class="lbl">LESSON</span>
     <button data-part="1">1 · Pens</button><button data-part="2">2 · Walking</button><button data-part="3">3 · Room &amp; gaps</button><button data-part="4">4 · Turning around</button></div>
+  <div class="grp"><span class="lbl">TRIALS</span><button id="trials-btn">Athena's trials · NOON to DAWN</button><button id="lab-btn">⚗ The Lab · your flock, your code</button></div>
+  <div class="grp"><span class="lbl">ISLANDS</span><button onclick="location.href='harbour_env.html'">1 · The Harbour</button><button onclick="location.href='circe_env.html'">3 · Circe's Island ▸</button></div>
   <div class="grp"><span class="lbl">ARRANGE</span>
     <button data-arrange="traverse">Sum</button><button data-arrange="insert">Insert</button><button data-arrange="delete">Delete</button><button data-arrange="reverse">Reverse</button></div>
 </div>
@@ -49,6 +57,7 @@
 <script type="module">
 import * as THREE from "three";
 import { World } from "./js/engine/world.js";
+import { panelW } from "./js/learn/panelWidth.js";
 import { Director } from "./js/engine/director.js";
 import { sound } from "./js/engine/sound.js";
 import { PenRow, PEN_W } from "./js/islands/cave/penRow.js";
@@ -62,6 +71,7 @@ import { playCaveOpening } from "./js/islands/cave/caveOpening.js";
 import { playCaveClimax } from "./js/islands/cave/caveClimax.js";
 import { nameCard } from "./js/story/tags.js";
 import { FIRE_AT } from "./js/islands/cave/caveScene.js";
+import { CaveTrials } from "./js/islands/cave/caveTrials.js";
 
 sound.muted = true;                         // no music or sound effects for now
 const params = new URLSearchParams(location.search);
@@ -86,7 +96,7 @@ hero.teleport(FIRE_AT.x + 1.7, FIRE_AT.z + 1.9, 2.4);
 // ---------- the opening film (caveOpening.js), and skipping it: fast-forward behind a black card
 let skipping = false, filming = false;
 const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast");
-function skip() { if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; fastEl.classList.add("on"); }
+function skip() { if (trialRun) { if (!trialFast) { trialFast = true; world.timeScale = 8; fastEl.classList.add("on"); } return; } if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; fastEl.classList.add("on"); }
 skipBtn.onclick = skip;
 addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
 async function opening() {
@@ -113,6 +123,30 @@ async function climax() {
   }
 }
 document.getElementById("climax-btn").onclick = () => climax();
+
+// ---------- Athena's trials (caveTrials.js): the panel on the right, the pens on the left
+let trialRun = false, trialFast = false;
+// the side panel takes 460px on the right; the array board, when open, about 230px at the bottom:
+// shift the picture so its centre sits in the space that's left
+const shiftForPanel = () => { const w = innerWidth, h = innerHeight; if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, document.body.classList.contains("board-on") ? 112 : 0, w, h); else world.camera.clearViewOffset(); };
+const trials = new CaveTrials({
+  world, pens, director, comic,
+  panelView: on => {
+    if (on) { document.body.classList.add("side-panel", "busy"); shiftForPanel(); addEventListener("resize", shiftForPanel); }
+    else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); }
+  },
+  onClose: () => { document.body.classList.remove("busy"); director.glide([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44, 1); },
+  onLesson: () => { trials.close(); lesson(1); },
+  onFinale: async () => { trials.ctx.fast.end(); await climax(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); },
+  skipping: () => trialFast,
+  fast: {
+    begin: () => { trialRun = true; trialFast = false; skipBtn.textContent = "FAST ▸▸ (Esc)"; skipBtn.classList.add("on"); },
+    land: () => { if (trialFast) { trialFast = false; world.timeScale = 1; fastEl.classList.remove("on"); } },
+    end: () => { trialRun = false; trialFast = false; fastEl.classList.remove("on"); skipBtn.classList.remove("on"); skipBtn.textContent = "SKIP SCENE ▸▸ (Esc)"; }
+  }
+});
+document.getElementById("trials-btn").onclick = () => trials.open();
+document.getElementById("lab-btn").onclick = () => trials.openLab();
 director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
 
 // ---------- the menu: each lesson part and each warm-up can be opened on its own
@@ -149,7 +183,7 @@ if (params.get("capture")) {
   world.resize();
   world.step(0.016);
   window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
-  window.__world = world; window.__pens = pens; window.__cave = cave; window.__giant = giant; window.__director = director; window.__lessonPart = lesson; window.__arrange = arrange; window.__opening = opening; window.__climax = climax; window.__hero = hero; window.__skip = skip;
+  window.__world = world; window.__pens = pens; window.__cave = cave; window.__giant = giant; window.__director = director; window.__lessonPart = lesson; window.__arrange = arrange; window.__opening = opening; window.__climax = climax; window.__hero = hero; window.__skip = skip; window.__trials = trials;
   window.__ready = true;
 } else {
   world.start();
@@ -157,6 +191,8 @@ if (params.get("capture")) {
   const part = params.get("part"); if (part) lesson(+part);
   if (params.get("opening")) opening();
   if (params.get("climax")) climax();
+  if (params.get("trials")) trials.open();
+  if (params.get("lab")) trials.openLab();
 }
 </script>
 </body>

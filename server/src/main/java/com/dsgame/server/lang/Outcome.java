@@ -9,5 +9,6 @@ public enum Outcome {
     UNDERFLOW,
     INFINITE_LOOP,
     OUT_OF_BOUNDS,
+    NULL_POINTER,   // following a pointer that leads to no node (NULL, freed, or made up)
     GOAL_NOT_MET
 }

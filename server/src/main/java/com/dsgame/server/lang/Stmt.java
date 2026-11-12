@@ -14,6 +14,22 @@ public interface Stmt {
         }
     }
 
+    // Node* p = head;   a pointer: it holds the ADDRESS of a node (0 = NULL)
+    record DeclarePointerStmt(String name, Expr initializer, int line) implements Stmt {
+        public void execute(Interpreter in) {
+            int address = (initializer == null) ? 0 : initializer.evaluate(in);
+            in.declarePointer(name, address, line);
+        }
+    }
+
+    // p->next = q;   p->data = 5;   (p->data++ and p->data += 2 become this too)
+    record FieldAssignStmt(Expr pointer, String field, String who, Expr value, int line) implements Stmt {
+        public void execute(Interpreter in) {
+            int address = pointer.evaluate(in);
+            in.writeField(address, field, value.evaluate(in), who, line);
+        }
+    }
+
     // x = 5;
     record AssignStmt(String name, Expr value, int line) implements Stmt {
         public void execute(Interpreter in) {

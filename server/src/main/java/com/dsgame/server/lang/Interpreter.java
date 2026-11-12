@@ -2,6 +2,7 @@ package com.dsgame.server.lang;
 
 import com.dsgame.server.ds.ArrayADT;
 import com.dsgame.server.ds.DataStructures;
+import com.dsgame.server.ds.NodeChain;
 import com.dsgame.server.ds.Queue;
 import com.dsgame.server.ds.Stack;
 import com.dsgame.server.ds.Step;
@@ -10,10 +11,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 // Stage 3: runs the tree on the REAL data structures and builds the timeline
 public class Interpreter {
@@ -29,6 +32,8 @@ public class Interpreter {
     // a level's array and the variable that holds how many cells are in use, e.g. "flock" -> "n"
     private final Map<String, String> lengthVars = new HashMap<>();
     private int ticks = 0;
+    // names declared as pointers (Node* p): their changes go on the timeline as PTR, so the game draws an arrow
+    private final Set<String> pointerNames = new HashSet<>();
 
     public Interpreter() {
         scopes.push(new HashMap<>());   // the global scope
@@ -66,6 +71,20 @@ public class Interpreter {
         declare(lengthVar, length, 0);
     }
 
+    // a level hands the player a list AND the pointer to its first node, e.g. head
+    public void bindPointer(String pointerName, int address) {
+        declarePointer(pointerName, address, 0);
+    }
+
+    public void declarePointer(String name, int address, int line) {
+        pointerNames.add(name);
+        declare(name, address, line);
+    }
+
+    public boolean isPointer(String name) {
+        return pointerNames.contains(name);
+    }
+
     public void declare(String name, int value, int line) {
         if (structures.containsKey(name)) {
             throw new RunError(Outcome.RUNTIME_ERROR, "'" + name + "' is already used for a data structure", line);
@@ -75,6 +94,7 @@ public class Interpreter {
             throw new RunError(Outcome.RUNTIME_ERROR, "Variable '" + name + "' is already declared", line);
         }
         currentScope.put(name, value);
+        recordVar(name, value, line);
     }
 
     public int getVariable(String name, int line) {
@@ -149,11 +169,60 @@ public class Interpreter {
         for (Map<String, Integer> scope : scopes) {
             if (scope.containsKey(name)) {
                 scope.put(name, value);
+                recordVar(name, value, line);
+                recordLength(name, value, line);
                 return;
             }
         }
         throw new RunError(Outcome.RUNTIME_ERROR,
                 "Variable '" + name + "' is not declared. Did you forget 'int'?", line);
+    }
+
+    // every time a plain int variable gets a value (int i = 0; total = total + ...; i++), put it on the
+    // timeline as a VAR step: the game's array board draws i, j, lo, hi... as arrows over the cells
+    private void recordVar(String name, int value, int line) {
+        if (pointerNames.contains(name)) {
+            timeline.add(new TimelineStep(name, "PTR", 0, value, name + " = " + NodeChain.hex(value), line));
+            return;
+        }
+        timeline.add(new TimelineStep(name, "VAR", 0, value, name + " = " + value, line));
+    }
+
+    // ---------- pointers and nodes (Chapter 3) ----------
+
+    // the island's node memory (there is one per level that uses lists)
+    private NodeChain chain(int line) {
+        for (DataStructures ds : structures.values()) {
+            if (ds instanceof NodeChain c) return c;
+        }
+        throw new RunError(Outcome.RUNTIME_ERROR, "There are no nodes here: Node* only works on Circe's island", line);
+    }
+
+    // p->data   p->next
+    public int readField(int address, String field, String who, int line) {
+        NodeChain c = chain(line);
+        int value = field.equals("data") ? c.getData(address, who) : c.getNext(address, who);
+        collectSteps(line);
+        return value;
+    }
+
+    // p->data = v   p->next = q
+    public void writeField(int address, String field, int value, String who, int line) {
+        NodeChain c = chain(line);
+        if (field.equals("data")) c.setData(address, value, who);
+        else c.setNext(address, value, who);
+        collectSteps(line);
+    }
+
+    // when the player changes an array's length variable (n = n + 1), the game shows the rope and
+    // the "n =" sign move: put that change on the timeline as a LENGTH step for that array
+    private void recordLength(String name, int value, int line) {
+        for (Map.Entry<String, String> entry : lengthVars.entrySet()) {
+            if (entry.getValue().equals(name)) {
+                timeline.add(new TimelineStep(entry.getKey(), "LENGTH", value, value,
+                        name + " = " + value + " (pens in use)", line));
+            }
+        }
     }
 
     // ---------- infinite-loop guard ----------
@@ -217,6 +286,21 @@ public class Interpreter {
             case "isFull" -> {
                 checkArgCount(name, args, 1, line);
                 yield structureArg(name, args.get(0), line).isFull() ? 1 : 0;
+            }
+            case "newNode" -> {
+                checkArgCount(name, args, 1, line);
+                NodeChain c = chain(line);
+                int address = c.newNode(args.get(0).evaluate(this));
+                collectSteps(line);
+                yield address;
+            }
+            case "free" -> {
+                checkArgCount(name, args, 1, line);
+                NodeChain c = chain(line);
+                Expr arg = args.get(0);
+                c.free(arg.evaluate(this), (arg instanceof Expr.VarExpr v) ? v.name() : "that pointer");
+                collectSteps(line);
+                yield 0;
             }
             case "size" -> {
                 checkArgCount(name, args, 1, line);
@@ -282,6 +366,8 @@ public class Interpreter {
             case "OVERFLOW", "FULL"   -> throw new RunError(Outcome.OVERFLOW, step.getMessage(), line);
             case "UNDERFLOW", "EMPTY" -> throw new RunError(Outcome.UNDERFLOW, step.getMessage(), line);
             case "OUT_OF_BOUNDS"      -> throw new RunError(Outcome.OUT_OF_BOUNDS, step.getMessage(), line);
+            case "NULL_DEREF"         -> throw new RunError(Outcome.NULL_POINTER, step.getMessage(), line);
+            case "NO_MEMORY"          -> throw new RunError(Outcome.OVERFLOW, step.getMessage(), line);
             default -> { }
         }
     }

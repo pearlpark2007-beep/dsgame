@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { LessonPlayer } from "../../learn/lessonPlayer.js";
 import { QUAY_TOP } from "./harbourScene.js";
+import { stackFrame } from "./trialSet.js";
 
 export const STACK_C = `#define CAP 3
 int items[CAP];            // the pile: 3 slots, side by side in memory
@@ -105,8 +106,9 @@ export function stackLesson(ctx) {
     await setAside(c, name, i);
   }
 
-  // three-quarter view from the front right: the pile, its gauge, and Odysseus beside it
-  const view = () => director.glide([s.x + 1.7, 2.25, 4.6], [s.x + 0.2, 1.2, -1.5], 44, 1.2);
+  // the stack camera: the pile, its gauge and Odysseus fill the picture, and it follows him smoothly
+  // when he goes for a crate or to the bench
+  const view = () => stackFrame(director, trial, hero, () => [s]);
 
   const steps = [
     { line: 1, vars: vars(), act: view,

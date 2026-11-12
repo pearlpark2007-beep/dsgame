@@ -101,6 +101,7 @@ public class Lexer {
             case "--" -> TokenType.MINUS_MINUS;
             case "+=" -> TokenType.PLUS_EQUAL;
             case "-=" -> TokenType.MINUS_EQUAL;
+            case "->" -> TokenType.ARROW;          // p->next: follow a pointer to its node
             default -> null;
         };
         if (twoType != null) {

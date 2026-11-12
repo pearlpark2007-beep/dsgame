@@ -1,3 +1,4 @@
+import "./panelWidth.js";
 // parsons.js — "arrange the lines": the warm-up before writing an operation for the first time.
 // The correct lines come shuffled, with one decoy that looks right but isn't (i <= n, a missing temp…).
 // Drag lines into order (or use the ↑ ↓ buttons; they work from the keyboard too), set the decoy aside,
@@ -5,7 +6,7 @@
 // (Research: Parsons problems teach as much as writing code, in less time; Ericson 2018.)
 //   new Parsons({ title, goal, lines: ["...", ...], decoys: ["..."], why }).open() -> Promise
 const css = `
-#parsons { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; z-index: 26; box-sizing: border-box; display: flex; flex-direction: column;
+#parsons { position: fixed; top: 0; right: 0; bottom: 0; width: var(--pw, 520px); z-index: 26; box-sizing: border-box; display: flex; flex-direction: column;
   background: rgba(14, 10, 7, 0.96); border-left: 3px solid #2a1c12; color: #efe1c2; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace;
   transform: translateX(100%); transition: transform 0.5s cubic-bezier(.2,.8,.2,1); }
 #parsons.on { transform: none; }

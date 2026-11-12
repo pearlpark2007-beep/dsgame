@@ -1,0 +1,9 @@
+1. Unzip this over C:\Users\pearl\IdeaProjects\dsgame  (say "Replace" to everything).
+   It only contains files that changed; nothing else is touched.
+2. In IntelliJ: stop the server (red square), then Run DsgameApplication again
+   (Interpreter.java changed, so the Java must recompile).
+3. Open http://localhost:8080/cave_env.html in Chrome.
+   NOT the little browser icons in IntelliJ (localhost:63342) - that is IntelliJ's file preview,
+   it has no game server behind it, which is the "server answered 404" error.
+   (The pages now jump to 8080 by themselves if you do open them that way.)
+4. Hard refresh once: Ctrl+Shift+R.

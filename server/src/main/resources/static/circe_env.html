@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+// opened from IntelliJ's built-in preview (port 63342)? That server has no game API (every call answers 404).
+// Jump to the same page on Spring Boot instead.
+if (location.port === "63342") { const page = location.pathname.split("/static/")[1] || ""; location.replace("http://localhost:8081/" + page + location.search); }
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Circe's Island</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: #e9e4da; font-family: 'Courier Prime', monospace; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #050403; z-index: 40; transition: opacity 1s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 30px; color: #f2c230; }
+  #loading p { margin: 0; color: #8a979b; font-size: 15px; }
+  #menu { position: fixed; left: 16px; bottom: 16px; z-index: 10; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); }
+  #menu .grp { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #menu .lbl { font-size: 11px; letter-spacing: 2px; color: #8c7c66; min-width: 64px; }
+  #menu button, #menu a { min-height: 40px; padding: 0 14px; background: rgba(8, 6, 4, 0.8); color: #efe1c2; border: 1px solid #4a3a28; border-radius: 4px;
+                 font: inherit; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }
+  #menu button:hover, #menu button:focus-visible, #menu a:hover { border-color: #f2c230; color: #f2c230; outline: none; }
+  #menu button.done { border-color: #6a8a58; color: #9fd08a; }
+  #chapter { position: fixed; left: 6%; top: 12%; pointer-events: none; z-index: 10; font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; transition: opacity 1s; }
+  #chapter b { display: block; margin-top: 2px; font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 46px; letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f; }
+  body.busy #menu, body.busy #chapter { opacity: 0; pointer-events: none; }
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.75); color: #efe1c2;
+          border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
+  #skip.on { display: block; }
+  @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
+  body.cinematic #menu, body.cinematic #chapter { display: none; }
+  #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
+  #fast.on { display: flex; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="loading"><h1>CIRCE'S ISLAND</h1><p>tying the rope…</p></div>
+<div id="chapter">CHAPTER THREE<b>CIRCE'S ISLAND</b></div>
+<button id="skip">SKIP SCENE ▸▸ (Esc)</button>
+<div id="fast">▸▸</div>
+<div id="menu">
+  <div class="grp"><span class="lbl">FILM</span><button id="open-btn">▶ Opening</button></div>
+  <div class="grp"><span class="lbl">LESSON</span>
+    <button data-demo="Count">1 · Walking the rope</button><button data-demo="Insert at head">2 · A new pig in front</button><button data-demo="Delete a value">3 · Cutting one loose</button><button data-demo="Reverse">4 · Turning the rope</button></div>
+  <div class="grp"><span class="lbl">TRIALS</span><button id="trials-btn">Athena's trials · ONE to MOONSET</button><button id="lab-btn">⚗ The Lab · your rope, your code</button></div>
+  <div class="grp"><span class="lbl">ISLANDS</span><a href="harbour_env.html">1 · The Harbour</a><a href="cave_env.html">2 · The Cave</a></div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { World } from "./js/engine/world.js";
+import { panelW } from "./js/learn/panelWidth.js";
+import { Director } from "./js/engine/director.js";
+import { sound } from "./js/engine/sound.js";
+import { Comic } from "./js/engine/comic.js";
+import { Hero } from "./js/engine/hero.js";
+import { nameCard } from "./js/story/tags.js";
+import { buildIsland, Sty, GATE, PIT } from "./js/islands/circe/sty.js";
+import { CirceTrials } from "./js/islands/circe/circeTrials.js";
+
+sound.muted = true;
+const params = new URLSearchParams(location.search);
+const world = new World({ quality: params.get("q") || "auto" });
+world.grade.uniforms.letterbox.value = 0;
+world.grade.uniforms.keepBlue.value = 0.6;      // keep the moonlight blue
+
+const island = buildIsland(world);
+const sty = new Sty(world, island);
+const director = new Director(world);
+const comic = new Comic(world, director);
+const hero = await new Hero(world, { groundY: 0 }).load();
+hero.teleport(GATE.x - 0.5, GATE.z + 1.9, Math.PI * 0.5);     // Odysseus at the gate, facing the sty
+const WIDE = [[2, 15, 12.5], [2, 0, 0.6], 42];
+
+// ---------- skipping: a black card while the film fast-forwards
+let skipping = false, filming = false, trialRun = false, trialFast = false;
+const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast");
+function skip() { if (trialRun) { if (!trialFast) { trialFast = true; world.timeScale = 8; fastEl.classList.add("on"); } return; } if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; fastEl.classList.add("on"); }
+skipBtn.onclick = skip;
+addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
+async function film(fn) {
+  if (filming) return;
+  filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy", "cinematic");
+  try { await fn(); }
+  finally {
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy", "cinematic");
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0; comic.clear();
+    director.cut(...WIDE);
+  }
+}
+
+// ---------- the opening: short. The house, the witch's name, the rope, the king at the gate.
+async function opening() {
+  await film(async () => {
+    sty.show(trials.board.frames ? trials.board.frames[0] : sty.frame);
+    director.cut([1, 3.2, -3], [1, 2.6, -13], 50);
+    await comic.chapter("CHAPTER THREE", "CIRCE'S ISLAND", 2.6);
+    await director.glide([1, 2.6, -7.5], [1, 2.0, -13], 44, 2.4);
+    await director.freeze("CIRCE", "Daughter of the Sun. Turns men into pigs.<br>Keeps them on a rope, nose to tail.", 2.8);
+    await director.glide([1.5, 12, 9.5], [1.5, 0, 0.4], 44, 2.6);
+    comic.caption("Each pig knows only the NEXT pig. Nobody can see the whole rope.", { seconds: 3.2 });
+    await sty.wait(3.2);
+    await director.glide([GATE.x + 3.2, 2.2, GATE.z + 6.2], [GATE.x - 0.5, 1.4, GATE.z + 1.9], 40, 2.0);
+    const c = nameCard("circe");
+    await director.freeze(c.name, c.sub, 2.6);
+    comic.caption("He has the gate. The gate has the first rope. That's all he has: head.", { seconds: 3 });
+    await sty.wait(3);
+  });
+}
+document.getElementById("open-btn").onclick = () => opening();
+
+// ---------- the finale film: the men stand on the grass; the card gains a line
+async function finale() {
+  await film(async () => {
+    await director.glide([2, 5.5, 14], [2, 1.0, 0], 42, 2.2);
+    comic.caption("Twenty-two men walked out of Circe's sty. They stayed a year.", { seconds: 3.2 });
+    await sty.wait(3.2);
+    const c = nameCard("circe", { done: true });
+    await director.freeze(c.name, c.sub, 3.2);
+  });
+  trials.setUp(trials.level);
+}
+
+// ---------- Athena's trials (circeTrials.js)
+const shiftForPanel = () => { const w = innerWidth, h = innerHeight; const lb = document.body.classList.contains("board-on") && document.getElementById("list-board"); if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, lb ? Math.round((lb.offsetHeight + 12) / 2) : 0, w, h); else world.camera.clearViewOffset(); };
+const trials = new CirceTrials({
+  world, sty, island, director, comic,
+  panelView: on => {
+    if (on) { document.body.classList.add("side-panel", "busy"); shiftForPanel(); addEventListener("resize", shiftForPanel); }
+    else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); }
+  },
+  onClose: () => { document.body.classList.remove("busy"); director.glide(...WIDE, 1); },
+  onLesson: () => demo("Count"),
+  onFinale: async () => { trials.ctx.fast.end(); await finale(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); },
+  skipping: () => trialFast,
+  fast: {
+    begin: () => { trialRun = true; trialFast = false; skipBtn.textContent = "FAST ▸▸ (Esc)"; skipBtn.classList.add("on"); },
+    land: () => { if (trialFast) { trialFast = false; world.timeScale = 1; fastEl.classList.remove("on"); } },
+    end: () => { trialRun = false; trialFast = false; fastEl.classList.remove("on"); skipBtn.classList.remove("on"); skipBtn.textContent = "SKIP SCENE ▸▸ (Esc)"; }
+  }
+});
+document.getElementById("trials-btn").onclick = () => trials.open();
+document.getElementById("lab-btn").onclick = () => trials.openLab();
+// a lesson: Athena runs one example in the Lab and the board explains every step (pause and step any time)
+async function demo(name) {
+  await trials.openLab();
+  if (!trials.levels.length) return;
+  trials.loadExample(name);
+  trials.status(`Athena shows you: ${name}. Pause, step back, or press GUIDE HIM to run it again.`);
+  await trials.run();
+}
+document.querySelectorAll("#menu [data-demo]").forEach(b => b.onclick = () => { b.classList.add("done"); demo(b.dataset.demo); });
+
+// the starting picture: the crew's rope, from the camera side
+trials.setUp({ structures: [{ initial: [7, 12, 3, 19, 5], lengthVar: "head" }] });
+director.cut(...WIDE);
+
+// ---------- start
+const loading = document.getElementById("loading");
+if (params.get("capture")) {
+  loading.remove();
+  world.resize(); world.step(0.016);
+  window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  window.__world = world; window.__sty = sty; window.__director = director; window.__trials = trials; window.__opening = opening; window.__finale = finale; window.__demo = demo; window.__skip = skip;
+  window.__ready = true;
+} else {
+  world.start();
+  loading.style.opacity = 0; setTimeout(() => loading.remove(), 1000);
+  if (params.get("opening")) opening();
+  if (params.get("trials")) trials.open();
+  if (params.get("lab")) trials.openLab();
+}
+</script>
+</body>
+</html>

@@ -38,6 +38,8 @@ export const POSES = {
   // blind and raging: both arms up, then one fist driven into the roof
   flail:  { armR: [2.8, 0, 0.6], foreR: [0.4, 0, 0], armL: [2.8, 0, -0.6], foreL: [0.4, 0, 0], head: [-0.3, 0, 0], spine: [-0.15, 0, 0] },
   smash:  { armR: [3.1, 0, 0.15], foreR: [0.05, 0, 0], armL: [1.2, 0, -0.4], spine: [-0.2, 0, 0], head: [-0.35, 0, 0] },
+  // asleep sitting back against the rock, head tipped back: the eye faces up and out (the stake scene)
+  slumpBack: { ...SIT, spine: [-0.2, 0, 0], neck: [-0.25, 0, 0.05], head: [-0.35, 0, 0.1], armL: [0.3, 0, 0], armR: [0.3, 0, 0] },
   // on his knees in the surf, bowed (the stinger)
   bow:    { ...SIT, spine: [0.5, 0, 0], neck: [0.3, 0, 0], head: [0.4, 0, 0], armL: [0.4, 0, 0], armR: [0.4, 0, 0] }
 };

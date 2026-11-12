@@ -4,10 +4,11 @@
 export const TITLES = ["King of Ithaca.", "Sacker of Troy."];
 
 // what he did, chapter by chapter, in the order he does it
-export const CHAPTERS = ["harbour", "cyclops", "underworld", "scheria", "voyage", "order", "ithaca"];
+export const CHAPTERS = ["harbour", "cyclops", "circe", "underworld", "scheria", "voyage", "order", "ithaca"];
 export const DEEDS = {
   harbour:    "Got one ship out of Telepylos.",
   cyclops:    "Told the Cyclops his name was Nobody.",
+  circe:      "Walked into Circe's house. Walked out with his men.",
   underworld: "Went down to the dead and came back.",
   scheria:    "Washed up with nothing. Left with a ship.",
   voyage:     "Found the way home.",
