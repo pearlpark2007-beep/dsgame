@@ -83,6 +83,13 @@ public interface Expr {
         }
     }
 
+    // "text": only printf("...", ...) can use one
+    record StringExpr(String text, int line) implements Expr {
+        public int evaluate(Interpreter in) {
+            throw new RunError(Outcome.RUNTIME_ERROR, "A \"string\" can only be printed, with printf(\"...\")", line);
+        }
+    }
+
     // push(&s, 10),  pop(&s),  isEmpty(&q), ...
     record CallExpr(String name, List<Expr> args, int line) implements Expr {
         public int evaluate(Interpreter in) {

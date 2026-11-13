@@ -9,9 +9,9 @@ public enum TokenType {
     EQUAL_EQUAL, BANG_EQUAL, LESS_EQUAL, GREATER_EQUAL, AND_AND, OR_OR,
     PLUS_PLUS, MINUS_MINUS, PLUS_EQUAL, MINUS_EQUAL, ARROW,
     // values and names
-    NUMBER, IDENTIFIER,
+    NUMBER, IDENTIFIER, STRING,
     // keywords
-    INT, IF, ELSE, WHILE, FOR, BREAK, CONTINUE,
+    INT, IF, ELSE, WHILE, FOR, BREAK, CONTINUE, RETURN,
     // end of the code
     EOF
 }

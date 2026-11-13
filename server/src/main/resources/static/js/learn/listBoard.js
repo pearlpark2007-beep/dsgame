@@ -30,12 +30,15 @@ body.side-panel #list-board { right: calc(var(--pw, 520px) + 12px); }
 #list-board .lb-say { font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #list-board .lb-say b { color: #f2c230; } #list-board .lb-say .w { color: #8fe3a0; } #list-board .lb-say .bad { color: #ff7a5c; } #list-board .lb-say .dim { opacity: 0.55; }
 #list-board .lb-stage { position: relative; height: 104px; margin-top: 2px; overflow: hidden; }
-#list-board .lb-stage.two { height: 166px; }
+#list-board .lb-stage.two { height: 184px; }
 #list-board svg.lb-arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 #list-board .lb-node { position: absolute; display: flex; box-sizing: border-box; height: 38px; border: 2px solid #6b5432; border-radius: 4px; background: #1d150d; transition: left 0.25s, top 0.25s, background 0.2s, border-color 0.2s, box-shadow 0.2s; }
-#list-board .lb-node .d { width: 44px; text-align: center; font-family: Anton, Impact, sans-serif; font-size: 20px; line-height: 34px; color: #f4ead2; border-right: 2px solid #6b5432; }
-#list-board .lb-node .n { width: 26px; text-align: center; font-size: 15px; line-height: 34px; color: #c9b48a; }
-#list-board .lb-node .ad { position: absolute; left: 0; right: 0; top: 38px; text-align: center; font-size: 10px; color: #7d6a4c; }
+#list-board .lb-node .d { width: 40px; text-align: center; font-family: Anton, Impact, sans-serif; font-size: 20px; line-height: 34px; color: #f4ead2; border-right: 2px solid #6b5432; }
+#list-board .lb-node .n { width: 56px; text-align: center; font-size: 12.5px; font-weight: 700; line-height: 34px; color: #8fb4ff; }
+#list-board .lb-node .n.nul { color: #ff7a5c; }
+#list-board .lb-stage.compact .lb-node .d { width: 32px; font-size: 17px; }
+#list-board .lb-stage.compact .lb-node .n { width: 46px; font-size: 11px; }
+#list-board .lb-node .ad { position: absolute; left: 0; right: 0; top: 38px; text-align: center; font-size: 11px; font-weight: 700; color: #c9a227; }
 #list-board .lb-node.read { border-color: #f2c230; box-shadow: 0 0 14px rgba(242,194,48,0.7); background: #3a2c0c; }
 #list-board .lb-node.write, #list-board .lb-node.new { border-color: #8fe3a0; box-shadow: 0 0 14px rgba(143,227,160,0.7); background: #12301a; }
 #list-board .lb-node.link { border-color: #ff9a5c; box-shadow: 0 0 14px rgba(255,154,92,0.7); }
@@ -60,6 +63,11 @@ body.side-panel #list-board { right: calc(var(--pw, 520px) + 12px); }
 #list-board .lb-ctrl button:disabled { opacity: 0.35; cursor: default; }
 #list-board .lb-ctrl select { background: #241a10; color: #efe1c2; border: 1px solid #5a4422; min-height: 30px; font-family: inherit; }
 #list-board .lb-count { font-size: 12px; color: #9c8a6c; min-width: 92px; text-align: right; }
+#list-board .lb-call { display: none; font-size: 12.5px; font-weight: 700; background: #1d3fd1; color: #fff4cf; padding: 1px 8px; border-radius: 3px; white-space: nowrap; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
+#list-board .lb-call.on { display: inline-block; }
+#list-board .lb-out { display: none; margin-top: 4px; font-size: 13px; background: #050403; border: 1px solid #3a2c18; border-radius: 3px; padding: 3px 8px; color: #8fe3a0; white-space: pre-wrap; max-height: 44px; overflow: auto; }
+#list-board .lb-out.on { display: block; }
+#list-board .lb-out b { color: #9c8a6c; font-weight: 400; }
 @media (max-width: 900px) { #list-board { display: none !important; } }
 `;
 
@@ -67,7 +75,7 @@ body.side-panel #list-board { right: calc(var(--pw, 520px) + 12px); }
 export function initialFrame(values, headVar = "head") {
   const nodes = {}, order = [];
   values.forEach((v, i) => { const a = FIRST_ADDRESS + i * 16; nodes[a] = { data: v, next: i + 1 < values.length ? a + 16 : NULL, freed: false }; order.push(a); });
-  return { nodes, order, ptrs: { [headVar]: values.length ? FIRST_ADDRESS : NULL }, vars: {}, hl: null, changed: null, say: "" };
+  return { nodes, order, ptrs: { [headVar]: values.length ? FIRST_ADDRESS : NULL }, vars: {}, calls: [], out: "", hl: null, changed: null, say: "" };
 }
 // walk from an address to NULL: the addresses met, and where it looped back (if it did)
 export function walkFrom(f, start) {
@@ -121,7 +129,7 @@ export function layoutFrame(f, headVar = "head") {
 
 function clone(f) {
   const nodes = {}; for (const [a, n] of Object.entries(f.nodes)) nodes[a] = { ...n };
-  return { nodes, order: f.order.slice(), ptrs: { ...f.ptrs }, vars: { ...f.vars }, hl: null, changed: null, say: "" };
+  return { nodes, order: f.order.slice(), ptrs: { ...f.ptrs }, vars: { ...f.vars }, calls: f.calls.slice(), out: f.out, hl: null, changed: null, say: "" };
 }
 
 export class ListBoard {
@@ -130,9 +138,10 @@ export class ListBoard {
     if (!document.getElementById("list-board-css")) { const s = document.createElement("style"); s.id = "list-board-css"; s.textContent = css; document.head.appendChild(s); }
     const el = this.el = document.createElement("section");
     el.id = "list-board"; el.setAttribute("aria-label", "The linked list, step by step");
-    el.innerHTML = `<div class="lb-head"><span class="lb-title">THE ROPE</span><span class="lb-say" role="status" aria-live="polite"></span></div>
+    el.innerHTML = `<div class="lb-head"><span class="lb-title">THE ROPE</span><span class="lb-call"></span><span class="lb-say" role="status" aria-live="polite"></span></div>
       <div class="lb-stage"><svg class="lb-arrows"><defs><marker id="lb-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c9b48a"/></marker>
         <marker id="lb-ah-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ff9a5c"/></marker></defs></svg></div>
+      <div class="lb-out" aria-live="polite"></div>
       <div class="lb-foot"><div class="lb-vars"></div>
         <div class="lb-ctrl">
           <button class="first" title="Back to the start" aria-label="Back to the start">⏮</button>
@@ -158,7 +167,7 @@ export class ListBoard {
   }
 
   open() { if (this.el.classList.contains("on")) return; this.el.classList.add("on"); document.body.classList.add("board-on"); document.body.style.setProperty("--board-h", this.el.offsetHeight + "px"); dispatchEvent(new Event("resize")); }
-  close() { if (!this.el.classList.contains("on")) return; this.el.classList.remove("on"); document.body.classList.remove("board-on"); dispatchEvent(new Event("resize")); }
+  close() { if (!this.el.classList.contains("on")) return; this._h = 0; this.el.classList.remove("on"); document.body.classList.remove("board-on"); dispatchEvent(new Event("resize")); }
   setPlaying(on) { this.playing = on; this.$(".play").textContent = on ? "⏸" : "▶"; }
   setEnabled(back, fwd) { this.$(".first").disabled = this.$(".back").disabled = !back; this.$(".fwd").disabled = this.$(".last").disabled = !fwd; }
 
@@ -186,9 +195,22 @@ export class ListBoard {
         nx.vars[s.target] = s.value; nx.changed = s.target;
         nx.say = `${s.target} = <b>${s.value}</b>` + (st.lastSay ? ` <span class="dim">· ${st.lastSay}</span>` : "");
         if (st.hl && st.hl.kind !== "null") nx.hl = { ...st.hl, dim: true };
+      } else if (s.action === "DROP") {
+        delete nx.ptrs[s.target]; delete nx.vars[s.target];
+        nx.say = `<span class="dim">${s.target} is gone (its block or function ended)</span>`;
+        if (st.hl && st.hl.kind !== "null") nx.hl = { ...st.hl, dim: true };
+      } else if (s.action === "CALL") {
+        nx.calls.push(s.target);
+        nx.say = `<b>call</b> ${s.message} <span class="dim">· the function gets COPIES of these</span>`;
+      } else if (s.action === "RETURN") {
+        nx.calls.pop();
+        nx.say = `<b>return</b> · ${s.message}`;
+      } else if (s.action === "PRINT") {
+        nx.out = (nx.out + s.message).slice(-600);
+        nx.say = `printf · <span class="w">${s.message.replace(/</g, "&lt;").replace(/\n/g, "↵")}</span>`;
       } else if (s.action === "NEW") {
         nx.nodes[a] = { data: s.value, next: NULL, freed: false }; nx.order.push(a);
-        nx.hl = { a, kind: "new" }; nx.say = `<span class="w">newNode(${s.value})</span>: a new pig at <b>${hex(a)}</b>, next = NULL`;
+        nx.hl = { a, kind: "new" }; nx.say = `<span class="w">${s.message || `newNode(${s.value}): a new pig at ${hex(a)}, next = NULL`}</span>`;
       } else if (s.action === "READ") {
         nx.hl = { a, kind: "read" }; nx.say = `${s.message.replace(/is (-?\d+)$/, "is <b>$1</b>")}`;
       } else if (s.action === "WRITE") {
@@ -204,7 +226,7 @@ export class ListBoard {
       } else if (s.action === "NULL_DEREF") {
         nx.hl = { a: NULL, kind: "null" }; nx.say = `<span class="bad">${s.message}</span>`;
       } else nx.say = s.message || s.action;
-      nx.lastSay = (s.action === "VAR" || s.action === "PTR") ? st.lastSay : nx.say;
+      nx.lastSay = (s.action === "VAR" || s.action === "PTR" || s.action === "DROP") ? st.lastSay : nx.say;
       frames.push(nx); st = nx;
     }
     this.frames = frames; this.k = 0;
@@ -217,21 +239,25 @@ export class ListBoard {
     const f = this.frames[k], stage = this.$(".lb-stage"), svg = this.$(".lb-arrows");
     stage.querySelectorAll(".lb-node,.lb-null,.lb-ptr,.lb-row,.lb-loop").forEach(e => e.remove());
     svg.querySelectorAll("path.ln").forEach(e => e.remove());
-    const W = 72, GAP = 30, pos = {};
+    const pos = {};
     // the same layout the 3D sty uses: row 0 the rope from head, row 1 everything else
     const L = layoutFrame(f, this.headVar), chain = L.chain, others = L.others;
-    for (const [a, p] of Object.entries(L.at)) pos[a] = { x: p.c * (W + GAP), y: p.r ? 108 : 30 };
+    // a long rope: narrower boxes first (every field still shown), then the whole stage zooms out a little
+    const cols = Math.max(1, ...Object.values(L.at).map(p => p.c + 1)), avail = Math.max(300, this.el.clientWidth - 30);
+    const compact = cols * 134 + 90 > avail, W = compact ? 82 : 100, GAP = compact ? 18 : 34;
+    stage.classList.toggle("compact", compact);
+    const need = cols * (W + GAP) + 90;
+    stage.style.zoom = need > avail ? Math.max(0.6, avail / need).toFixed(3) : "";
+    for (const [a, p] of Object.entries(L.at)) pos[a] = { x: p.c * (W + GAP), y: p.r ? 126 : 30 };
     const lost = new Set(lostNodes(f));
     stage.classList.toggle("two", others.length > 0);
     if (others.length) {
-      const r = document.createElement("div"); r.className = "lb-row"; r.style.top = "80px"; r.style.left = "auto"; r.style.right = "4px";
+      const r = document.createElement("div"); r.className = "lb-row"; r.style.top = "100px"; r.style.left = "auto"; r.style.right = "4px";
       r.textContent = [...others].some(a => lost.has(a)) ? "OFF THE ROPE  (red = LOST: no pointer can reach it)" : "OFF THE ROPE  (held by a pointer)";
       stage.appendChild(r);
     }
-    // fit: shrink the spacing if the row is too long for the board
-    const span = Math.max(chain.seen.length, 1) * (W + GAP) + 60, avail = stage.clientWidth || 700;
-    const sx = span > avail ? avail / span : 1;
-    for (const p of Object.values(pos)) p.x = 10 + p.x * sx;
+    const sx = 1;
+    for (const p of Object.values(pos)) p.x = 10 + p.x;
     // the nodes
     for (const [a, p] of Object.entries(pos)) {
       const n = f.nodes[a], d = document.createElement("div");
@@ -239,7 +265,7 @@ export class ListBoard {
       if (f.hl && +f.hl.a === +a) cls += " " + f.hl.kind + (f.hl.dim ? " dim" : "");
       if (lost.has(+a)) cls += " lost";
       d.className = cls; d.style.left = p.x + "px"; d.style.top = p.y + "px";
-      d.innerHTML = `<span class="d">${n.data}</span><span class="n">${n.next === NULL ? "⏚" : "•"}</span><span class="ad">${hex(+a)}</span>`;
+      d.innerHTML = `<span class="d">${n.data}</span><span class="n${n.next === NULL ? " nul" : ""}">${hex(n.next)}</span><span class="ad">${hex(+a)}</span>`;
       stage.appendChild(d);
     }
     // arrows: next of every placed node
@@ -309,6 +335,13 @@ export class ListBoard {
       c.innerHTML = `${nm} = <b>${v}</b>`; vars.appendChild(c);
     }
     this.$(".lb-say").innerHTML = f.say || "";
+    const call = this.$(".lb-call"); call.classList.toggle("on", f.calls.length > 0);
+    call.textContent = f.calls.length ? "inside " + f.calls.map(c => c + "()").join(" › ") : "";
+    const out = this.$(".lb-out"), had = out.classList.contains("on"); out.classList.toggle("on", !!f.out);
+    out.innerHTML = f.out ? "<b>console ▸ </b>" + f.out.replace(/&/g, "&amp;").replace(/</g, "&lt;") : ""; out.scrollTop = out.scrollHeight;
+    if (this.el.classList.contains("on") && Math.abs((this._h || 0) - this.el.offsetHeight) > 2) {
+      this._h = this.el.offsetHeight;
+      document.body.style.setProperty("--board-h", this.el.offsetHeight + "px"); dispatchEvent(new Event("resize")); }
     this.$(".lb-count").textContent = `step ${k} / ${this.frames.length - 1}`;
   }
 }

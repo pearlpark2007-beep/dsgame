@@ -1,8 +1,9 @@
-// sty.js — Circe's island: a moonlit clearing in the oak woods, her house glowing behind, and the
-// crew turned into pigs. Each pig IS a node of a linked list, seen from above:
+// sty.js — the sty on Circe's island (the island itself is helios.js): the crew turned into pigs. Each pig IS a node of a linked list, seen from above:
 //   • its back is the node's box: the tag (data) painted big, its address small under it,
 //   • the little crate on its rump is the node's next field: the rope to the NEXT pig leaves from
 //     there and ends in an arrow at that pig's nose; a loose rope end is NULL,
+//   • in front of every pig stands its plaque, [ address | data | next ], so every field of every node
+//     is readable at all times (next shows the address it holds, or NULL),
 //   • the pigs stand in the order of the rope, left to right, like the board under the picture:
 //     row 0 is the rope from the gate (head); row 1, nearer the camera, is anything off that rope.
 //     Arrows on row 0 only ever point right, so they never cross. When the rope changes, the pigs
@@ -16,7 +17,7 @@ import * as THREE from "three";
 import { NULL, hex, walkFrom, lostNodes, layoutFrame, HEAD_COLOR } from "../../learn/listBoard.js";
 
 // the grid the pigs stand on
-const X0 = -7.5, SP = 2.9, ROW0 = -1.0, ROW1 = 2.8;
+const X0 = -7.5, SP = 3.4, ROW0 = -1.0, ROW1 = 3.2;
 export const GATE = new THREE.Vector3(X0 - 2.7, 0, ROW0);
 export const PIT = new THREE.Vector3(X0 + 9 * SP, 0, ROW0);      // where the NULL stone rests when the rope is long
 const cell = (c, r) => new THREE.Vector3(X0 + c * SP, 0, r ? ROW1 : ROW0);
@@ -30,7 +31,7 @@ function canvasTexture(w, h, draw) {
 }
 function labelSprite(draw, w, h, scale) {
   const tex = canvasTexture(w, h, draw);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, fog: false }));
   s.scale.set(scale * w / h, scale, 1); s.renderOrder = 10;
   return s;
 }
@@ -44,6 +45,42 @@ function backTexture(value, address, rim = null) {
     g.fillStyle = "#7a5a3a"; g.font = "bold 30px 'Courier Prime', monospace"; g.fillText(hex(address), w / 2, h * 0.84);
   });
 }
+// the node's plaque, standing in front of the pig so nothing about the node is ever hidden:
+//   [ address | data | next ]  — next shows the address it holds, or NULL.
+// rim: a colour while the node is read/written; hot: "next" lit while that rope is being re-tied;
+// dangling: next holds an address that is no longer a node; lost: nothing can reach this pig.
+function plaqueTexture({ address, data, next, rim = null, hot = false, dangling = false, lost = false }) {
+  return canvasTexture(600, 200, (g, w, h) => {
+    const A = 176, D = 360;
+    g.fillStyle = lost ? "#d9d4cc" : "#fbf5e6"; g.fillRect(0, 0, w, h);
+    // address cell: black, brass text
+    g.fillStyle = "#141008"; g.fillRect(0, 0, A, h);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = "#e0b83a"; g.font = "bold 28px 'Courier Prime', 'Courier New', monospace"; g.fillText("address", A / 2, 34);
+    g.fillStyle = "#ffd21a"; g.strokeStyle = "#ffd21a"; g.lineWidth = 3; g.font = "bold 62px 'Courier Prime', 'Courier New', monospace"; g.fillText(hex(address), A / 2, 126, A - 12); g.strokeText(hex(address), A / 2, 126, A - 12);
+    // data cell
+    g.fillStyle = "#4a3c2a"; g.font = "bold 28px 'Courier Prime', 'Courier New', monospace"; g.fillText("data", (A + D) / 2, 34);
+    g.fillStyle = "#141008"; g.font = "bold 124px Anton, Impact, 'Arial Black', sans-serif"; g.fillText(String(data), (A + D) / 2, 130, D - A - 14);
+    // next cell
+    if (hot) { g.fillStyle = "#ffb070"; g.fillRect(D, 0, w - D, h); }
+    g.fillStyle = "#4a3c2a"; g.font = "bold 28px 'Courier Prime', 'Courier New', monospace"; g.fillText("next", (D + w) / 2, 34);
+    const isNull = next === NULL;
+    g.fillStyle = g.strokeStyle = isNull || dangling ? "#b0140c" : "#0a1a8c"; g.lineWidth = 4; g.font = "bold 76px 'Courier Prime', 'Courier New', monospace";
+    const nt = isNull ? "NULL" : hex(next) + (dangling ? "✗" : "");
+    g.fillText(nt, (D + w) / 2, 126, w - D - 14); g.strokeText(nt, (D + w) / 2, 126, w - D - 14);
+    // cell walls and the rim
+    g.fillStyle = "#141008"; g.fillRect(D - 3, 0, 6, h);
+    g.strokeStyle = rim || "#141008"; g.lineWidth = rim ? 20 : 8; g.strokeRect(g.lineWidth / 2, g.lineWidth / 2, w - g.lineWidth, h - g.lineWidth);
+    if (lost) {
+      // the labels row becomes a red band: every value stays readable underneath
+      g.fillStyle = "#c8261e"; g.fillRect(0, 0, w, 66);
+      g.fillStyle = "#fff4cf"; g.font = "bold 40px 'Courier Prime', 'Courier New', monospace"; g.fillText("UNREACHABLE · LOST", w / 2, 36);
+      g.strokeStyle = "#c8261e"; g.lineWidth = 12; g.setLineDash([26, 14]); g.strokeRect(6, 6, w - 12, h - 12); g.setLineDash([]);
+    }
+  });
+}
+const PLAQUE_H = 1.08, PLAQUE_AT = new THREE.Vector3(0, 0.66, 1.35);
+
 // the next field's crate lid: a dot (it points somewhere) or NULL
 const lidTex = {};
 function lidTexture(isNull) {
@@ -99,97 +136,35 @@ function makePig(value, address) {
   return g;
 }
 // a man again (the finale): a plain figure in a tunic
+// a crewman, freed: rounded limbs, a flared tunic with a belt, hair and a beard. Each one a little different.
+const MEN = [0, 0];
 function makeMan() {
+  const n = MEN[0]++;
   const g = new THREE.Group();
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc89a78, roughness: 0.8 }), tunic = new THREE.MeshStandardMaterial({ color: 0x7a3a28, roughness: 0.9 });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.9, 10), tunic); body.position.y = 1.0; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 10), skin); head.position.y = 1.66; g.add(head);
-  for (const x of [-0.12, 0.12]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.56, 0.14), skin); leg.position.set(x, 0.28, 0); g.add(leg); }
-  for (const x of [-0.33, 0.33]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.6, 0.12), skin); arm.position.set(x, 1.05, 0); g.add(arm); }
+  const tunicC = [0x9a3a22, 0x2f4f7a, 0x6a5a2a, 0x7a2a4a, 0x3a6a4a][n % 5], hairC = [0x2a1a10, 0x4a2a14, 0x1a1410, 0x6a4a2a][n % 4];
+  const skin = new THREE.MeshStandardMaterial({ color: [0xc89a78, 0xb07a58, 0xd8ad88, 0x9a6a4a][n % 4], roughness: 0.75 });
+  const tunic = new THREE.MeshStandardMaterial({ color: tunicC, roughness: 0.9 });
+  const hair = new THREE.MeshStandardMaterial({ color: hairC, roughness: 1 });
+  const leather = new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.8 });
+  const add = (geo, mat, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; g.add(m); return m; };
+  // legs and sandals
+  for (const x of [-0.11, 0.11]) { add(new THREE.CapsuleGeometry(0.075, 0.5, 4, 8), skin, x, 0.36, 0); add(new THREE.BoxGeometry(0.13, 0.05, 0.24), leather, x, 0.025, 0.04); }
+  // the tunic: wider at the hem, a belt at the waist
+  const pts = [[0.0, 0.62], [0.30, 0.62], [0.25, 0.9], [0.22, 1.05], [0.27, 1.3], [0.29, 1.42], [0.12, 1.5], [0.0, 1.5]].map(([r, y]) => new THREE.Vector2(r, y));
+  add(new THREE.LatheGeometry(pts, 14), tunic, 0, 0, 0);
+  add(new THREE.CylinderGeometry(0.235, 0.235, 0.07, 14), leather, 0, 1.0, 0);
+  // arms, a little away from the body, hands
+  for (const sx of [-1, 1]) { add(new THREE.CapsuleGeometry(0.065, 0.48, 4, 8), skin, sx * 0.34, 1.12, 0, 0, sx * 0.12); add(new THREE.SphereGeometry(0.075, 8, 6), skin, sx * 0.38, 0.8, 0); }
+  // neck, head, hair, beard
+  add(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 8), skin, 0, 1.56, 0);
+  add(new THREE.SphereGeometry(0.16, 14, 12), skin, 0, 1.74, 0).scale.set(0.95, 1.1, 1);
+  add(new THREE.SphereGeometry(0.168, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 1.76, -0.015);
+  add(new THREE.ConeGeometry(0.11, 0.2, 10), hair, 0, 1.6, 0.07, Math.PI, 0).scale.set(1, 1, 0.7);
+  add(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0x120c08 }), -0.055, 1.77, 0.145);
+  add(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0x120c08 }), 0.055, 1.77, 0.145);
+  g.scale.setScalar(1.15);
   return g;
 }
-
-// ---------- the island around the sty
-export function buildIsland(world) {
-  const scene = world.scene;
-  scene.background = new THREE.Color(0x07060c);
-  scene.fog = new THREE.FogExp2(0x120c1c, 0.028);
-  // ground: dark grass with lighter trodden earth in the clearing
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({
-    map: canvasTexture(1024, 1024, (g, w, h) => {
-      g.fillStyle = "#1b2414"; g.fillRect(0, 0, w, h);
-      const rg = g.createRadialGradient(w / 2, h / 2, 20, w / 2, h / 2, w * 0.2);
-      rg.addColorStop(0, "#4a3a28"); rg.addColorStop(0.8, "#3a3020"); rg.addColorStop(1, "rgba(27,36,20,0)");
-      g.fillStyle = rg; g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(${40 + Math.random() * 40},${50 + Math.random() * 40},${25 + Math.random() * 20},0.35)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2 + Math.random() * 4); }
-    }), roughness: 1 }));
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-  // the oak wood around the clearing
-  const trunkM = new THREE.MeshStandardMaterial({ color: 0x2a1d14, roughness: 1 }), leafM = new THREE.MeshStandardMaterial({ color: 0x18261a, roughness: 1 });
-  const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
-  for (let i = 0; i < 70; i++) {
-    const a = rnd() * Math.PI * 2, r = 18 + rnd() * 20;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r * 0.8 - 2;
-    if (z > 7 && Math.abs(x) < 18) continue;          // keep the view from the camera side open
-    const h = 4 + rnd() * 5, t = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.45, h, 7), trunkM);
-    t.position.set(x, h / 2, z); t.castShadow = true; scene.add(t);
-    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8 + rnd() * 1.6, 0), leafM);
-    crown.position.set(x, h + 0.8, z); crown.scale.y = 0.8; crown.castShadow = true; scene.add(crown);
-  }
-  // Circe's house: stone walls, a lit doorway, smoke-purple light spilling out
-  const stone = new THREE.MeshStandardMaterial({ color: 0x5a5560, roughness: 0.95 });
-  const house = new THREE.Group(); house.position.set(1, 0, -14);
-  const walls = new THREE.Mesh(new THREE.BoxGeometry(10, 4.4, 6), stone); walls.position.y = 2.2; walls.castShadow = true; house.add(walls);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 2.6, 4), new THREE.MeshStandardMaterial({ color: 0x2e2028, roughness: 1 })); roof.position.y = 5.7; roof.rotation.y = Math.PI / 4; roof.scale.z = 0.62; house.add(roof);
-  const glow = new THREE.MeshBasicMaterial({ color: 0xffb070 });
-  const door = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.6), glow); door.position.set(0, 1.3, 3.01); house.add(door);
-  for (const x of [-3.2, 3.2]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.9), glow); w.position.set(x, 2.6, 3.01); house.add(w); }
-  // Circe herself, a dark figure standing in her lit doorway
-  const robe = new THREE.MeshStandardMaterial({ color: 0x0a0610, roughness: 0.6, emissive: 0x2a0a40, emissiveIntensity: 0.4 });
-  const circe = new THREE.Group(); circe.position.set(0, 0, 3.15);
-  const dress = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.7, 14), robe); dress.position.y = 0.85; circe.add(dress);
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.22, 0.5, 10), robe); torso.position.y = 1.85; circe.add(torso);
-  const headC = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), robe); headC.position.y = 2.22; circe.add(headC);
-  const hair = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.7, 10), robe); hair.position.set(0, 1.95, -0.08); circe.add(hair);
-  const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.4, 6), robe); staff.position.set(0.4, 1.2, 0); circe.add(staff);
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), new THREE.MeshBasicMaterial({ color: 0xd08aff })); orb.position.set(0.4, 2.45, 0); circe.add(orb);
-  house.add(circe);
-  scene.add(house);
-  // a warm lantern hung high over the sty, so the pigs (the nodes) read clearly from above
-  const over = new THREE.PointLight(0xffd8a8, 70, 34, 1.3); over.position.set(2, 10, 1.5); scene.add(over);
-  const doorLight = new THREE.PointLight(0xff9a50, 40, 18, 1.6); doorLight.position.set(1, 1.6, -10.4); scene.add(doorLight);
-  const spell = new THREE.PointLight(0xb070ff, 30, 26, 1.4); spell.position.set(1, 6, -11); scene.add(spell);
-  // moonlight and a low fill
-  const moon = new THREE.DirectionalLight(0x9fb4ff, 1.1); moon.position.set(-14, 22, 12); moon.castShadow = true;
-  moon.shadow.mapSize.set(2048, 2048); Object.assign(moon.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 70 }); scene.add(moon);
-  scene.add(new THREE.HemisphereLight(0x46405a, 0x1a140c, 0.65));
-  // torches on stakes around the sty, flickering
-  const torches = [];
-  for (const [x, z] of [[-13, -5], [15, -5], [-13, 6.5], [15, 6.5], [3, -7.5]]) {
-    const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.8, 6), trunkM); stake.position.set(x, 0.9, z); scene.add(stake);
-    const fire = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffb050 })); fire.position.set(x, 1.9, z); scene.add(fire);
-    const l = new THREE.PointLight(0xff8a3a, 14, 11, 1.7); l.position.set(x, 2.1, z); scene.add(l); torches.push(l);
-  }
-  // the gate (head): two posts and a crossbar, painted HEAD
-  const wood = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 });
-  const gate = new THREE.Group(); gate.position.copy(GATE);
-  for (const z of [-0.9, 0.9]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.2, 0.22), wood); post.position.set(0, 1.1, z); post.castShadow = true; gate.add(post); }
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 2.2), wood); bar.position.y = 2.1; gate.add(bar);
-  const sign = labelSprite((g, w, h) => { g.fillStyle = "#2a1c10"; g.fillRect(0, 0, w, h); g.strokeStyle = HEAD_COLOR; g.lineWidth = 8; g.strokeRect(4, 4, w - 8, h - 8); g.fillStyle = HEAD_COLOR; g.font = "bold 80px Anton, Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("HEAD", w / 2, h / 2 + 4); }, 256, 110, 0.6);
-  sign.position.set(0, 2.62, 0); gate.add(sign);
-  scene.add(gate);
-  // the NULL pit: a black hole in the ground, a stone marked NULL
-  const pit = new THREE.Group(); pit.position.copy(PIT);
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(0.62, 24), new THREE.MeshBasicMaterial({ color: 0x020102 })); hole.rotation.x = -Math.PI / 2; hole.position.y = 0.02; pit.add(hole);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.09, 6, 24), stone); rim.rotation.x = Math.PI / 2; rim.position.y = 0.06; pit.add(rim);
-  const nullSign = labelSprite((g, w, h) => { g.fillStyle = "#1a1418"; g.fillRect(0, 0, w, h); g.strokeStyle = "#8a7f88"; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = "#cfc6cc"; g.font = "bold 78px 'Courier Prime', monospace"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("NULL", w / 2, h / 2 + 4); }, 256, 110, 0.55);
-  nullSign.position.set(0, 0.95, -0.75); pit.add(nullSign);
-  const pitGlow = new THREE.PointLight(0xff2a10, 0, 6, 1.5); pitGlow.position.set(0, 0.6, 0); pit.add(pitGlow);
-  scene.add(pit);
-  world.add({ update: (dt, t) => { torches.forEach((l, i) => (l.intensity = 12 + Math.sin(t * 9 + i * 2.1) * 2 + Math.sin(t * 23 + i) * 1.2)); spell.intensity = 26 + Math.sin(t * 1.3) * 6; } });
-  return { house, gate, pit, pitGlow, doorAt: new THREE.Vector3(1, 0, -10.6) };
-}
-
 
 // ---------- the sty: draws frames
 export class Sty {
@@ -213,12 +188,15 @@ export class Sty {
   points() {
     // (a little past the gate sign on the left and the NULL stone on the right, so neither is cut off)
     const pts = [GATE.clone().add(new THREE.Vector3(-1.5, 0, 0)), GATE.clone().add(new THREE.Vector3(0, 0, 1.8)), this.nullSpot().add(new THREE.Vector3(1.4, 0, 0))];
-    for (const a of Object.keys(this.layout.at)) { const c = this.spot(a); pts.push(c.clone().add(new THREE.Vector3(-1.7, 0, 0)), c.clone().add(new THREE.Vector3(1.7, 0, 0.9))); }   // the whole pig, nose to crate
+    for (const a of Object.keys(this.layout.at)) { const c = this.spot(a); pts.push(c.clone().add(new THREE.Vector3(-1.7, 0, -0.6)), c.clone().add(new THREE.Vector3(1.7, 0, 2.0))); }   // the whole pig, nose to crate, and its plaque
     return pts;
   }
 
   // ---------- jump straight to a frame (stepping back, or setting a trial up)
   show(f) {
+    for (const m of this.men || []) this.group.remove(m);      // a new picture: the men of an earlier finale go
+    this.men = [];
+    for (const p of Object.values(this.pigs)) p.pig.visible = true;
     this.frame = f; this.layout = layoutFrame(f, this.headVar);
     const live = new Set(f.order.filter(a => !f.nodes[a].freed).map(String));
     for (const a of Object.keys(this.pigs)) if (!live.has(a)) this._dropPig(a);
@@ -258,16 +236,18 @@ export class Sty {
       }
       case "LINK": {
         // the re-tied rope grows from the crate, then everyone walks to their new places
+        if (this.pigs[a]) this.pigs[a].hot = true;
         this._ropesAll(a);
         const r = this.ropes[a];
         if (r) await this._tween(dur * 1.2, k => r.geometry.setDrawRange(0, Math.floor(r.userData.count * k)));
         if (r) r.geometry.setDrawRange(0, Infinity);
+        if (this.pigs[a]) { this.pigs[a].hot = false; }
         this._lostTint();
         break;
       }
       case "FREE": {
         const p = this.pigs[a]; if (!p) break;
-        const mats = []; p.pig.traverse(o => o.material && mats.push(o.material));
+        const mats = [p.plaque.material]; p.pig.traverse(o => o.material && mats.push(o.material));
         mats.forEach(m => (m.transparent = true));
         await this._tween(dur * 1.4, k => { p.pig.position.y = k * 2; mats.forEach(m => (m.opacity = 1 - k)); });
         this._dropPig(a); break;
@@ -279,7 +259,9 @@ export class Sty {
     this._banners(step.action === "PTR" ? step.target : null, dur);
     this._placeNull(false, dur);
     if (step.action === "PTR") await this._tween(dur * 0.8, () => {});
-    else if (step.action === "VAR") await this._tween(0.05, () => {});
+    else if (step.action === "VAR" || step.action === "DROP") await this._tween(0.05, () => {});
+    else if (step.action === "CALL" || step.action === "RETURN") await this._tween(dur * 0.9, () => {});
+    else if (step.action === "PRINT") await this._tween(dur * 0.6, () => {});
   }
 
   // pigs whose place in the layout changed walk there (legs going), ropes hidden while they move
@@ -309,28 +291,42 @@ export class Sty {
     if (!p) {
       const pig = makePig(value, +a);
       this.group.add(pig);
-      p = this.pigs[a] = { pig, value };
+      const plaque = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, toneMapped: false, fog: false }));
+      plaque.scale.set(PLAQUE_H * 3, PLAQUE_H, 1); plaque.renderOrder = 6;
+      this.group.add(plaque);
+      p = this.pigs[a] = { pig, value, plaque, rim: null, hot: false, key: "" };
     }
     if (p.value !== value) { p.value = value; this._rim(p, a, null); }
     return p;
   }
-  _dropPig(a) { const p = this.pigs[a]; if (!p) return; this.group.remove(p.pig); delete this.pigs[a]; }
-  // repaint the node box on its back, with a coloured rim for a moment
+  _dropPig(a) { const p = this.pigs[a]; if (!p) return; this.group.remove(p.pig); this.group.remove(p.plaque); p.plaque.material.map?.dispose(); delete this.pigs[a]; }
+  // repaint the node box on its back and its plaque, with a coloured rim for a moment
   _rim(p, a, color) {
     const back = p.pig.userData.back;
     back.material.map = backTexture(p.value, +a, color); back.material.needsUpdate = true;
-    if (color) { const v = p.value; setTimeout(() => { if (this.pigs[a] === p && p.value === v) { back.material.map = backTexture(p.value, +a); back.material.needsUpdate = true; } }, 900); }
+    p.rim = color; this._plaque(a);
+    if (color) { const v = p.value; setTimeout(() => { if (this.pigs[a] === p && p.value === v) { back.material.map = backTexture(p.value, +a); back.material.needsUpdate = true; p.rim = null; this._plaque(a); } }, 900); }
   }
+  // redraw a plaque from the frame (only when something on it changed)
+  _plaque(a) {
+    const p = this.pigs[a], f = this.frame; if (!p || !f || !f.nodes[a]) return;
+    const n = f.nodes[a], t = f.nodes[n.next];
+    const st = { address: +a, data: p.value, next: n.next, rim: p.rim, hot: p.hot, dangling: n.next !== NULL && (!t || t.freed), lost: !!p.lost };
+    const key = JSON.stringify(st);
+    if (key === p.key) return;
+    p.key = key; p.plaque.material.map?.dispose(); p.plaque.material.map = plaqueTexture(st); p.plaque.material.needsUpdate = true;
+  }
+  _plaques() { for (const a of Object.keys(this.pigs)) this._plaque(a); }
 
   // a rope across the ground, from one point to another, with an arrowhead at the far end.
   // bend > 0 swings it out sideways (towards the house), so ropes that go back never cross the row
-  _rope(from, to, color = 0xc9b48a, radius = 0.05, bend = 0) {
+  _rope(from, to, color = 0x1a1208, radius = 0.07, bend = 0) {
     const mid = from.clone().lerp(to, 0.5); mid.y = Math.min(from.y, to.y) - 0.08; mid.z -= bend;
     const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
     const geo = new THREE.TubeGeometry(curve, 36, radius, 6, false);
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.8, emissive: color, emissiveIntensity: 0.18 }));
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.7, emissive: color, emissiveIntensity: 0.25 }));
     m.userData.count = geo.index.count;
-    const head = new THREE.Mesh(new THREE.ConeGeometry(radius * 3.6, radius * 9, 8), m.material);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(radius * 3.4, radius * 7, 8), m.material);
     head.position.copy(curve.getPoint(0.96)); head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), curve.getTangent(0.96)); m.add(head);
     return m;
   }
@@ -351,17 +347,19 @@ export class Sty {
       const isNull = n.next === NULL;
       p.pig.userData.lid.material.map = lidTexture(isNull); p.pig.userData.lid.material.needsUpdate = true;
       if (isNull) continue;                                  // NULL: the lid says so; no rope
-      let to, bend = 0, color = 0xc9b48a;
+      let to, bend = 0, color = 0x1a1208;
       if (f.nodes[n.next] && !f.nodes[n.next].freed && this.layout.at[n.next]) {
         const t = this.spot(n.next), same = Math.abs(t.z - s.z) < 0.1, side = t.x >= s.x ? 1 : -1;
-        if (same) {
+        if (String(n.next) === String(a)) {                                       // it points at itself: a loop round its own back
+          to = new THREE.Vector3(s.x - dir * 1.25, 0.68, s.z); bend = 2.4;
+        } else if (same) {
           to = new THREE.Vector3(t.x - side * 1.25, 0.68, t.z);                  // the near end of the pig it points at
           if (Math.abs(t.x - s.x) > SP * 1.5) bend = (s.z > 0 ? -1 : 1) * (1.7 + Math.abs(t.x - s.x) * 0.14);   // past other pigs: swing round them
         } else {
           to = new THREE.Vector3(t.x + (t.x > s.x + 0.1 ? -0.5 : t.x < s.x - 0.1 ? 0.5 : dir * 0.35), 0.68, t.z + (s.z > t.z ? 0.66 : -0.66));   // the near flank
         }
       } else { to = start.clone().add(new THREE.Vector3(dir * 0.9, -0.5, 0)); color = 0xe0442a; }
-      const r = this._rope(start, to, String(a) === String(growing) ? 0xff9a5c : color, 0.05, bend);
+      const r = this._rope(start, to, String(a) === String(growing) ? 0xff7a2a : color, 0.07, bend);
       this.group.add(r); this.ropes[a] = r;
       if (String(a) === String(growing)) r.geometry.setDrawRange(0, 0);
     }
@@ -372,8 +370,10 @@ export class Sty {
     let to;
     if (h === NULL || h == null || !f.nodes[h] || f.nodes[h].freed) to = this.nullSpot().add(new THREE.Vector3(-0.5, 0.4, 0));
     else { const t = this.spot(h); to = new THREE.Vector3(t.x - 1.25, 0.7, t.z); }
-    this.headRope = this._rope(from, to, 0xf2c230, 0.065, Math.abs(to.z - from.z) < 0.1 && to.x > from.x + SP * 1.5 ? 0.9 : 0);
+    this.island.setHead?.(h === NULL || h == null ? "NULL" : hex(h));
+    this.headRope = this._rope(from, to, 0xe0a800, 0.08, Math.abs(to.z - from.z) < 0.1 && to.x > from.x + SP * 1.5 ? 0.9 : 0);
     this.group.add(this.headRope);
+    this._plaques();
   }
 
   // the NULL stone sits right after the last pig of the rope
@@ -413,7 +413,8 @@ export class Sty {
   _lostTint() {
     const f = this.frame; if (!f) return;
     const lost = new Set(lostNodes(f).map(String));
-    for (const [a, p] of Object.entries(this.pigs)) p.pig.userData.mat.color.copy(lost.has(a) ? GREY : PINK);
+    for (const [a, p] of Object.entries(this.pigs)) { p.lost = lost.has(a); p.pig.userData.mat.color.copy(p.lost ? GREY : PINK); }
+    this._plaques();
   }
 
   _puff(at) {
@@ -442,9 +443,9 @@ export class Sty {
       const p = this.pigs[a]; if (!p) continue;
       const s = this.spot(a); this._puff(s);
       if (comic && (a === order[0] || a === order[order.length - 1])) comic.sfx("POOF!", { x: 25 + Math.random() * 25, y: 28 + Math.random() * 14, size: 6, seconds: 0.8 });
-      const man = makeMan(); man.position.set(s.x, 0, s.z); this.group.add(man);
+      const man = makeMan(); man.position.set(s.x, 0, s.z); this.group.add(man); (this.men ||= []).push(man);
       p.pig.visible = false; if (this.ropes[a]) this.group.remove(this.ropes[a]);
-      await this._tween(0.55, k => man.scale.setScalar(0.4 + 0.6 * k));
+      await this._tween(0.55, k => man.scale.setScalar((0.4 + 0.6 * k) * 1.15));
     }
     if (this.headRope) this.group.remove(this.headRope);
     for (const b of Object.values(this.banners)) this.group.remove(b);
@@ -458,6 +459,8 @@ export class Sty {
       const y = p.pig.rotation.y, to = p.turn || 0;
       if (Math.abs(to - y) > 0.001) p.pig.rotation.y = Math.abs(to - y) < 0.02 ? to : y + (to - y) * Math.min(1, dt * 7);
       p.pig.userData.back.rotation.z = -p.pig.rotation.y;
+      p.plaque.position.copy(p.pig.position).add(PLAQUE_AT);
+      p.plaque.visible = p.pig.visible;
     }
     for (const tw of [...this.tweens]) {
       tw.t += dt; const k = Math.min(1, tw.t / tw.d); tw.fn(k);

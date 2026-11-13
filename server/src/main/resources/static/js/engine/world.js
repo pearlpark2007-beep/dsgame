@@ -14,11 +14,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1280, 720) },
-    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }, keepBlue: { value: 0 }, halo: { value: 1 }, focusOn: { value: 0 }, focusAt: { value: new THREE.Vector2(0.5, 0.5) }
+    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }, keepBlue: { value: 0 }, burn: { value: 1 }, halo: { value: 1 }, focusOn: { value: 0 }, focusAt: { value: new THREE.Vector2(0.5, 0.5) }
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze, keepBlue, halo, focusOn; uniform vec2 focusAt;
+    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze, keepBlue, burn, halo, focusOn; uniform vec2 focusAt;
     varying vec2 vUv;
     float rand(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     float luma(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
@@ -51,7 +51,7 @@ const GradeShader = {
       if (r > 0.9992) { vec2 p = fract(vUv * vec2(64.0, 36.0)) - 0.5; if (length(p * vec2(1.0, 0.56)) < 0.08) c = mix(c, r > 0.9996 ? vec3(0.95, 0.9, 0.8) : vec3(0.06, 0.04, 0.03), 0.8); }
       vec2 d = vUv - 0.5;
       float edge = smoothstep(0.38, 0.85, length(d * vec2(1.25, 1.0)));                    // burned edges
-      c = mix(c, c * vec3(0.55, 0.32, 0.2), edge * 0.85 * strength);
+      c = mix(c, c * vec3(0.55, 0.32, 0.2), edge * 0.85 * strength * burn);
       // learning focus: everything away from the thing being taught sinks into shadow
       float fd = length((vUv - focusAt) * vec2(res.x / res.y, 1.0));
       c *= mix(1.0, 0.42, focusOn * smoothstep(0.22, 0.75, fd));

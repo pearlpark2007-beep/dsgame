@@ -15,8 +15,8 @@ public class FindEurylochusLevel extends CirceLevel {
                 "Walk with p. When p->data == 19, do found = p; and stop. found holds where he is, not the 19.",
                 """
                 // head -> 7 -> 12 -> 3 -> 19 -> 5 -> NULL
-                Node* found = NULL;
-                Node* p = head;
+                struct Node *found = NULL;
+                struct Node *p = head;
 
                 """);
     }

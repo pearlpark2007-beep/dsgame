@@ -11,28 +11,57 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 <title>Circe's Island</title>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: #e9e4da; font-family: 'Courier Prime', monospace; }
+  :root { --sun: #ffd21a; --ink: #141008; --blood: #c8261e; --cobalt: #1d3fd1; --paper: #f4ead2; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: var(--paper); font-family: 'Courier Prime', monospace; }
   canvas { display: block; }
-  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #050403; z-index: 40; transition: opacity 1s; }
-  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 30px; color: #f2c230; }
-  #loading p { margin: 0; color: #8a979b; font-size: 15px; }
-  #menu { position: fixed; left: 16px; bottom: 16px; z-index: 10; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); }
-  #menu .grp { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  #menu .lbl { font-size: 11px; letter-spacing: 2px; color: #8c7c66; min-width: 64px; }
-  #menu button, #menu a { min-height: 40px; padding: 0 14px; background: rgba(8, 6, 4, 0.8); color: #efe1c2; border: 1px solid #4a3a28; border-radius: 4px;
-                 font: inherit; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }
-  #menu button:hover, #menu button:focus-visible, #menu a:hover { border-color: #f2c230; color: #f2c230; outline: none; }
-  #menu button.done { border-color: #6a8a58; color: #9fd08a; }
-  #chapter { position: fixed; left: 6%; top: 12%; pointer-events: none; z-index: 10; font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; transition: opacity 1s; }
-  #chapter b { display: block; margin-top: 2px; font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 46px; letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f; }
-  body.busy #menu, body.busy #chapter { opacity: 0; pointer-events: none; }
-  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.75); color: #efe1c2;
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--sun); z-index: 40; transition: opacity 1s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 34px; color: var(--ink); }
+  #loading p { margin: 0; color: var(--ink); font-size: 15px; }
+
+  /* the chapter mark: Kill Bill black bands on a bright picture */
+  #title { position: fixed; left: 0; top: 7%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: opacity 0.6s; }
+  #title span { background: var(--ink); padding: 4px 18px 4px max(18px, 4vw); }
+  #title .k { font-size: 15px; letter-spacing: 4px; color: var(--paper); }
+  #title .t { font-family: Anton, Impact, sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: 1.05; color: var(--sun); letter-spacing: 1px; }
+  #title .t em { font-style: normal; color: var(--blood); }
+
+  /* three doors: three colours, three jobs */
+  #doors { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 0 max(16px, 3vw) 18px; display: flex; flex-direction: column; gap: 10px; transition: opacity 0.6s; }
+  #doors .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .door { position: relative; text-align: left; border: 0; border-top: 10px solid var(--c); background: rgba(14, 10, 7, 0.92); color: var(--paper); padding: 14px 16px 16px; cursor: pointer;
+          font: inherit; display: flex; flex-direction: column; gap: 6px; min-height: 150px; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 6px 6px 0 var(--ink); }
+  .door:hover, .door:focus-visible { transform: translate(-2px, -3px); box-shadow: 9px 10px 0 var(--ink); outline: none; }
+  .door:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
+  .door .kick { font-size: 12px; letter-spacing: 3px; color: var(--c); font-weight: 700; }
+  .door .name { font-family: Anton, Impact, sans-serif; font-size: clamp(26px, 2.8vw, 38px); line-height: 1; letter-spacing: 1px; }
+  .door .what { font-size: 14px; line-height: 1.4; color: #d8ccb2; }
+  .door .prog { margin-top: auto; font-size: 12.5px; color: var(--c); font-weight: 700; letter-spacing: 1px; }
+  .door.lesson { --c: #3b62ff; } .door.trials { --c: var(--blood); } .door.lab { --c: var(--sun); }
+  #doors .extra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #doors .extra button, #doors .extra a { min-height: 36px; padding: 0 14px; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); font: inherit; font-size: 13px;
+          letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }
+  #doors .extra button:hover, #doors .extra a:hover, #doors .extra :focus-visible { border-color: var(--sun); color: var(--sun); outline: none; }
+  #doors .extra .lbl { font-size: 11px; letter-spacing: 2px; color: var(--ink); background: var(--sun); padding: 2px 8px; font-weight: 700; }
+  @media (max-width: 760px) { #doors .row { grid-template-columns: minmax(0, 1fr); } .door { min-height: 0; } .door .what { display: none; } }
+
+  body.busy #doors, body.busy #title { opacity: 0; pointer-events: none; }
+  body.cinematic #doors, body.cinematic #title { display: none; }
+
+  /* the prologue: typed title cards on black */
+  #lore { position: fixed; inset: 0; z-index: 33; background: #050403; display: none; flex-direction: column; justify-content: center; padding: 0 12vw; pointer-events: none; }
+  #lore.on { display: flex; }
+  #lore p { margin: 0; max-width: 46ch; font-family: 'Courier Prime', monospace; font-weight: 700; font-size: clamp(22px, 2.7vw, 38px); line-height: 1.35; color: var(--paper); min-height: 2.7em; }
+  #lore p.red { font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: clamp(44px, 7vw, 96px); letter-spacing: 2px; color: var(--blood); line-height: 1; }
+  #lore p::after { content: "▌"; color: var(--sun); animation: blink 0.8s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #lore p::after { animation: none; } .door { transition: none; } }
+
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.8); color: var(--paper);
           border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
   #skip.on { display: block; }
   @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
-  body.cinematic #menu, body.cinematic #chapter { display: none; }
   #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
-          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: var(--sun); }
   #fast.on { display: flex; }
 </style>
 <script type="importmap">
@@ -40,17 +69,22 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 </script>
 </head>
 <body>
-<div id="loading"><h1>CIRCE'S ISLAND</h1><p>tying the rope…</p></div>
-<div id="chapter">CHAPTER THREE<b>CIRCE'S ISLAND</b></div>
+<div id="loading"><h1>AEAEA · HIGH NOON</h1><p>polishing the marble…</p></div>
+<div id="title"><span class="k">CHAPTER THREE</span><span class="t">THE WITCH WHO <em>KEPT PIGS</em></span></div>
+<div id="lore" aria-live="polite"><p></p></div>
 <button id="skip">SKIP SCENE ▸▸ (Esc)</button>
 <div id="fast">▸▸</div>
-<div id="menu">
-  <div class="grp"><span class="lbl">FILM</span><button id="open-btn">▶ Opening</button></div>
-  <div class="grp"><span class="lbl">LESSON</span>
-    <button data-demo="Count">1 · Walking the rope</button><button data-demo="Insert at head">2 · A new pig in front</button><button data-demo="Delete a value">3 · Cutting one loose</button><button data-demo="Reverse">4 · Turning the rope</button></div>
-  <div class="grp"><span class="lbl">TRIALS</span><button id="trials-btn">Athena's trials · ONE to MOONSET</button><button id="lab-btn">⚗ The Lab · your rope, your code</button></div>
-  <div class="grp"><span class="lbl">ISLANDS</span><a href="harbour_env.html">1 · The Harbour</a><a href="cave_env.html">2 · The Cave</a></div>
-</div>
+<nav id="doors" aria-label="Chapter three">
+  <div class="row">
+    <button class="door lesson" id="door-lesson"><span class="kick">LEARN</span><span class="name">ATHENA'S LESSON</span>
+      <span class="what">The ten operations of your linked-list program. Your C runs on the pigs, line by line. Nothing is graded.</span><span class="prog" id="prog-lesson">10 operations</span></button>
+    <button class="door trials" id="door-trials"><span class="kick">BE JUDGED</span><span class="name">CIRCE'S TRIALS</span>
+      <span class="what">Five tests and the banquet at sunset. Get a pointer wrong and a man stays a pig.</span><span class="prog" id="prog-trials"></span></button>
+    <button class="door lab" id="door-lab"><span class="kick">PLAY</span><span class="name">THE LAB</span>
+      <span class="what">No judge, no story. Your rope, your code, any of your ten functions.</span><span class="prog">up to 8 pigs</span></button>
+  </div>
+  <div class="extra"><button id="open-btn">▶ PROLOGUE</button><span class="lbl">ISLANDS</span><a href="harbour_env.html">1 · The Harbour</a><a href="cave_env.html">2 · The Cave</a></div>
+</nav>
 
 <script type="module">
 import * as THREE from "three";
@@ -61,83 +95,126 @@ import { sound } from "./js/engine/sound.js";
 import { Comic } from "./js/engine/comic.js";
 import { Hero } from "./js/engine/hero.js";
 import { nameCard } from "./js/story/tags.js";
-import { buildIsland, Sty, GATE, PIT } from "./js/islands/circe/sty.js";
+import { Sty, GATE } from "./js/islands/circe/sty.js";
+import { buildIsland } from "./js/islands/circe/helios.js";
 import { CirceTrials } from "./js/islands/circe/circeTrials.js";
 
 sound.muted = true;
 const params = new URLSearchParams(location.search);
 const world = new World({ quality: params.get("q") || "auto" });
 world.grade.uniforms.letterbox.value = 0;
-world.grade.uniforms.keepBlue.value = 0.6;      // keep the moonlight blue
+world.grade.uniforms.keepBlue.value = 0.85;     // keep Circe's cobalt
+world.grade.uniforms.halo.value = 0.35;         // noon: no halation bleeding round every white thing
+world.renderer.toneMappingExposure = 1.0;
+if (world.grade.uniforms.burn) world.grade.uniforms.burn.value = 0.3;   // only a light burn at the edges: it is the brightest island
+
+// canvas labels (the plaques, the head sign) are drawn with Anton / Courier Prime: wait for them, briefly
+try { await Promise.race([Promise.all([document.fonts.load("40px Anton"), document.fonts.load("bold 40px 'Courier Prime'")]), new Promise(r => setTimeout(r, 2500))]); } catch { /* fonts blocked: fallbacks */ }
 
 const island = buildIsland(world);
+// sunset for the banquet: dusk(to, seconds) eases the island from noon to dusk (or back)
+let duskTween = null;
+world.add({ update: dt => {
+  if (!duskTween) return;
+  duskTween.t += dt; const k = Math.min(1, duskTween.t / duskTween.d), e = k * k * (3 - 2 * k);
+  island.setDusk(duskTween.from + (duskTween.to - duskTween.from) * e);
+  if (k >= 1) duskTween = null;
+} });
+function dusk(to, seconds = 0) {
+  if (seconds <= 0) { duskTween = null; island.setDusk(to); return; }
+  duskTween = { from: island.dusk, to, t: 0, d: seconds };
+}
 const sty = new Sty(world, island);
 const director = new Director(world);
 const comic = new Comic(world, director);
 const hero = await new Hero(world, { groundY: 0 }).load();
 hero.teleport(GATE.x - 0.5, GATE.z + 1.9, Math.PI * 0.5);     // Odysseus at the gate, facing the sty
-const WIDE = [[2, 15, 12.5], [2, 0, 0.6], 42];
+// the title shot: the palace, Circe against her sun window, the sun machine over the roof
+const POSTCARD = [[2, 4.4, 15.5], [2, 7.4, -14], 56];
 
 // ---------- skipping: a black card while the film fast-forwards
 let skipping = false, filming = false, trialRun = false, trialFast = false;
-const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast");
+const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast"), lore = document.getElementById("lore");
 function skip() { if (trialRun) { if (!trialFast) { trialFast = true; world.timeScale = 8; fastEl.classList.add("on"); } return; } if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; fastEl.classList.add("on"); }
 skipBtn.onclick = skip;
 addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
-async function film(fn) {
+async function film(fn, { back = true } = {}) {
   if (filming) return;
   filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy", "cinematic");
   try { await fn(); }
   finally {
     filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
-    fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy", "cinematic");
-    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0; comic.clear();
-    director.cut(...WIDE);
+    fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("cinematic");
+    if (!trials.el.classList.contains("on")) document.body.classList.remove("busy");
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0; comic.clear(); lore.classList.remove("on");
+    if (back) director.cut(...POSTCARD);
   }
 }
 
-// ---------- the opening: short. The house, the witch's name, the rope, the king at the gate.
+// ---------- the prologue: typed cards on black, then the witch, then the rope
+const LORE = [
+  ["Twenty-three men walked up the hill."],
+  ["One came back down."],
+  ["Eurylochus. Sweating. Talking about a house of polished stone, a woman singing at a loom, and wine that smelled like honey."],
+  ["He didn't drink it. That's the only reason he still has hands."],
+  ["THE OTHERS DID.", "red"],
+  ["Now they live in pens. Each one knows exactly one thing: where the next one is."],
+  ["Lose that, and a man is gone for good."],
+  ["Odysseus has a sword, a flower from a god, and Athena in his ear."],
+  ["He's going to need all three.", "red"]
+];
+async function typeCard(text, cls = "") {
+  const p = lore.querySelector("p"); p.className = cls; p.textContent = "";
+  const n = text.length, t = cls ? 0.5 : Math.min(2.4, 0.035 * n);
+  await sty._tween(t, k => { p.textContent = text.slice(0, Math.ceil(n * k)); });
+  p.textContent = text;
+  await sty.wait(cls ? 1.4 : Math.max(1.3, 0.022 * n));
+}
 async function opening() {
   await film(async () => {
     sty.show(trials.board.frames ? trials.board.frames[0] : sty.frame);
-    director.cut([1, 3.2, -3], [1, 2.6, -13], 50);
-    await comic.chapter("CHAPTER THREE", "CIRCE'S ISLAND", 2.6);
-    await director.glide([1, 2.6, -7.5], [1, 2.0, -13], 44, 2.4);
-    await director.freeze("CIRCE", "Daughter of the Sun. Turns men into pigs.<br>Keeps them on a rope, nose to tail.", 2.8);
-    await director.glide([1.5, 12, 9.5], [1.5, 0, 0.4], 44, 2.6);
-    comic.caption("Each pig knows only the NEXT pig. Nobody can see the whole rope.", { seconds: 3.2 });
-    await sty.wait(3.2);
-    await director.glide([GATE.x + 3.2, 2.2, GATE.z + 6.2], [GATE.x - 0.5, 1.4, GATE.z + 1.9], 40, 2.0);
+    lore.classList.add("on");
+    for (const [text, cls] of LORE) await typeCard(text, cls);
+    lore.classList.remove("on");
+    director.cut([2, 5.2, 2], [2, 6.4, -13], 44);
+    await comic.chapter("CHAPTER THREE", "THE WITCH WHO KEPT PIGS", 2.6);
+    await director.glide([2, 5.8, -4.5], [2, 6.6, -13], 40, 2.6);
+    await director.freeze("CIRCE", "Daughter of the Sun. Runs her island like a factory.<br>Keeps the crew on a rope, nose to tail.", 3.0);
+    await director.glide([-0.6, 14.5, 9.6], [-0.6, 0, -0.5], 44, 2.6);
+    comic.caption("Every pig has an address. Every pig knows one address: the next pig's. That's a linked list.", { seconds: 3.6 });
+    await sty.wait(3.6);
+    await director.glide([GATE.x + 1.1, 2.3, GATE.z + 8.2], [GATE.x + 1.1, 1.4, GATE.z + 0.4], 40, 2.0);   // straight on: Odysseus, the gate and the first pig side by side
     const c = nameCard("circe");
     await director.freeze(c.name, c.sub, 2.6);
-    comic.caption("He has the gate. The gate has the first rope. That's all he has: head.", { seconds: 3 });
-    await sty.wait(3);
+    comic.caption("He has the gate. The gate holds the first address: head. Everything else, he has to walk to.", { seconds: 3.4 });
+    await sty.wait(3.4);
   });
+  try { localStorage.setItem("odyssey.circe.prologue", "1"); } catch { /* storage off */ }
 }
 document.getElementById("open-btn").onclick = () => opening();
 
-// ---------- the finale film: the men stand on the grass; the card gains a line
+// ---------- the finale film (after the banquet): the men stand on the marble at sunset
 async function finale() {
   await film(async () => {
-    await director.glide([2, 5.5, 14], [2, 1.0, 0], 42, 2.2);
-    comic.caption("Twenty-two men walked out of Circe's sty. They stayed a year.", { seconds: 3.2 });
-    await sty.wait(3.2);
+    world.grade.uniforms.freeze.value = 0;
+    await director.glide([0.5, 2.6, 9.5], [1.0, 2.4, -6], 46, 2.4);   // low, among the men: the palace and the sinking sun behind them
+    comic.caption("Twenty-two men walked out of Circe's sty. They stayed a year.", { seconds: 3.4 });
+    await sty.wait(3.4);
     const c = nameCard("circe", { done: true });
     await director.freeze(c.name, c.sub, 3.2);
-  });
-  trials.setUp(trials.level);
+  }, { back: false });
+  // the men stay standing on the marble: the next trial (or the doors) puts the rope back
 }
 
-// ---------- Athena's trials (circeTrials.js)
+// ---------- the three doors (circeTrials.js runs all three; the mode decides the panel)
 const shiftForPanel = () => { const w = innerWidth, h = innerHeight; const lb = document.body.classList.contains("board-on") && document.getElementById("list-board"); if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, lb ? Math.round((lb.offsetHeight + 12) / 2) : 0, w, h); else world.camera.clearViewOffset(); };
 const trials = new CirceTrials({
-  world, sty, island, director, comic,
+  world, sty, island, director, comic, dusk,
   panelView: on => {
     if (on) { document.body.classList.add("side-panel", "busy"); shiftForPanel(); addEventListener("resize", shiftForPanel); }
     else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); }
   },
-  onClose: () => { document.body.classList.remove("busy"); director.glide(...WIDE, 1); },
-  onLesson: () => demo("Count"),
+  onClose: () => { document.body.classList.remove("busy"); dusk(0, 1.2); trials.setUp({ structures: [{ initial: [7, 12, 3, 19, 5], lengthVar: "head" }] }); director.glide(...POSTCARD, 1.2); progress(); },
   onFinale: async () => { trials.ctx.fast.end(); await finale(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); },
   skipping: () => trialFast,
   fast: {
@@ -146,21 +223,19 @@ const trials = new CirceTrials({
     end: () => { trialRun = false; trialFast = false; fastEl.classList.remove("on"); skipBtn.classList.remove("on"); skipBtn.textContent = "SKIP SCENE ▸▸ (Esc)"; }
   }
 });
-document.getElementById("trials-btn").onclick = () => trials.open();
-document.getElementById("lab-btn").onclick = () => trials.openLab();
-// a lesson: Athena runs one example in the Lab and the board explains every step (pause and step any time)
-async function demo(name) {
-  await trials.openLab();
-  if (!trials.levels.length) return;
-  trials.loadExample(name);
-  trials.status(`Athena shows you: ${name}. Pause, step back, or press GUIDE HIM to run it again.`);
-  await trials.run();
+document.getElementById("door-lesson").onclick = () => trials.openLesson();
+document.getElementById("door-trials").onclick = () => trials.open();
+document.getElementById("door-lab").onclick = () => trials.openLab();
+function progress() {
+  let d = []; try { d = JSON.parse(localStorage.getItem("odyssey.circe.done")) || []; } catch { /* storage off */ }
+  const n = d.filter(id => id.startsWith("circe-")).length;
+  document.getElementById("prog-trials").textContent = n ? `${n} / 6 done${d.includes("circe-banquet") ? " · the men are free" : ""}` : "6 trials · start with ONE";
 }
-document.querySelectorAll("#menu [data-demo]").forEach(b => b.onclick = () => { b.classList.add("done"); demo(b.dataset.demo); });
+progress();
 
-// the starting picture: the crew's rope, from the camera side
+// the starting picture: the crew's rope, and the title shot
 trials.setUp({ structures: [{ initial: [7, 12, 3, 19, 5], lengthVar: "head" }] });
-director.cut(...WIDE);
+director.cut(...POSTCARD);
 
 // ---------- start
 const loading = document.getElementById("loading");
@@ -168,14 +243,16 @@ if (params.get("capture")) {
   loading.remove();
   world.resize(); world.step(0.016);
   window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
-  window.__world = world; window.__sty = sty; window.__director = director; window.__trials = trials; window.__opening = opening; window.__finale = finale; window.__demo = demo; window.__skip = skip;
+  window.__world = world; window.__sty = sty; window.__director = director; window.__trials = trials; window.__opening = opening; window.__finale = finale; window.__skip = skip;
   window.__ready = true;
 } else {
   world.start();
   loading.style.opacity = 0; setTimeout(() => loading.remove(), 1000);
-  if (params.get("opening")) opening();
-  if (params.get("trials")) trials.open();
-  if (params.get("lab")) trials.openLab();
+  let seen = false; try { seen = !!localStorage.getItem("odyssey.circe.prologue"); } catch { /* storage off */ }
+  if (params.get("opening") || (!seen && !params.get("trials") && !params.get("lab") && !params.get("lesson"))) opening();
+  else if (params.get("trials")) trials.open();
+  else if (params.get("lab")) trials.openLab();
+  else if (params.get("lesson")) trials.openLesson();
 }
 </script>
 </body>

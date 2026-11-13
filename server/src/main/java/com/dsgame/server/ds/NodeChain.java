@@ -50,6 +50,20 @@ public class NodeChain extends BaseStructure {
         return address;
     }
 
+    // malloc(sizeof(struct Node)): room for one node. (Real C leaves garbage in it; here data starts at 0 and
+    // next at NULL, and the very next lines of createNode set both anyway.)
+    public int allocate() {
+        if (memory.size() >= MAX_NODES) {
+            record("NO_MEMORY", NULL, 0, "malloc failed: no memory left for another node (" + MAX_NODES + " at most)");
+            return NULL;
+        }
+        int address = nextAddress;
+        nextAddress += 0x10;
+        memory.put(address, new Node(0));
+        record("NEW", address, 0, "malloc: room for one node at " + hex(address) + " (data = 0, next = NULL for now)");
+        return address;
+    }
+
     // p->data
     public int getData(int address, String who) {
         Node node = nodeAt(address, who);

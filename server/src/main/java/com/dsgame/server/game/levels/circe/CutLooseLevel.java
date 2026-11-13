@@ -17,7 +17,7 @@ public class CutLooseLevel extends CirceLevel {
                 "Stop on the pig BEFORE him (12). Then make it skip over him: p->next = p->next->next;",
                 """
                 // head -> 7 -> 12 -> 3 -> 19 -> 5 -> NULL
-                Node* p = head;
+                struct Node *p = head;
 
                 """);
     }

@@ -13,7 +13,8 @@ public class Lexer {
             "while", TokenType.WHILE,
             "for", TokenType.FOR,
             "break", TokenType.BREAK,
-            "continue", TokenType.CONTINUE
+            "continue", TokenType.CONTINUE,
+            "return", TokenType.RETURN
     );
 
     private final String source;
@@ -33,6 +34,10 @@ public class Lexer {
                 pos++;
             } else if (Character.isWhitespace(c)) {
                 pos++;
+            } else if (c == '#' && atLineStart()) {
+                skipLineComment();            // #include <stdio.h> and friends: nothing to do on Aeaea
+            } else if (c == '"') {
+                readString();
             } else if (c == '/' && peekNext() == '/') {
                 skipLineComment();
             } else if (c == '/' && peekNext() == '*') {
@@ -51,6 +56,36 @@ public class Lexer {
 
     private char peekNext() {
         return (pos + 1 < source.length()) ? source.charAt(pos + 1) : '\0';
+    }
+
+    // only spaces before it on this line?
+    private boolean atLineStart() {
+        for (int k = pos - 1; k >= 0 && source.charAt(k) != '\n'; k--) {
+            if (!Character.isWhitespace(source.charAt(k))) return false;
+        }
+        return true;
+    }
+
+    // "text with %d and \n": the text, with its escapes turned into the real characters
+    private void readString() {
+        int startLine = line;
+        StringBuilder text = new StringBuilder();
+        pos++;                                  // the opening "
+        while (pos < source.length() && source.charAt(pos) != '"') {
+            char ch = source.charAt(pos);
+            if (ch == '\n') throw new CompileError("A string must end on the same line: missing '\"'", startLine);
+            if (ch == '\\' && pos + 1 < source.length()) {
+                char e = source.charAt(pos + 1);
+                text.append(switch (e) { case 'n' -> '\n'; case 't' -> '\t'; case '0' -> '\0'; default -> e; });
+                pos += 2;
+                continue;
+            }
+            text.append(ch);
+            pos++;
+        }
+        if (pos >= source.length()) throw new CompileError("A string must end with '\"'", startLine);
+        pos++;                                  // the closing "
+        tokens.add(new Token(TokenType.STRING, text.toString(), startLine));
     }
 
     private void skipLineComment() {

@@ -16,7 +16,7 @@ public class NewPigLevel extends CirceLevel {
                 "Order matters. First tie him to the old first pig (m->next = head), THEN move the gate rope (head = m).",
                 """
                 // head -> 7 -> 12 -> 3 -> 19 -> 5 -> NULL
-                Node* m = newNode(22);   // a new pig, roped to nothing yet
+                struct Node *m = newNode(22);   // a new pig, roped to nothing yet
 
                 """);
     }

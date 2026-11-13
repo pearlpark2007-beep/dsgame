@@ -6,10 +6,10 @@ import com.dsgame.server.lang.Interpreter;
 
 import java.util.List;
 
-// FINALE (reverse a linked list): turn every arrow around with three pointers, losing nobody
+// FIVE (reverse a linked list): turn every arrow around with three pointers, losing nobody
 public class TurnThemBackLevel extends CirceLevel {
     public TurnThemBackLevel() {
-        super("circe-finale", Tier.FINALE, "Turn Them Back",
+        super("circe-finale", Tier.PRACTICE, "Turn Them Back",
                 "Circe's spell unwinds backwards: the last pig roped is the first to turn back into a man. "
                         + "Turn the whole rope around, so the gate leads to tag 5 first.",
                 "Reverse the chain: head -> 5 -> 19 -> 3 -> 12 -> 7 -> NULL. Every pig stays on the rope.",
@@ -17,8 +17,8 @@ public class TurnThemBackLevel extends CirceLevel {
                         + "cur->next = prev; prev = cur; cur = next;  At the end, head = prev;",
                 """
                 // head -> 7 -> 12 -> 3 -> 19 -> 5 -> NULL
-                Node* prev = NULL;
-                Node* cur = head;
+                struct Node *prev = NULL;
+                struct Node *cur = head;
 
                 """);
     }

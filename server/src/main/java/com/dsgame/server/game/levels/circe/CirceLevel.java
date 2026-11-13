@@ -24,6 +24,12 @@ public abstract class CirceLevel extends Level {
                 List.of(StructureSpec.list("sty", "head", STY)));
     }
 
+    // a level that starts from its own rope (the banquet adds Circe's spies)
+    protected CirceLevel(String id, Tier tier, String title, String story, String goal, String hint, String starterCode, Integer... initial) {
+        super(id, "circe", tier, title, story, goal, hint, starterCode, 0,
+                List.of(StructureSpec.list("sty", "head", initial)));
+    }
+
     // ---------- helpers for checkGoal ----------
 
     protected static NodeChain chain(Interpreter in) {

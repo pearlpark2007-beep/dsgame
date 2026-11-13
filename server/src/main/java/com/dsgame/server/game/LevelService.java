@@ -38,12 +38,13 @@ public class LevelService {
         register(new SortedLineLevel());     // bonus: binary search
         register(new DawnLevel());           // finale
 
-        // Circe's island (linked list): four trials, then the finale
+        // Circe's island (linked list): five trials, then the banquet at sunset
         register(new CountThePigsLevel());   // traverse
         register(new FindEurylochusLevel()); // search, keep a pointer
         register(new NewPigLevel());         // insert at the head
         register(new CutLooseLevel());       // delete from the middle
-        register(new TurnThemBackLevel());   // finale: reverse
+        register(new TurnThemBackLevel());   // reverse
+        register(new BanquetLevel());        // finale: delete two values, free them, then reverse
     }
 
     private void register(Level level) {

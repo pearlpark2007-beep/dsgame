@@ -13,6 +13,8 @@ public class Parser {
     private final List<Token> tokens;
     private int current = 0;
     private int loopDepth = 0;   // so 'break' and 'continue' can only be used inside a loop
+    private int blockDepth = 0;  // functions can only be written at the top, outside other code
+    private Function inFunction = null;   // so 'return' can only be used inside a function
 
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
@@ -29,6 +31,15 @@ public class Parser {
     // ---------- statements ----------
 
     private Stmt statement() {
+        if (isFunctionStart()) return functionDefinition();
+        if (isStructDefinition()) return structDefinition();
+        if (match(RETURN)) {
+            Token word = previous();
+            if (inFunction == null) throw new CompileError("'return' can only be used inside a function", word.line());
+            Expr value = check(SEMICOLON) ? null : expression();
+            consume(SEMICOLON, "Missing ';' after return");
+            return new ReturnStmt(value, word.line());
+        }
         if (isPointerType()) {
             Stmt declaration = pointerDeclarationList();
             consume(SEMICOLON, "Missing ';' after the declaration");
@@ -67,6 +78,83 @@ public class Parser {
             all.add(declarationRest());
         }
         return new ListStmt(all);
+    }
+
+    // ---------- functions (Chapter 3: the program from the course, as written) ----------
+
+    private Token at(int k) { return tokens.get(Math.min(current + k, tokens.size() - 1)); }
+    private boolean word(int k, String text) { return at(k).type() == IDENTIFIER && at(k).text().equals(text); }
+
+    // struct Node* name(   |   Node* name(   |   int name(   |   void name(
+    private boolean isFunctionStart() {
+        int k = word(0, "struct") ? 1 : 0;
+        if (word(k, "Node") && at(k + 1).type() == STAR && at(k + 2).type() == IDENTIFIER && at(k + 3).type() == LEFT_PAREN) return true;
+        if ((check(INT) || word(0, "void")) && at(1).type() == IDENTIFIER && at(2).type() == LEFT_PAREN) return true;
+        return false;
+    }
+
+    private Stmt functionDefinition() {
+        int line = peek().line();
+        String returns;
+        if (word(0, "void")) { advance(); returns = "void"; }
+        else if (match(INT)) returns = "int";
+        else { if (word(0, "struct")) advance(); advance(); advance(); returns = "pointer"; }   // struct Node *
+        Token name = consume(IDENTIFIER, "Expected the function's name");
+        if (blockDepth > 0 || inFunction != null) {
+            throw new CompileError("Write the function " + name.text() + "() outside any other code, at the top", name.line());
+        }
+        consume(LEFT_PAREN, "Expected '(' after " + name.text());
+        List<Function.Param> params = new ArrayList<>();
+        if (word(0, "void") && at(1).type() == RIGHT_PAREN) advance();
+        if (!check(RIGHT_PAREN)) {
+            do {
+                if (isPointerType()) {
+                    if (word(0, "struct")) advance();
+                    advance(); consume(STAR, "Expected '*'");
+                    params.add(new Function.Param(consume(IDENTIFIER, "Expected the parameter's name").text(), true));
+                } else if (match(INT)) {
+                    params.add(new Function.Param(consume(IDENTIFIER, "Expected the parameter's name").text(), false));
+                } else {
+                    throw new CompileError("A parameter is  int x  or  struct Node *p", peek().line());
+                }
+            } while (match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Missing ')' after the parameters of " + name.text() + "()");
+        consume(LEFT_BRACE, "Expected '{' to start the body of " + name.text() + "()");
+        Function fn = new Function(name.text(), returns, params, new ArrayList<>(), line);
+        inFunction = fn;
+        try {
+            while (!check(RIGHT_BRACE) && !check(EOF)) fn.body().add(statement());
+            consume(RIGHT_BRACE, "Missing '}' to close " + name.text() + "()");
+        } finally {
+            inFunction = null;
+        }
+        return new FunctionDefStmt(fn);
+    }
+
+    // struct Node { int data; struct Node *next; };
+    private boolean isStructDefinition() {
+        return word(0, "struct") && word(1, "Node") && at(2).type() == LEFT_BRACE;
+    }
+
+    private Stmt structDefinition() {
+        int line = advance().line(); advance(); advance();
+        while (!check(RIGHT_BRACE) && !check(EOF)) {
+            Token t = advance();
+            if (t.type() == IDENTIFIER && !t.text().matches("struct|Node|data|next")) {
+                throw new CompileError("A node here has two parts: int data; and struct Node *next; (not '" + t.text() + "')", t.line());
+            }
+        }
+        consume(RIGHT_BRACE, "Missing '}' to close struct Node");
+        consume(SEMICOLON, "Missing ';' after the struct's '}'");
+        return new StructDefStmt(line);
+    }
+
+    // (struct Node*)   (Node*)   (int)   a cast: Aeaea doesn't need it, so it is skipped
+    private boolean isCastAhead() {
+        int k = word(0, "struct") ? 1 : 0;
+        if (word(k, "Node") && at(k + 1).type() == STAR && at(k + 2).type() == RIGHT_PAREN) return true;
+        return check(INT) && at(1).type() == RIGHT_PAREN;
     }
 
     // ---------- pointers (Chapter 3) ----------
@@ -284,8 +372,13 @@ public class Parser {
 
     private Stmt block() {
         List<Stmt> statements = new ArrayList<>();
-        while (!check(RIGHT_BRACE) && !check(EOF)) {
-            statements.add(statement());
+        blockDepth++;
+        try {
+            while (!check(RIGHT_BRACE) && !check(EOF)) {
+                statements.add(statement());
+            }
+        } finally {
+            blockDepth--;
         }
         consume(RIGHT_BRACE, "Missing '}' to close the block");
         return new BlockStmt(statements);
@@ -371,9 +464,20 @@ public class Parser {
         if (match(AMPERSAND)) {
             return primary();   // C-style &s: we simply use s
         }
+        if (match(STRING)) {
+            return new StringExpr(previous().text(), previous().line());
+        }
         if (match(IDENTIFIER)) {
             Token name = previous();
             if (name.text().equals("NULL")) return new NumberExpr(0);   // NULL is address 0: no node
+            if (name.text().equals("sizeof")) {
+                // sizeof(struct Node): 16 bytes on a 64-bit machine (4 for data, 4 padding, 8 for next):
+                // that is why every new node's address is 0x10 after the last one
+                consume(LEFT_PAREN, "Expected '(' after sizeof");
+                int depth = 1;
+                while (depth > 0 && !check(EOF)) { Token t = advance(); if (t.type() == LEFT_PAREN) depth++; if (t.type() == RIGHT_PAREN) depth--; }
+                return new NumberExpr(16);
+            }
             if (match(LEFT_PAREN)) {
                 List<Expr> args = new ArrayList<>();
                 if (!check(RIGHT_PAREN)) {
@@ -392,6 +496,10 @@ public class Parser {
             return new VarExpr(name.text(), name.line());
         }
         if (match(LEFT_PAREN)) {
+            if (isCastAhead()) {
+                while (!match(RIGHT_PAREN)) advance();
+                return unary();
+            }
             Expr inside = expression();
             consume(RIGHT_PAREN, "Missing ')'");
             return inside;

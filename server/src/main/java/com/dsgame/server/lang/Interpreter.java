@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,11 @@ public class Interpreter {
     private int ticks = 0;
     // names declared as pointers (Node* p): their changes go on the timeline as PTR, so the game draws an arrow
     private final Set<String> pointerNames = new HashSet<>();
+    // functions the player wrote (createNode, insertAtEnd...), and how deep the calls go right now
+    private final Map<String, Function> functions = new HashMap<>();
+    private int depth = 0;
+    private int printed = 0;          // characters printf has written (a runaway loop can't flood the console)
+    private static final int MAX_DEPTH = 60, MAX_PRINT = 4000;
 
     public Interpreter() {
         scopes.push(new HashMap<>());   // the global scope
@@ -55,15 +61,135 @@ public class Interpreter {
     }
 
     public void run(List<Stmt> program) {
+        // every function is known before anything runs (so the order they are written in doesn't matter)
         for (Stmt statement : program) {
+            if (statement instanceof Stmt.FunctionDefStmt def) {
+                if (functions.containsKey(def.function().name())) {
+                    throw new RunError(Outcome.COMPILE_ERROR, "The function " + def.function().name() + "() is written twice", def.function().line());
+                }
+                functions.put(def.function().name(), def.function());
+            }
+        }
+        boolean mainCalled = false;
+        for (Stmt statement : program) {
+            if (statement instanceof Stmt.FunctionDefStmt) continue;
             statement.execute(this);
         }
+        // a whole C program: run main() (only when nothing at the top level already did the work)
+        Function main = functions.get("main");
+        if (main != null && program.stream().allMatch(s -> s instanceof Stmt.FunctionDefStmt || s instanceof Stmt.StructDefStmt)) {
+            callUser(main, List.of(), main.line());
+        }
+    }
+
+    // ---------- the player's own functions ----------
+
+    private int callUser(Function fn, List<Expr> args, int line) {
+        if (depth >= MAX_DEPTH) {
+            throw new RunError(Outcome.INFINITE_LOOP, "More than " + MAX_DEPTH + " calls inside calls. Does " + fn.name() + "() call itself forever?", line);
+        }
+        if (args.size() != fn.params().size()) {
+            throw new RunError(Outcome.RUNTIME_ERROR, fn.name() + "() needs " + fn.params().size() + " argument(s), but got " + args.size(), line);
+        }
+        // the arguments are worked out where the call is (C passes COPIES of them)
+        int[] values = new int[args.size()];
+        for (int k = 0; k < values.length; k++) values[k] = args.get(k).evaluate(this);
+        StringBuilder call = new StringBuilder(fn.name()).append("(");
+        for (int k = 0; k < values.length; k++) {
+            Function.Param p = fn.params().get(k);
+            call.append(k > 0 ? ", " : "").append(p.name()).append(" = ").append(p.pointer() ? NodeChain.hex(values[k]) : String.valueOf(values[k]));
+        }
+        call.append(")");
+        timeline.add(new TimelineStep(fn.name(), "CALL", depth + 1, 0, call.toString(), line));
+
+        // a fresh set of variables: the function sees only its own, and the global ones
+        List<Map<String, Integer>> savedScopes = new ArrayList<>(scopes);
+        List<Map<String, ArrayADT>> savedArrays = new ArrayList<>(arrayScopes);
+        Map<String, Integer> global = scopes.peekLast();
+        Map<String, ArrayADT> globalArrays = arrayScopes.peekLast();
+        scopes.clear(); arrayScopes.clear();
+        scopes.push(global); arrayScopes.push(globalArrays);
+        scopes.push(new HashMap<>()); arrayScopes.push(new HashMap<>());
+        depth++;
+        int result = 0;
+        boolean returned = false, ok = false;
+        Set<String> locals = new LinkedHashSet<>();
+        try {
+            for (int k = 0; k < values.length; k++) {
+                Function.Param p = fn.params().get(k);
+                if (p.pointer()) declarePointer(p.name(), values[k], fn.line());
+                else declare(p.name(), values[k], fn.line());
+            }
+            try {
+                for (Stmt s : fn.body()) s.execute(this);
+            } catch (ReturnSignal r) {
+                result = r.value; returned = r.hasValue;
+            }
+            if (!returned && !fn.returns().equals("void")) {
+                throw new RunError(Outcome.RUNTIME_ERROR, fn.name() + "() reached its closing '}' without a 'return'", line);
+            }
+            ok = true;
+        } catch (LoopSignal signal) {
+            throw new RunError(Outcome.COMPILE_ERROR, "'break' or 'continue' outside a loop in " + fn.name() + "()", line);
+        } finally {
+            depth--;
+            locals.addAll(scopes.peek().keySet());
+            scopes.clear(); arrayScopes.clear();
+            for (int k = savedScopes.size() - 1; k >= 0; k--) scopes.push(savedScopes.get(k));
+            for (int k = savedArrays.size() - 1; k >= 0; k--) arrayScopes.push(savedArrays.get(k));
+        }
+        if (ok) {
+            // the function's variables are gone; a name the caller also has shows the caller's value again
+            for (String name : locals) forget(name, line);
+            String what = fn.returns().equals("void") ? fn.name() + "() is done"
+                    : fn.name() + "() returns " + (fn.returns().equals("pointer") ? NodeChain.hex(result) : String.valueOf(result));
+            timeline.add(new TimelineStep(fn.name(), "RETURN", depth + 1, result, what, line));
+        }
+        return result;
+    }
+
+    // a variable left its block or function: show the outer one with that name again, or drop it
+    private void forget(String name, int line) {
+        for (Map<String, Integer> scope : scopes) {
+            if (scope.containsKey(name)) { recordVar(name, scope.get(name), line); return; }
+        }
+        timeline.add(new TimelineStep(name, "DROP", 0, 0, name + " is gone", line));
+    }
+
+    // printf("%d -> ", temp->data);
+    private int printf(List<Expr> args, int line) {
+        if (args.isEmpty() || !(args.get(0) instanceof Expr.StringExpr fmt)) {
+            throw new RunError(Outcome.RUNTIME_ERROR, "printf needs a \"text\" first, like printf(\"%d\\n\", x)", line);
+        }
+        StringBuilder out = new StringBuilder();
+        String f = fmt.text();
+        int next = 1;
+        for (int k = 0; k < f.length(); k++) {
+            char c = f.charAt(k);
+            if (c == '%' && k + 1 < f.length()) {
+                char spec = f.charAt(++k);
+                if (spec == '%') { out.append('%'); continue; }
+                if (next >= args.size()) throw new RunError(Outcome.RUNTIME_ERROR, "printf has a %" + spec + " but no value for it", line);
+                int v = args.get(next++).evaluate(this);
+                out.append(spec == 'p' ? NodeChain.hex(v) : String.valueOf(v));
+            } else out.append(c);
+        }
+        printed += out.length();
+        if (printed > MAX_PRINT) throw new RunError(Outcome.INFINITE_LOOP, "printf has printed more than " + MAX_PRINT + " characters. Does a loop ever stop?", line);
+        timeline.add(new TimelineStep("console", "PRINT", 0, 0, out.toString(), line));
+        return out.length();
     }
 
     // ---------- variables and scopes ----------
 
     public void pushScope() { scopes.push(new HashMap<>()); arrayScopes.push(new HashMap<>()); }
-    public void popScope()  { scopes.pop(); arrayScopes.pop(); }
+    public void popScope()  { popScope(true); }
+    // ok: the block ended normally (or by break/continue/return): the game is told its variables are gone
+    public void popScope(boolean ok) {
+        Map<String, Integer> gone = scopes.pop();
+        arrayScopes.pop();
+        if (ok) for (String name : gone.keySet()) forget(name, 0);
+    }
 
     // a level hands the player an array AND its length, e.g. flock with n = 8
     public void bindLength(String arrayName, String lengthVar, int length) {
@@ -239,7 +365,20 @@ public class Interpreter {
 
     public int callFunction(String name, List<Expr> args, int line) {
         tick(line);
+        Function fn = functions.get(name);
+        if (fn != null) return callUser(fn, args, line);
         return switch (name) {
+            case "malloc" -> {
+                checkArgCount(name, args, 1, line);
+                args.get(0).evaluate(this);
+                NodeChain c = chain(line);
+                int address = c.allocate();
+                collectSteps(line);
+                yield address;
+            }
+            case "printf" -> printf(args, line);
+            case "exit" -> throw new RunError(Outcome.RUNTIME_ERROR, "exit(" + (args.isEmpty() ? "" : args.get(0).evaluate(this)) + "): the program stopped itself", line);
+            case "scanf" -> throw new RunError(Outcome.RUNTIME_ERROR, "scanf waits for a keyboard: on Aeaea the values are written into the code (or set in the Lab)", line);
             case "push" -> {
                 checkArgCount(name, args, 2, line);
                 DataStructures ds = structureArg(name, args.get(0), line);

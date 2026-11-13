@@ -92,14 +92,36 @@ public interface Stmt {
     record BlockStmt(List<Stmt> statements) implements Stmt {
         public void execute(Interpreter in) {
             in.pushScope();
+            boolean ok = false;
             try {
                 for (Stmt s : statements) {
                     s.execute(in);
                 }
+                ok = true;
+            } catch (LoopSignal | ReturnSignal signal) {
+                ok = true;                 // leaving by break / continue / return is normal
+                throw signal;
             } finally {
-                in.popScope();
+                in.popScope(ok);           // ok: the game sees the block's variables go
             }
         }
+    }
+
+    // return x;   return;
+    record ReturnStmt(Expr value, int line) implements Stmt {
+        public void execute(Interpreter in) {
+            throw new ReturnSignal(value == null ? 0 : value.evaluate(in), value != null, line);
+        }
+    }
+
+    // struct Node* insertAtEnd(struct Node *head, int value) { ... }   (registered before the program runs)
+    record FunctionDefStmt(Function function) implements Stmt {
+        public void execute(Interpreter in) { }
+    }
+
+    // struct Node { int data; struct Node *next; };   the island already knows what a node is
+    record StructDefStmt(int line) implements Stmt {
+        public void execute(Interpreter in) { }
     }
 
     // if (...) ... else ...
@@ -142,8 +164,13 @@ public interface Stmt {
                     }
                     if (update != null) update.execute(in);   // continue still runs the update, as in C
                 }
-            } finally {
-                in.popScope();
+                in.popScope(true);
+            } catch (ReturnSignal r) {
+                in.popScope(true);
+                throw r;
+            } catch (RuntimeException e) {
+                in.popScope(false);
+                throw e;
             }
         }
     }

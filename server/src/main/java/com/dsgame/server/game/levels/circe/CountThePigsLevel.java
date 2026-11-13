@@ -11,11 +11,11 @@ public class CountThePigsLevel extends CirceLevel {
                 "Circe has turned your men into pigs and roped them nose to tail. You can't see the whole sty: "
                         + "from the gate you can only follow the rope, one pig at a time.",
                 "Count the pigs into count. Walk from head, pig to pig, until the rope ends (NULL).",
-                "Never move head itself: walk a copy.  Node* p = head;  then  p = p->next;  until p is NULL.",
+                "Never move head itself: walk a copy.  struct Node *p = head;  then  p = p->next;  until p is NULL.",
                 """
                 // head -> ? -> ? -> ... -> NULL   (you can't see how many)
                 int count = 0;
-                Node* p = head;
+                struct Node *p = head;
 
                 """);
     }
@@ -23,7 +23,7 @@ public class CountThePigsLevel extends CirceLevel {
     @Override
     public GoalResult checkGoal(Interpreter in) {
         if (head(in) != gate(in)) {
-            return GoalResult.fail("head moved. Now nobody knows where the chain starts. Walk a copy: Node* p = head;");
+            return GoalResult.fail("head moved. Now nobody knows where the chain starts. Walk a copy: struct Node *p = head;");
         }
         Integer count = var(in, "count");
         if (count == null) return GoalResult.fail("There is no variable called count.");

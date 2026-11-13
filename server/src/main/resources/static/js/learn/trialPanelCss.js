@@ -40,7 +40,7 @@ export const TRIAL_CSS = `
 @media (max-height: 820px) {
   #trial-panel { gap: 7px; padding: 10px 14px; } #trial-panel .who { font-size: 21px; } #trial-panel h2 { font-size: 19px; }
   #trial-panel .tab { min-height: 34px; font-size: 12px; }
-  #trial-panel .story { font-size: 12.5px; max-height: 3.2em; overflow: auto; } #trial-panel .goal { font-size: 13px; line-height: 1.35; }
+  #trial-panel .story { font-size: 12.5px; } #trial-panel .goal { font-size: 13px; line-height: 1.35; }
   #trial-panel .run { min-height: 42px; font-size: 18px; } #trial-panel .row button { min-height: 34px; }
   #trial-panel .words { font-size: 11px; }
 }

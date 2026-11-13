@@ -8,7 +8,7 @@ import { TRIAL_CSS } from "../../learn/trialPanelCss.js";
 import { ListBoard, walkFrom, lostNodes, NULL } from "../../learn/listBoard.js";
 import { GATE } from "./sty.js";
 import { Codex } from "../../learn/codex.js";
-import { CIRCE_CODEX } from "../../learn/codexContent.js";
+import { LESSONS, lessonCode, CIRCE_CODEX } from "./circeLessons.js";
 
 const STORE = "odyssey.circe.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -16,41 +16,42 @@ const markDone = id => { try { const d = done(); if (!d.includes(id)) { d.push(i
 
 // a black card before each trial: the night goes on
 const CARDS = {
-  "circe-1": ["ONE.", "Five pigs on a rope. You can only see the first."],
+  "circe-1": ["ONE.", "Noon. Five pigs on a rope. You can only see the first."],
   "circe-2": ["TWO.", "Somewhere on that rope is your second-in-command."],
   "circe-3": ["THREE.", "Elpenor. Drunk, late, and now a pig."],
   "circe-4": ["FOUR.", "The herb works. One man walks free."],
-  "circe-finale": ["MOONSET.", "The spell runs backwards. So does the rope."]
+  "circe-finale": ["FIVE.", "The spell runs backwards. So does the rope."],
+  "circe-banquet": ["SUNSET.", "Circe pours the wine. She wants to make a deal."]
 };
 
 // THE LAB: any chain, any code
 const LAB_EXAMPLES = {
   "Count": `// walk from head to NULL, counting
 int count = 0;
-Node* p = head;
+struct Node *p = head;
 while (p != NULL) {
     count++;
     p = p->next;
 }`,
   "Sum": `int total = 0;
-for (Node* p = head; p != NULL; p = p->next) {
+for (struct Node *p = head; p != NULL; p = p->next) {
     total = total + p->data;
 }`,
   "Search": `// keep a POINTER to the node, not its number
-Node* found = NULL;
-Node* p = head;
+struct Node *found = NULL;
+struct Node *p = head;
 while (p != NULL) {
     if (p->data == 19) { found = p; break; }
     p = p->next;
 }`,
-  "Insert at head": `Node* m = newNode(99);
+  "Insert at head": `struct Node *m = newNode(99);
 m->next = head;   // tie first...
 head = m;         // ...then move head`,
-  "Insert at tail": `Node* m = newNode(99);
+  "Insert at tail": `struct Node *m = newNode(99);
 if (head == NULL) {
     head = m;
 } else {
-    Node* p = head;
+    struct Node *p = head;
     while (p->next != NULL) { p = p->next; }
     p->next = m;
 }`,
@@ -59,39 +60,39 @@ int x = 3;
 if (head != NULL && head->data == x) {
     head = head->next;
 } else {
-    Node* p = head;
+    struct Node *p = head;
     while (p != NULL && p->next != NULL && p->next->data != x) { p = p->next; }
     if (p != NULL && p->next != NULL) {
-        Node* gone = p->next;
+        struct Node *gone = p->next;
         p->next = gone->next;
         free(gone);
     }
 }`,
-  "Reverse": `Node* prev = NULL;
-Node* cur = head;
+  "Reverse": `struct Node *prev = NULL;
+struct Node *cur = head;
 while (cur != NULL) {
-    Node* next = cur->next;
+    struct Node *next = cur->next;
     cur->next = prev;
     prev = cur;
     cur = next;
 }
 head = prev;`,
-  "Biggest": `Node* big = head;
-for (Node* p = head; p != NULL; p = p->next) {
+  "Biggest": `struct Node *big = head;
+for (struct Node *p = head; p != NULL; p = p->next) {
     if (p->data > big->data) { big = p; }
 }`,
   "Lose them (bug)": `// moving head before tying: watch the rope go grey
-Node* m = newNode(1);
+struct Node *m = newNode(1);
 head = m;
 m->next = head;`,
-  "Fall into NULL (bug)": `Node* p = head;
+  "Fall into NULL (bug)": `struct Node *p = head;
 while (p->data != 999) {
     p = p->next;
 }`
 };
 const LAB = {
   id: "lab", tier: "LAB", title: "The Lab",
-  story: "No witch. No moon. Your rope, your code: Athena only watches.",
+  story: "No witch, no judge, no story. Your rope, your code: Athena only watches.",
   goal: "", hint: "Up to 8 pigs. Values go in rope order: the first one is where head points.",
   starterCode: LAB_EXAMPLES["Reverse"], maxMoves: 0,
   structures: [{ name: "sty", kind: "list", capacity: 40, initial: [7, 12, 3, 19, 5], lengthVar: "head" }]
@@ -132,6 +133,26 @@ const css = `
 #trial-panel .lab .labmsg { font-size: 12.5px; margin-top: 5px; color: #9c8a6c; min-height: 16px; }
 #trial-panel .lab .labmsg.bad { color: #ff7a5c; }
 #trial-panel .tab.labtab { border-color: #3f7a52; color: #8fe3a0; }
+/* three doors, three colours: you always know where you are */
+#trial-panel { border-top: 8px solid var(--mode, #c8261e); }
+#trial-panel.m-trials { --mode: #c8261e; } #trial-panel.m-lab { --mode: #f2c230; } #trial-panel.m-lesson { --mode: #3b62ff; }
+#trial-panel .who { display: flex; align-items: center; gap: 10px; }
+#trial-panel .who .badge { font-size: 13px; letter-spacing: 2px; padding: 2px 8px; border-radius: 3px; background: var(--mode); color: #fff4cf; text-shadow: none; font-family: 'Courier Prime', monospace; font-weight: 700; }
+#trial-panel.m-lab .who .badge { color: #120c06; }
+#trial-panel .who .sub { font-family: 'Courier Prime', monospace; font-size: 12.5px; color: #9c8a6c; letter-spacing: 0; text-shadow: none; }
+#trial-panel.m-lesson .tab.on { background: #3b62ff; border-color: #3b62ff; color: #fff4cf; }
+#trial-panel .lesson-watch { display: none; border-left: 4px solid #3b62ff; background: #10162e; padding: 7px 10px; font-size: 13px; line-height: 1.4; color: #dfe6ff; }
+#trial-panel.m-lesson .lesson-watch { display: block; }
+#trial-panel .lesson-watch b { color: #8fb4ff; }
+#trial-panel .lesson-watch.mis { border-left-color: #c8261e; background: #2a0f0c; color: #ffd9d0; } #trial-panel .lesson-watch.mis b { color: #ff7a5c; }
+#trial-panel .lesson-btns { display: none; gap: 6px; flex-wrap: wrap; }
+#trial-panel.m-lesson .lesson-btns { display: flex; }
+#trial-panel .lesson-btns button { flex: 1; min-height: 34px; background: #1a130c; color: #efe1c2; border: 1px solid #5a4422; border-radius: 3px; font: 700 12.5px 'Courier Prime', monospace; cursor: pointer; }
+#trial-panel .lesson-btns button.mis { border-color: #c8261e; color: #ff9a85; }
+#trial-panel .lesson-btns button:disabled { opacity: 0.35; cursor: default; }
+#trial-panel.m-lesson .tabs .tab { flex: 1 0 18% !important; }
+#trial-panel.m-lesson .lab select.examples, #trial-panel.m-lesson .meta { display: none; }
+#trial-panel .status:empty { display: none; }
 `;
 
 export class CirceTrials {
@@ -144,44 +165,75 @@ export class CirceTrials {
     document.body.appendChild(this.card);
     const el = this.el = document.createElement("aside");
     el.id = "trial-panel"; el.setAttribute("aria-label", "Athena: the trials");
-    el.innerHTML = `<div class="who">ATHENA · THE TRIALS</div><div class="tabs"></div><h2></h2><p class="story"></p><p class="goal"></p>
+    el.innerHTML = `<div class="who"><span class="badge"></span><span class="sub"></span></div><div class="tabs"></div><h2></h2><p class="story"></p><p class="goal"></p>
+      <div class="lesson-watch"></div><div class="lesson-btns"><button class="lb-right">✓ The right code</button><button class="lb-mis mis">✗ Show the classic mistake</button></div>
       <div class="lab"><label for="labchain">YOUR ROPE <small>(up to 8 numbers, head first)</small></label>
         <input id="labchain" class="labin" autocomplete="off" spellcheck="false">
         <div class="labbtns"></div><div class="labmsg" aria-live="polite"></div></div>
       <div class="meta"><span class="moves"></span><span class="hintArea"></span></div>
       <div class="editor"><div class="gutter">1</div><div class="wrap"><div class="hl"></div><label class="sr" style="position:absolute;left:-9999px" for="lcode">Your C code</label><textarea id="lcode" spellcheck="false" autocomplete="off"></textarea></div></div>
       <button class="run">GUIDE HIM</button>
-      <div class="row"><button class="reset">Reset trial</button><button class="lessonb">Athena's lesson</button><button class="closeb">Close</button></div>
+      <div class="row"><button class="reset">Reset</button><button class="closeb">◂ Back to the three doors</button></div>
       <div class="status" role="status" aria-live="polite"></div>
-      <div class="words">Words Athena understands: <code>Node* p = head;</code> <code>p->data</code> <code>p->next</code> <code>NULL</code> <code>newNode(x)</code> <code>free(p)</code> <code>int x = ...;</code> <code>if</code> <code>while</code> <code>for</code> <code>break</code></div>`;
+      <div class="words">Words Athena understands: <code>struct Node *p = head;</code> <code>p->data</code> <code>p->next</code> <code>NULL</code> <code>malloc(sizeof(struct Node))</code> <code>newNode(x)</code> <code>free(p)</code> <code>printf</code> your own functions with <code>return</code>, <code>int</code> <code>if</code> <code>while</code> <code>for</code> <code>break</code></div>`;
     document.body.appendChild(el);
     this.$ = q => el.querySelector(q);
+    el.querySelector(".editor").before(el.querySelector(".status"));   // what happened stays in view, right above the code
     this.code = this.$("textarea"); this.gutter = this.$(".gutter"); this.hl = this.$(".hl");
     this.code.addEventListener("input", () => this.updateGutter());
-    this.code.addEventListener("scroll", () => { this.gutter.scrollTop = this.code.scrollTop; this.hl.style.display = "none"; });
+    this.code.addEventListener("scroll", () => { this.gutter.scrollTop = this.code.scrollTop; if (this._auto) { this._auto = false; return; } this.hl.style.display = "none"; });
     this.code.addEventListener("keydown", e => { if (e.key === "Tab") { e.preventDefault(); const s = this.code.selectionStart; this.code.setRangeText("    ", s, this.code.selectionEnd, "end"); this.updateGutter(); } });
     this.$(".run").onclick = () => this.run();
     this.$(".reset").onclick = () => { if (!this.busy && this.level) this.select(this.level); };
-    this.$(".lessonb").onclick = () => { if (!this.busy && ctx.onLesson) ctx.onLesson(); };
+    this.$(".lb-right").onclick = () => { if (!this.busy && this.level && this.level.lesson) this.selectLesson(this.level.lesson, false); };
+    this.$(".lb-mis").onclick = () => { if (!this.busy && this.level && this.level.lesson) this.selectLesson(this.level.lesson, true); };
     this.$(".closeb").onclick = () => { if (!this.busy) this.close(); };
     this.board = new ListBoard();
     ctx.sty.colorOf = n => this.board.color(n);
     this.buildLab();
     this.codex = new Codex(el, CIRCE_CODEX, part => this.runPart(part));
+    this.lessons = LESSONS.map(l => ({ id: "lesson-" + l.id, tier: "LESSON", title: `${l.n} · ${l.name}`, lesson: l, sandbox: true, structures: [{ name: "sty", kind: "list", capacity: 40, initial: l.chain.slice(), lengthVar: "head" }] }));
+    this.setMode("trials");
   }
-  // the Codex's "run this part": the part's steps, in the Lab, on its own little rope
+  // the Codex's "run this part": the same function, in Athena's lesson
   async runPart(part) {
-    if (this.busy || !part.run) return;
-    if (!this.levels.length) await this.open();
-    LAB.structures[0].initial = part.run.chain.slice();
-    await this.select(LAB);
-    this.code.value = part.run.code; this.updateGutter();
-    this.codex.say(part);
-    await this.run();
-    if (!this.busy) this.status(`${part.name}: that's the part from the whole program, run on the board. Step back with ◀ to see any moment again.`, "good");
+    if (this.busy || !part.lesson) return;
+    await this.openLesson(part.lesson.id, true);
+  }
+
+  // which door the player came through: the panel's colour, title, tabs and buttons follow
+  setMode(mode) {
+    this.mode = mode;
+    this.el.classList.remove("m-trials", "m-lab", "m-lesson"); this.el.classList.add("m-" + mode);
+    const [badge, sub] = { trials: ["CIRCE'S TRIALS", "she judges · five tests, then the banquet"], lab: ["THE LAB", "no judge · your rope, your code"], lesson: ["ATHENA'S LESSON", "your C, line by line · nothing is graded"] }[mode];
+    this.$(".who .badge").textContent = badge; this.$(".who .sub").textContent = sub;
+    this.el.setAttribute("aria-label", badge);
+    const t = this.codex && this.codex.tabs.querySelector(".t-trials"); if (t) t.textContent = { trials: "THE TRIALS", lab: "THE LAB", lesson: "THE LESSON" }[mode];
+    if (this.codex) this.codex.show(false);
+    this.$(".run").textContent = mode === "lesson" ? "▶ SHOW ME" : mode === "lab" ? "▶ RUN IT" : "GUIDE HIM";
+    this.$(".reset").textContent = mode === "trials" ? "Reset trial" : mode === "lab" ? "Reset rope" : "Reset lesson";
+    if (this.ctx.onMode) this.ctx.onMode(mode);
+  }
+
+  async openLesson(id = null, runNow = false) {
+    this.setMode("lesson");
+    this.el.classList.add("on"); this.ctx.panelView(true);
+    const l = (id && this.lessons.find(x => x.lesson.id === id)) || this.level && this.level.lesson && this.level || this.lessons[0];
+    await this.selectLesson(l.lesson, false);
+    if (runNow) await this.run();
+  }
+  async selectLesson(lesson, mistake) {
+    const l = this.lessons.find(x => x.lesson === lesson);
+    l.mistake = !!mistake;
+    l.structures[0].initial = lesson.chain.slice();
+    await this.select(l);
   }
 
   async open() {
+    this.setMode("trials");
+    await this.loadLevels();
+  }
+  async loadLevels() {
     this.el.classList.add("on"); this.ctx.panelView(true);
     if (!this.levels.length) {
       try {
@@ -190,10 +242,11 @@ export class CirceTrials {
         this.levels = await r.json();
       } catch (e) { this.status("Can't reach the game server (" + e.message + "). Run the Spring Boot app in IntelliJ, then open http://localhost:8081/circe_env.html (not IntelliJ's browser preview).", "bad"); return; }
     }
+    if (this.mode !== "trials") return;
     const d = done();
     await this.select(this.levels.find(l => !d.includes(l.id) && !this.locked(l)) || this.levels[0], false, true);
   }
-  async openLab() { await this.open(); if (this.levels.length) await this.select(LAB); }
+  async openLab() { this.setMode("lab"); this.el.classList.add("on"); this.ctx.panelView(true); await this.select(LAB); }
   close() {
     this.el.classList.remove("on"); this.ctx.panelView(false); this.board.close();
     if (this.ctx.onClose) this.ctx.onClose();
@@ -204,7 +257,9 @@ export class CirceTrials {
   mark(line, err = false) {
     if (!line || line < 1) { this.hl.style.display = "none"; return; }
     this.hl.style.display = "block"; this.hl.classList.toggle("err", err);
-    this.hl.style.top = (10 + (line - 1) * 20 - this.code.scrollTop) + "px";
+    const y = 10 + (line - 1) * 20, h = this.code.clientHeight || 300;
+    if (y < this.code.scrollTop + 10 || y > this.code.scrollTop + h - 40) { this._auto = true; this.code.scrollTop = Math.max(0, y - h / 2); this.gutter.scrollTop = this.code.scrollTop; }
+    this.hl.style.top = (y - this.code.scrollTop) + "px";
   }
   status(t, kind = "") { const s = this.$(".status"); s.textContent = t; s.className = "status " + kind; }
   moves(n) { this.$(".moves").innerHTML = `ROPES RE-TIED <b>${n}</b>`; }
@@ -212,7 +267,20 @@ export class CirceTrials {
   renderTabs() {
     const d = done(), tabs = this.$(".tabs"); tabs.innerHTML = "";
     tabs.style.flexWrap = "wrap";
-    [...this.levels, LAB].forEach((l, i) => {
+    tabs.style.display = this.mode === "lab" ? "none" : "";
+    if (this.mode === "lesson") {
+      this.lessons.forEach(l => {
+        const b = document.createElement("button");
+        b.className = "tab" + (l === this.level ? " on" : "");
+        b.style.minHeight = "34px"; b.style.fontSize = "12px";
+        b.textContent = `${l.lesson.n}`; b.title = l.title;
+        b.setAttribute("aria-pressed", l === this.level); b.setAttribute("aria-label", l.title);
+        b.onclick = () => { if (!this.busy) this.selectLesson(l.lesson, false); };
+        tabs.appendChild(b);
+      });
+      return;
+    }
+    this.levels.forEach((l, i) => {
       const b = document.createElement("button");
       b.className = "tab" + (l === this.level ? " on" : "") + (l === LAB ? " labtab" : "");
       b.style.flex = "1 0 30%"; b.style.minHeight = "34px"; b.style.fontSize = "12px";
@@ -221,7 +289,7 @@ export class CirceTrials {
       b.title = l.title;
       b.setAttribute("aria-pressed", l === this.level);
       b.setAttribute("aria-label", l.title + (locked ? " (locked)" : "") + (d.includes(l.id) ? " (done)" : ""));
-      b.onclick = () => { if (this.busy) return; if (locked) { this.status("Free your men one trial at a time: the finale comes after the other four.", "bad"); return; } this.select(l, false, true); };
+      b.onclick = () => { if (this.busy) return; if (locked) { this.status("Free your men one trial at a time: the banquet comes after the other five.", "bad"); return; } this.select(l, false, true); };
       tabs.appendChild(b);
     });
   }
@@ -254,8 +322,14 @@ export class CirceTrials {
       box.appendChild(b);
     }
     const sel = document.createElement("select"); sel.className = "examples"; sel.setAttribute("aria-label", "Load an example algorithm");
-    sel.innerHTML = `<option value="">Examples…</option>` + Object.keys(LAB_EXAMPLES).map(k => `<option>${k}</option>`).join("");
-    sel.onchange = () => { if (!sel.value || this.busy) return; this.code.value = LAB_EXAMPLES[sel.value]; this.updateGutter(); this.mark(0); this.status(`${sel.value} loaded. Press GUIDE HIM.`); sel.value = ""; };
+    sel.innerHTML = `<option value="">Examples…</option><optgroup label="Your program's functions">` + LESSONS.map(l => `<option value="fn:${l.id}">${l.n} · ${l.name}</option>`).join("")
+      + `</optgroup><optgroup label="Short snippets">` + Object.keys(LAB_EXAMPLES).map(k => `<option>${k}</option>`).join("") + `</optgroup>`;
+    sel.onchange = () => {
+      if (!sel.value || this.busy) return;
+      const fn = sel.value.startsWith("fn:") && LESSONS.find(l => "fn:" + l.id === sel.value);
+      this.code.value = fn ? lessonCode(fn) : LAB_EXAMPLES[sel.value]; this.code.scrollTop = 0;
+      this.updateGutter(); this.mark(0); this.status(`${fn ? fn.name : sel.value} loaded. Press ${this.$(".run").textContent.trim()}.`); sel.value = "";
+    };
     box.appendChild(sel);
     input.addEventListener("input", () => this.labInput());
     input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); this.run(); } });
@@ -265,9 +339,10 @@ export class CirceTrials {
     input.classList.toggle("bad", !!r.error); msg.classList.toggle("bad", !!r.error);
     this.$(".run").disabled = !!r.error || this.busy;
     if (r.error) { msg.textContent = r.error; return; }
-    LAB.structures[0].initial = r.vals;
+    const target = this.level && this.level.sandbox ? this.level : LAB;
+    target.structures[0].initial = r.vals;
     msg.textContent = r.vals.length ? "head -> " + r.vals.join(" -> ") + " -> NULL" : "head = NULL (an empty rope)";
-    if (!this.busy) this.setUp(LAB);
+    if (!this.busy) this.setUp(target);
   }
 
   // load one of the Lab's examples into the editor (the lessons use this too)
@@ -284,17 +359,26 @@ export class CirceTrials {
 
   async select(l, keepCode = false, card = false) {
     this.level = l;
-    const lab = l === LAB;
-    this.$("h2").innerHTML = `<span class="trial-hour">${lab ? "LAB" : (CARDS[l.id] || [""])[0]}</span>`; this.$("h2").append(l.title);
-    this.$(".story").textContent = l.story;
-    this.$(".goal").innerHTML = "<b>THE TRIAL</b>"; this.$(".goal").append(l.goal);
-    this.$(".goal").style.display = lab ? "none" : "";
-    this.$(".lab").classList.toggle("on", lab);
+    if (this.ctx.dusk) this.ctx.dusk(0, 0);        // every trial, lesson and Lab run is at noon
+    const lab = l === LAB, ls = l.lesson;
+    this.$("h2").innerHTML = `<span class="trial-hour">${lab ? "LAB" : ls ? "LESSON " + ls.n : (CARDS[l.id] || [""])[0]}</span>`; this.$("h2").append(ls ? ls.name : l.title);
+    if (ls) { this.$(".story").innerHTML = l.mistake ? ls.mistake.say : ls.say; }
+    else this.$(".story").textContent = l.story;
+    this.$(".goal").innerHTML = "<b>THE TRIAL</b>"; this.$(".goal").append(l.goal || "");
+    this.$(".goal").style.display = lab || ls ? "none" : "";
+    this.$(".lab").classList.toggle("on", lab || !!ls);
+    const w = this.$(".lesson-watch");
+    if (ls) {
+      w.classList.toggle("mis", !!l.mistake);
+      w.innerHTML = l.mistake ? `<b>THE MISTAKE · </b>${ls.mistake.label}. Press SHOW ME and watch what breaks.` : `<b>WATCH FOR · </b>${ls.watch}`;
+      this.$(".lb-mis").disabled = !ls.mistake; this.$(".lb-mis").textContent = ls.mistake ? `✗ The classic mistake: ${ls.mistake.label}` : "✗ (no classic mistake here)";
+      this.$(".lb-right").classList.toggle("on", !l.mistake);
+    }
     const ha = this.$(".hintArea"); ha.innerHTML = "";
     if (l.hint) { const b = document.createElement("button"); b.className = "linkb"; b.textContent = "ask for a hint"; b.onclick = () => this.status(l.hint); ha.appendChild(b); }
-    if (!keepCode) { this.code.value = l.starterCode; if (this.codex) this.codex.say(null); }
-    this.updateGutter(); this.mark(0); this.moves(0); this.status("");
-    if (lab && !keepCode) { this.$(".labin").value = l.structures[0].initial.join(" "); this.labInput(); }
+    if (!keepCode) { this.code.value = ls ? lessonCode(ls, l.mistake) : l.starterCode; if (this.codex) this.codex.say(null); this.code.scrollTop = 0; }
+    this.updateGutter(); this.mark(0); this.moves(0); this.status(ls && !keepCode ? `This is your program's ${ls.id}(), unchanged. The last line${ls.driver.trim().split("\n").length > 1 ? "s" : ""} call${ls.driver.trim().split("\n").length > 1 ? "" : "s"} it. Press SHOW ME.` : "");
+    if ((lab || ls) && !keepCode) { this.$(".labin").value = l.structures[0].initial.join(" "); this.labInput(); }
     else this.setUp(l);
     this.renderTabs();
     if (card) await this.trialCard(l);
@@ -308,9 +392,9 @@ export class CirceTrials {
     this.status("Athena speaks…");
     let res;
     try {
-      const lab = this.level === LAB;
+      const lab = this.level === LAB || !!this.level.sandbox;
       const r = lab
-        ? await fetch("/api/sandbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ island: "circe", code, structures: LAB.structures }) })
+        ? await fetch("/api/sandbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ island: "circe", code, structures: this.level.structures }) })
         : await fetch(`/api/levels/${this.level.id}/play`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
       if (lab && r.status === 400) {
         let why = "The server refused this rope."; try { why = (await r.json()).message || why; } catch { /* no body */ }
@@ -334,7 +418,7 @@ export class CirceTrials {
     const spec = this.level.structures[0], board = this.board;
     board.load({ initial: spec.initial, headVar: spec.lengthVar || "head", steps });
     board.open();
-    const acting = steps.filter(s => s.action !== "VAR").length;
+    const acting = steps.filter(s => s.action !== "VAR" && s.action !== "DROP").length;
     // 1x is a calm, readable pace; only long runs are sped up a little
     const pace = 0.7 * Math.min(2, Math.max(1, acting / 40));
     const P = this.player = { k: 0, playing: true, speed: 1, wake: null, ended: false, gen: 0, links: 0 };
@@ -389,8 +473,21 @@ export class CirceTrials {
   // ---------- endings
   async endSuccess(res) {
     const { director, sty, comic } = this.ctx;
-    if (this.level === LAB) {
-      this.status(res.message, "good");
+    if (this.level === LAB || this.level.sandbox) {
+      const f = this.board.frames[this.board.frames.length - 1], lost = lostNodes(f), ls = this.level.lesson;
+      const out = (f.out || "").trim();
+      if (lost.length) {
+        const which = lost.map(a => `${f.nodes[a].data} (0x${a.toString(16).toUpperCase()})`).join(", ");
+        this.status(`It ran, but ${which} ${lost.length > 1 ? "are" : "is"} UNREACHABLE: no pointer leads there any more. ${ls && this.level.mistake ? ls.mistake.say : ""}`, "bad");
+        await director.stamp("UNREACHABLE", `${which}: lost for good`, { kind: "bad", seconds: 2.6 });
+        return;
+      }
+      if (ls) {
+        this.status(`${ls.name}: done.${out ? " The console printed: " + out.replace(/\n/g, " ") : ""} Step back with ◀ to see any moment again, change the rope above, or try the next operation.`, "good");
+        await director.stamp(ls.name.toUpperCase(), out ? out.split("\n").pop() || out : "step back through it on the board", { kind: "good", seconds: 2 });
+        return;
+      }
+      this.status(res.message + (out ? " Console: " + out.replace(/\n/g, " ") : ""), "good");
       await director.stamp("DONE", "step back through it on the board", { kind: "good", seconds: 1.6 });
       return;
     }
@@ -398,6 +495,7 @@ export class CirceTrials {
     if (this.level.tier === "FINALE") {
       this.status(res.message, "good");
       this.board.close();
+      if (this.ctx.dusk) this.ctx.dusk(1, 4.5);     // the sun goes down while the men stand up
       await sty.turnBack(comic);
       await director.stamp("MEN AGAIN", res.message, { kind: "good", seconds: 2.6 });
       this.el.classList.remove("on"); this.ctx.panelView(false);
@@ -423,7 +521,10 @@ export class CirceTrials {
     this.mark(st.line, true);
     this.status(res.message + " Fix the code and try again.", "bad");
     const lineText = (this.lines[st.line - 1] || "").trim();
-    await director.siren({ title: "NULL", sub: res.message + ". Check p != NULL before p->data or p->next.", lineNo: st.line, lineText, focus: (s => ({ x: s.x, z: s.z, y: 0.3 }))(this.ctx.sty.nullSpot()) });
+    const freed = /freed/.test(res.message), ls = this.level && this.level.lesson;
+    const sub = freed ? res.message + ". That pig was already handed back with free(): nothing may read it again." + (ls && this.level.mistake ? " " + ls.mistake.say : "")
+                      : res.message + ". Check p != NULL before p->data or p->next.";
+    await director.siren({ title: freed ? "FREED" : "NULL", sub, lineNo: st.line, lineText, focus: (s => ({ x: s.x, z: s.z, y: 0.3 }))(this.ctx.sty.nullSpot()) });
     island.pitGlow.intensity = 0;
   }
   async endCompile(res) {
