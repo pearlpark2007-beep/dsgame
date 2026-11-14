@@ -65,7 +65,7 @@ export async function voyageTo(to, { from = null } = {}) {
   }
   if (card && !skipped) {                                         // one typed card
     const p = el.querySelector("p");
-    for (let i = 1; i <= card.length && !skipped; i++) { p.textContent = card.slice(0, i); await wait(32); }
+    for (let i = 1; i <= card.length && !skipped; i++) { p.textContent = card.slice(0, i); if (card[i - 1] !== " ") sound.cue("type"); await wait(32); }
     await wait(1600);
   }
   go();

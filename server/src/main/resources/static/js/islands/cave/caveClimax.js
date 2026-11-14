@@ -7,6 +7,9 @@
 //  3. THE DOOR  Dawn. Sheep pass his legs in silhouette. The ram, Odysseus under it. His blind head comes
 //               down, sniffing. HOLD SPACE. Daylight.
 //  4. OUT       Odysseus runs; the giant roars from the cave mouth. Freeze on the card.
+//  5. AFTERMATH the camera breathes: it rises and pulls back over the slope as he runs for the ship, the
+//               cave falling behind him; the sound opens out from the cave into wind and sea.
+// Re-cut for the redesign: steadier cameras, real sounds instead of most lettering, shake only on impacts.
 // The stake is placed from Odysseus's two hands every frame (grip between them, tip to the eye) and
 // pushing it moves HIM forward, so it can never pass through his body.
 // Test hooks: ?from=2 | 3 | 4 (or window.__climaxFrom) starts at that scene.
@@ -16,8 +19,8 @@ import { COALS_AT } from "./caveLights.js";
 import { shot, dustFall, sparks, ease } from "./caveOpening.js";
 import { crag } from "./caveRock.js";
 import { stoneTexture } from "../../engine/textures.js";
-import { Sea } from "../../engine/sea.js";
-import { buildTrireme } from "../harbour/trireme.js";
+import { buildOutside } from "./caveOutside.js";
+import { sound } from "../../engine/sound.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const yawTo = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
@@ -70,69 +73,6 @@ function stalactite(world, at, len, onLand) {
     }
   } };
   world.add(u);
-}
-
-// the outside: a cliff face with the cave mouth in it, a slope down to a beach, the sea, the ship, a dawn sky
-function buildOutside(world) {
-  const g = new THREE.Group(); g.visible = false; world.scene.add(g);
-  const st = stoneTexture({ seed: 44, base: [140, 124, 104], dark: [62, 54, 46], moss: [90, 96, 60], repeat: 6 });
-  const rock = new THREE.MeshStandardMaterial({ ...st, roughness: 1 });
-  const face = new THREE.Shape();
-  face.moveTo(-40, -20); face.lineTo(40, -20); face.lineTo(40, 34); face.lineTo(-40, 34); face.lineTo(-40, -20);
-  const hole = new THREE.Path();
-  hole.moveTo(-4.0, 0); hole.lineTo(-3.9, 6); hole.quadraticCurveTo(0, 12.8, 3.9, 6); hole.lineTo(4.0, 0); hole.lineTo(-4.0, 0);
-  face.holes.push(hole);
-  const fg = new THREE.ExtrudeGeometry(face, { depth: 2.5, bevelEnabled: false, curveSegments: 16 });
-  const fp = fg.attributes.position;
-  for (let i = 0; i < fp.count; i++) {
-    const x = fp.getX(i), y = fp.getY(i), z = fp.getZ(i);
-    const far = Math.min(1, Math.max(0, (Math.hypot(x / 5, (y - 5) / 8) - 1) / 1.5));
-    if (z < 0.1) fp.setZ(i, z - far * (Math.sin(x * 0.5) * Math.cos(y * 0.4) * 1.6 + Math.sin(x * 1.3 + y) * 0.6 + 1.5));
-  }
-  fg.computeVertexNormals();
-  const wall = new THREE.Mesh(fg, rock);
-  wall.rotation.y = -Math.PI / 2; wall.position.set(DOOR_AT.x - 3.6, 0, DOOR_AT.z);
-  wall.castShadow = wall.receiveShadow = true; g.add(wall);
-  for (const [x, y, z, s] of [[-28, 25, -6, 10], [-29, 14, 18, 10], [-29, 13, -30, 11], [-28, 33, 12, 12], [-28, 32, -24, 12]]) {
-    const c = crag(x + z, { sx: s * 0.7, sy: s, sz: s * 1.2, strata: 1.4 }); c.translate(x, y, z);
-    const m = new THREE.Mesh(c, new THREE.MeshStandardMaterial({ ...st, vertexColors: true, roughness: 1 })); m.castShadow = m.receiveShadow = true; g.add(m);
-  }
-  const groundY = x => x > -30 ? 0 : x > -58 ? -12 * ease((-30 - x) / 28) : -12 - (-58 - x) * 0.45;
-  const gg = new THREE.PlaneGeometry(90, 90, 90, 60);
-  const gp = gg.attributes.position;
-  for (let i = 0; i < gp.count; i++) { const x = gp.getX(i) - 52, z = gp.getY(i); gp.setXYZ(i, x, groundY(x) + Math.sin(x * 0.7 + z * 0.5) * 0.25 + Math.sin(z * 0.23) * 0.6, -z); }
-  gg.computeVertexNormals();
-  const turf = stoneTexture({ seed: 12, base: [118, 112, 80], dark: [60, 58, 40], moss: [86, 104, 56], repeat: 14 });
-  const ground = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ ...turf, roughness: 1, side: THREE.DoubleSide }));
-  ground.position.z = DOOR_AT.z; ground.receiveShadow = true; g.add(ground);
-  const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `varying vec3 vP; void main(){
-      float h = clamp(vP.y, -0.2, 1.0);
-      vec3 low = vec3(1.0, 0.62, 0.32), mid = vec3(0.86, 0.55, 0.45), high = vec3(0.30, 0.42, 0.62);
-      vec3 c = mix(low, mid, smoothstep(0.0, 0.18, h)); c = mix(c, high, smoothstep(0.18, 0.7, h));
-      float sun = pow(max(dot(vP, normalize(vec3(-1.0, 0.08, 0.15))), 0.0), 220.0) * 3.0 + pow(max(dot(vP, normalize(vec3(-1.0, 0.08, 0.15))), 0.0), 8.0) * 0.35;
-      gl_FragColor = vec4(c + vec3(1.0, 0.8, 0.5) * sun, 1.0); }`
-  });
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), skyMat));
-  const sun = new THREE.DirectionalLight(0xffc890, 0); sun.position.set(-120, 30, 20); sun.target.position.set(-30, 0, -6);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, far: 300 });
-  g.add(sun, sun.target);
-  const skyFill = new THREE.HemisphereLight(0x9ab0d0, 0x5a4a30, 0); g.add(skyFill);
-  const ship = buildTrireme({ length: 30 });
-  ship.rotation.y = 0.15; ship.position.set(-78, -13.9, -4); g.add(ship);
-  let sea = null;
-  return {
-    group: g, ship, sun, skyFill, groundY, get sea() { return sea; },
-    // the real height of the ground at a point (the slope plus the same bumps the mesh was built with)
-    heightAt(x, z) { const zp = DOOR_AT.z - z; return groundY(x) + Math.sin(x * 0.7 + zp * 0.5) * 0.25 + Math.sin(zp * 0.23) * 0.6; },
-    show(on) {
-      g.visible = on; sun.intensity = on ? 2.4 : 0; skyFill.intensity = on ? 1.1 : 0;
-      if (on && !sea) { sea = world.add(new Sea(world, { color: 0x1a3440, sunDir: V(-1, 0.2, 0.15), sunColor: 0xffb070 })); sea.water.position.y = -13; }
-      if (sea) sea.water.visible = on;
-    }
-  };
 }
 
 export async function playCaveClimax(c) {
@@ -236,7 +176,7 @@ export async function playCaveClimax(c) {
       stake.position.copy(FIRE_AT).addScaledVector(toFire, -3.0).setY(0.45); stake.rotation.set(0, -Math.atan2(toFire.z, toFire.x), 0.08);
       cam((t, o) => { const p = tipAt(); o.pos.copy(p).add(V(-1.4, 0.8, 2.4)).add(V(0, 0, -t * 0.2)); o.look.copy(p); o.fov = 32; });
       comic.black(false, 0.2);
-      comic.sfx("tssss", { x: 60, y: 60, r: 4, size: 3, color: "#efe1c2", seconds: 1.2 });
+      sound.whoosh({ seconds: 1.4, level: 0.12 });
       await over(1.6, k => heat(k));
       // on the ledge, the stake levelled at the eye
       onLedge();
@@ -260,6 +200,7 @@ export async function playCaveClimax(c) {
       await wait(0.5);
       const g0 = giant.group.position.clone();
       let done = false;
+      let rise = sound.riser({ level: 0.045 });                 // a restrained musical rise under the push: one step per cut
       while (!done) {
         giant.open(0); hero.group.position.copy(standAt);
         const h = comic.holdPrompt("DRIVE IT IN", "HOLD SPACE");
@@ -271,8 +212,8 @@ export async function playCaveClimax(c) {
             h.progress(k);
             hero.group.position.copy(standAt).addScaledVector(flat, 0.9 * k);
             // the cuts come faster the deeper it goes
-            if (h.down() && ct > 0.85 - 0.55 * k) { ct = 0; ci = (ci + 1) % eyeCams.length; cam(eyeCams[ci]); }
-            if (s) s.o.shake = Math.max(s.o.shake, 0.04 + 0.3 * k);
+            if (h.down() && ct > 0.85 - 0.55 * k) { ct = 0; ci = (ci + 1) % eyeCams.length; cam(eyeCams[ci]); rise.step(); }
+            if (s) s.o.shake = Math.max(s.o.shake, 0.01 + 0.1 * k);
             // the eye fights it: the lid twitches, the eye rolls toward the heat, the whole giant trembles
             if (h.down()) { giant.open(0.04 + k * 0.35 * Math.random()); giant.look(tipAt()); }
             else if (k > 0.1) giant.open(0.3 + 0.4 * Math.random());                 // letting off: he stirs
@@ -280,7 +221,7 @@ export async function playCaveClimax(c) {
             giant.group.position.copy(g0).add(V((Math.random() - 0.5) * 0.06 * k, 0, (Math.random() - 0.5) * 0.06 * k));
             giant.roar(0.18 * k);
             if (h.down() && k > 0.25 && Math.random() < dt * (6 + 30 * k)) sparks(world, tipAt(), 4 + Math.floor(10 * k));
-            if (beat > 0.75 - 0.4 * k) { beat = 0; comic.sfx("thmp", { x: 12 + Math.random() * 10, y: 70, r: -4, size: 2 + 2 * k, color: "#d4241a", seconds: 0.3 }); }
+            if (beat > 0.75 - 0.4 * k) { beat = 0; sound.heart({ level: 0.35 + 0.4 * k }); }
             if (k >= 1 || t > 10) { remove(world, u); res(); }
           } };
           world.add(u);
@@ -289,23 +230,24 @@ export async function playCaveClimax(c) {
         giant.group.position.copy(g0); giant.roar(0);
         if (k >= 1) done = true;
         else {
-          giant.open(1); cam(eyeCams[0]); director.crashZoom(24, 0.18);
+          giant.open(1); cam(eyeCams[0]); rise.stop(0.3); rise = sound.riser({ level: 0.045 });
           await director.stamp("HE WOKE!", "Hold Space and keep holding. Try again.", { kind: "bad", seconds: 2.0 });
           if (window.__holdFail) window.__holdFail = false, window.__autoHold = true;      // (test runs: fail once, then pass)
           giant.open(0); cam(eyeCams[0]);
         }
       }
 
+      rise.stop(0.05);
       // IMPACT: close on the eye as the tip goes home... black... white
       cam(eyeCams[0]);
       await comic.black(true, 0.01); await wait(0.07); comic.black(false, 0.01);
       comic.flash();
       giant.blind(); faceL.intensity = 0;
       for (let q = 0; q < 5; q++) sparks(world, giant.eyePos(V()), 40);
-      comic.sfx("THUNK", { x: 30, y: 30, r: -4, size: 14, color: "#d4241a", seconds: 1.4, drift: false });
+      comic.sfx("THUNK", { x: 30, y: 30, r: -4, size: 12, color: "#d4241a", seconds: 1.2, drift: false }); sound.giant("slam");
       // the camera is thrown back off the eye
       { giant.eyePos(eye); const p0 = eye.clone().addScaledVector(flat, -2.5).addScaledVector(sd, 1.2).add(V(0, -0.2, 0));
-        cam((t, o) => { const k = 1 - Math.pow(1 - Math.min(1, t / 0.35), 3); o.pos.copy(p0).addScaledVector(flat, -4.5 * k).add(V(0, 1.2 * k, 0)); o.look.copy(eye); o.fov = 30 + 30 * k; o.shake = 1.6; }); }
+        cam((t, o) => { const k = 1 - Math.pow(1 - Math.min(1, t / 0.35), 3); o.pos.copy(p0).addScaledVector(flat, -4.5 * k).add(V(0, 1.2 * k, 0)); o.look.copy(eye); o.fov = 30 + 22 * k; o.shake = 0.7; }); }
       ungrip(); hero.play("idle", 0.2);
       await wait(0.6);
 
@@ -315,12 +257,12 @@ export async function playCaveClimax(c) {
       world.scene.remove(seat);
       giant.roar(1);
       const red = temp(new THREE.PointLight(0xff2a10, 0, 80, 1)); red.position.copy(GIANT_AT).add(V(-6, 8, 6));
-      cam((t, o) => { giant.headPos(head); o.pos.copy(GIANT_AT).addScaledVector(gf, 10).addScaledVector(side, -3).add(V(0, 0.6, 0)); o.look.copy(head).add(V(0, -2.5, 0)); o.fov = 62; o.shake = Math.max(o.shake, 0.9); });
-      comic.sfx("AAAARRGH!!", { x: 12, y: 14, r: -6, size: 10, color: "#e0442a", seconds: 1.8 });
+      cam((t, o) => { giant.headPos(head); o.pos.copy(GIANT_AT).addScaledVector(gf, 10).addScaledVector(side, -3).add(V(0, 0.6, 0)); o.look.copy(head).add(V(0, -2.5, 0)); o.fov = 62; o.shake = Math.max(o.shake, 0.4); });
+      comic.sfx("AAAARRGH!!", { x: 12, y: 14, r: -6, size: 9, color: "#e0442a", seconds: 1.6 }); sound.roar({ seconds: 2.4, level: 0.55 });
       hero.fall("fall", { groundY: 0, back: 1.5 }); hero.groundY = 0;
       for (let q = 0; q < 5; q++) sparks(world, COALS_AT.clone().add(V(0, 0.5, 0)), 50);
       dustFall(world, V(GIANT_AT.x - 6, roofAt(GIANT_AT.x - 6, GIANT_AT.z + 6) - 1, GIANT_AT.z + 6), 220);
-      stalactite(world, V(standAt.x + 1.6, roofAt(standAt.x, standAt.z) - 2, standAt.z - 0.8), 2.4, () => comic.sfx("KRAK", { x: 60, y: 54, r: 8, size: 5, color: "#efe1c2", seconds: 0.7 }));
+      stalactite(world, V(standAt.x + 1.6, roofAt(standAt.x, standAt.z) - 2, standAt.z - 0.8), 2.4, () => sound.boom({ freq: 90, to: 50, seconds: 0.4, level: 0.3 }));
       stalactite(world, V(GIANT_AT.x - 12, roofAt(GIANT_AT.x - 12, GIANT_AT.z + 10) - 2, GIANT_AT.z + 10), 3.0);
       const tumble = sheep.filter(Boolean).map(o => ({ o, y: o.rotation.y, ph: Math.random() * 6 }));
       await over(1.6, k => {
@@ -332,8 +274,8 @@ export async function playCaveClimax(c) {
       for (const q of tumble) { q.o.rotation.y = q.y; q.o.position.y = 0; }
       // a fist into the roof
       await giant.pose("smash", 0.22);
-      if (s) s.o.shake = 1.8;
-      comic.sfx("KRA-KOOM", { x: 52, y: 16, r: 6, size: 8, color: "#efe1c2", seconds: 1.0 });
+      if (s) s.o.shake = 0.8;
+      sound.giant("slam");
       const fist = giant.bones.handR.getWorldPosition(V());
       dustFall(world, V(fist.x, roofAt(fist.x, fist.z) - 0.5, fist.z), 260);
       stalactite(world, V(hero.group.position.x + 0.8, Math.min(14, roofAt(hero.group.position.x, hero.group.position.z) - 1), hero.group.position.z + 0.6), 2.0);
@@ -391,7 +333,7 @@ export async function playCaveClimax(c) {
       // the giant's silhouette in the doorway, closer: his head turns toward the hooves
       const giantWide = (t, o) => { o.pos.set(DOOR_AT.x + 11, 0.9, DOOR_AT.z + 3.6); o.look.set(DOOR_AT.x + 1, 2.6, DOOR_AT.z - 1.8); o.fov = 40; };
       cam(giantWide);
-      comic.sfx("sniff", { x: 60, y: 30, r: 4, size: 3, color: "#efe1c2", seconds: 0.8 });
+      comic.sfx("sniff", { x: 60, y: 30, r: 4, size: 2.6, color: "#efe1c2", seconds: 0.8 }); sound.giant("breath");
       await wait(1.2);
       // the ram, last. Odysseus hangs under its belly, face up, head toward its head, hands and feet in the wool.
       // (his feet are his origin: the body runs 1.8 m forward from them, so the feet sit 0.9 m behind the ram's middle)
@@ -421,8 +363,8 @@ export async function playCaveClimax(c) {
             // his blind head turns and lowers toward the ram, closer and closer, then lifts away
             if (giant.extra.head) giant.extra.head.x = headY + 0.45 * Math.sin(k * Math.PI);
             if (giant.extra.neck) giant.extra.neck.z = neckZ - 0.35 * Math.sin(k * Math.PI);
-            if (s) s.o.shake = Math.max(s.o.shake, 0.04 + 0.16 * k);
-            if (Math.random() < dt * 1.6) comic.sfx("sniff", { x: 50 + Math.random() * 30, y: 20 + Math.random() * 20, r: 4, size: 2.4, color: "#efe1c2", seconds: 0.5 });
+            if (s) s.o.shake = Math.max(s.o.shake, 0.01 + 0.05 * k);
+            if (Math.random() < dt * 0.5) sound.giant("breath", { level: 0.8 });
             if (!h.down() && t > 0.3) held = false;
             if (!held || k >= 1) { remove(world, u); res(); }
           } };
@@ -436,8 +378,8 @@ export async function playCaveClimax(c) {
         unCling();
         const fall = ram.position.clone().add(V(0, 0, 0.9));
         hero.teleport(fall.x, fall.z, ram.rotation.y + Math.PI / 2, 0); hero.play("fall", 0.05);
-        cam((t, o) => { o.pos.copy(ram.position).add(V(2.2, 1.4, 4.6)); o.look.copy(ram.position).add(V(0, 0.3, 0.6)); o.fov = 44; o.shake = 0.6; });
-        comic.sfx("THUD", { x: 40, y: 50, r: 6, size: 6, color: "#e8c21c", seconds: 0.8 });
+        cam((t, o) => { o.pos.copy(ram.position).add(V(2.2, 1.4, 4.6)); o.look.copy(ram.position).add(V(0, 0.3, 0.6)); o.fov = 44; o.shake = 0.25; });
+        sound.boom({ freq: 80, to: 40, seconds: 0.5, level: 0.4 });
         await director.stamp("CAUGHT!", "He felt you drop. Hold Space the whole time. Try again.", { kind: "bad", seconds: 2.2 });
         if (window.__holdFailWord) window.__holdFailWord = null;
         await comic.black(true, 0.2); comic.black(false, 0.2);
@@ -476,19 +418,33 @@ export async function playCaveClimax(c) {
     // running at us, low, the cave mouth behind him
     cam((t, o) => { const P = hero.group.position; o.pos.set(P.x - 4.2, P.y + 0.7, P.z + 1.4); o.look.set(P.x + 2, P.y + 1.6, P.z); o.fov = 46; });
     comic.black(false, 0.12);
-    comic.sfx("SKRRT", { x: 60, y: 62, r: -6, size: 4, color: "#efe1c2", seconds: 0.6 });
+    sound.ambience("title");                        // out of the cave: wind and sea
     await wait(1.3);
     giant.roar(1);
-    if (s) s.o.shake = 0.6;
+    if (s) s.o.shake = 0.3;
+    sound.roar({ seconds: 2.0, level: 0.5 });
     comic.sfx("NOBODYYY!!", { x: 46, y: 14, r: -6, size: 9, color: "#e0442a", seconds: 1.8 });
     await wait(1.2);
     await director.freeze(cardAfter.name, cardAfter.sub, 3.6);
-    await comic.black(true, 0.4);
+    // ---- 5. AFTERMATH: let the camera breathe. It rises and drifts back over the slope while he runs on down
+    //      toward the ship; the cave mouth (and the giant in it) falls away behind him; wind and sea.
+    giant.roar(0);
+    const r2 = r1.clone().add(V(-16, 0, 1.2));
+    hero.play("walk", 0.2, { timeScale: 2.0 });
+    over(6.5, k => { hero.group.position.lerpVectors(r1, r2, k); hero.group.position.y = outside.heightAt(hero.group.position.x, hero.group.position.z); hero.group.rotation.y = -Math.PI / 2; });
+    cam((t, o) => {
+      const k = ease(Math.min(1, t / 6.5)), P = hero.group.position;
+      o.pos.set(r1.x - 7 - 10 * k, outside.heightAt(r1.x - 7, r1.z) + 2.2 + 7 * k, r1.z + 6 + 6 * k);
+      o.look.set(P.x + 6 * (1 - k) - 8 * k, P.y + 1.2, P.z - 1); o.fov = 48 + 6 * k;
+    });
+    await wait(6.2);
+    await comic.black(true, 0.9);
   } finally {
     if (s) s.stop();
     props.forEach(f => f());
     hero.raise = null;
-    if (outside) { outside.show(false); world.scene.remove(outside.group); }
+    if (outside) outside.dispose();
+    sound.ambience("cave");
     if (fogWas !== undefined) world.scene.fog = fogWas;
     lights.setFires(1);
     door.sky.visible = true; door.skyColor = null; door.power = 1; door.set(0);

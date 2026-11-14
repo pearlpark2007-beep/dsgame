@@ -153,7 +153,7 @@ const LORE = [
 async function typeCard(text, cls = "") {
   const p = lore.querySelector("p"); p.className = cls; p.textContent = "";
   const n = text.length, t = cls ? 0.5 : Math.min(2.4, 0.035 * n);
-  await pit._tween(t, k => { p.textContent = text.slice(0, Math.ceil(n * k)); });
+  await pit._tween(t, k => { const c = Math.ceil(n * k); if (c > p.textContent.length && text[c - 1] !== " ") sound.cue("type"); p.textContent = text.slice(0, c); });
   p.textContent = text;
   await pit.wait(cls ? 1.4 : Math.max(1.3, 0.022 * n));
 }

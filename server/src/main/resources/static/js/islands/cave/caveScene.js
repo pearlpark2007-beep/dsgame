@@ -84,7 +84,10 @@ export async function buildCave(world) {
   const fp = fl.attributes.position;
   for (let i = 0; i < fp.count; i++) {
     const x = fp.getX(i), y = fp.getY(i);
-    const flat = Math.min(1, Math.hypot((x - 8) / 16, (-y - 2) / 8));      // flat by the pens, rougher further out
+    // dead flat over the whole pen strip (world x -2.5 to 19, z -1 to 4: the plates, the straw, the hoof path),
+    // rougher further out. (The old flat spot was centred at world x 15 and buried the plates of pens 0 and 1.)
+    const pz = -y + HALL.z, dxs = Math.max(0, Math.abs(x + HALL.x - 8.1) - 10.5) / 7, dzs = Math.max(0, Math.abs(pz - 1.5) - 2.5) / 6;
+    const flat = Math.min(1, Math.hypot(dxs, dzs));
     // the pool (caveLights POOL_AT, world -8, -12) sits in a hollow
     const wx = x + HALL.x, wz = HALL.z - y, dp = Math.hypot((wx + 8) / 1.3, wz + 12);
     const hollow = THREE.MathUtils.smoothstep(dp, 4.2, 6.5);

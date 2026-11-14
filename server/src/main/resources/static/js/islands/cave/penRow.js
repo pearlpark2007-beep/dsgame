@@ -77,14 +77,26 @@ function makeJunk(value) {
   stone.position.y = 0.22; stone.scale.set(1.3, 0.7, 1); g.add(stone);
   const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0xcfc4a8, roughness: 1 }));
   bone.rotation.z = Math.PI / 2; bone.rotation.y = 0.5; bone.position.set(0.1, 0.08, 0.15); g.add(bone);
-  const tag = plate(0.5, 0.3, (c, w, h) => {
-    c.font = `700 ${h * 0.7}px ${TYPE}`; c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillStyle = "#8c7c66"; c.fillText("?" + value, w / 2, h / 2);
-  });
+  // the leftover number stays a "?" until someone reads the pen: only a read shows what was there
+  // (and the value shown is the one the interpreter reported, so the board and the pens agree)
+  const tag = plate(0.5, 0.3, junkLabel("?"));
   tag.position.set(0, 0.5, 0.3); g.add(tag);
-  g.userData = { junk: value, stone };
+  g.userData = { junk: value, stone, tag };
   return g;
 }
+const junkLabel = text => (c, w, h) => {
+  c.clearRect(0, 0, w, h);
+  c.font = `700 ${h * 0.7}px ${TYPE}`; c.textAlign = "center"; c.textBaseline = "middle";
+  c.fillStyle = "#8c7c66"; c.fillText(text, w / 2, h / 2);
+};
+function relabel(junk, text) {
+  const m = junk.userData.tag.material, img = m.map.image;
+  junkLabel(text)(img.getContext("2d"), img.width, img.height); m.map.needsUpdate = true;
+}
+
+// give a sheep (or junk) its own copies of its materials before fading it: the face and legs share ONE
+// material across the whole flock, so fading the shared one made every sheep's face flicker
+function own(obj) { obj.traverse(o => { if (o.isMesh && !o.userData.own) { o.material = o.material.clone(); o.material.transparent = true; o.userData.own = true; } }); }
 
 export class PenRow {
   constructor(world, { pens = 10, x = 0, z = 0 } = {}) {
@@ -207,7 +219,9 @@ export class PenRow {
     this.rope.scale.y = len; this.rope.position.set(this.px(0) - PEN_W / 2 + 0.15 + len / 2, 1.42, -0.68);
     const tex = canvasTex(384, 154, (c, w, h) => {
       c.fillStyle = "#1d140c"; c.fillRect(0, 0, w, h); c.strokeStyle = "#c9a227"; c.lineWidth = 6; c.strokeRect(3, 3, w - 6, h - 6);
-      c.fillStyle = "#f2c230"; c.font = `${h * 0.56}px ${HEAVY}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(`n = ${n}`, w / 2, h * 0.52);
+      // the length, big; the capacity under it, always there: n changes, the ten pens never do
+      c.fillStyle = "#f2c230"; c.font = `${h * 0.5}px ${HEAVY}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(`n = ${n}`, w / 2, h * 0.4);
+      c.fillStyle = "#b9a684"; c.font = `700 ${h * 0.17}px ${TYPE}`; c.fillText(`in use · of ${this.cap} pens`, w / 2, h * 0.8);
     });
     if (this.sign.material.map) this.sign.material.map.dispose();
     this.sign.material.map = tex; this.sign.material.needsUpdate = true;
@@ -239,17 +253,30 @@ export class PenRow {
   clearMarkers() { for (const m of Object.values(this.markers)) this._remove(m); this.markers = {}; }
 
   // ---------- reading and writing pens
-  // a read: the sheep in pen i lifts its head and glows for a moment
-  async read(i) {
+  // a read: the sheep in pen i lifts its head and shifts its weight, with a faint warm touch of light
+  // (no neon flash). A junk pen shows its leftover number now, in a muted red: `value` is what the
+  // interpreter says was there (left out, the pen's own value).
+  async read(i, value = null) {
     const s = this.sheep[i] ?? this.junk[i];
     if (!s) return this.values[i];
-    const mat = s.userData.body ? s.userData.body.material : s.userData.stone.material;
     const junk = !this.sheep[i];
-    mat.emissive = new THREE.Color(junk ? 0x6a1a0a : 0x5a4310);
-    await this.over(0.45, k => { const b = Math.sin(Math.PI * k); s.position.y = b * 0.18; mat.emissiveIntensity = b * 1.6; });
+    if (junk) { if (value != null) { this.values[i] = value; s.userData.junk = value; } relabel(s, "?" + this.values[i]); }
+    const mat = s.userData.body ? s.userData.body.material : s.userData.stone.material;
+    mat.emissive = new THREE.Color(junk ? 0x5a160a : 0x3a2c0c);
+    const head = s.children[1], hy = head ? head.position.y : 0, ry = s.rotation.z;
+    await this.over(0.5, k => {
+      const b = Math.sin(Math.PI * k);
+      if (head && !junk) head.position.y = hy + b * 0.12; else s.position.y = b * 0.1;
+      s.rotation.z = ry + Math.sin(Math.PI * 2 * k) * 0.04;                 // a small shift of weight
+      mat.emissiveIntensity = b * (junk ? 0.9 : 0.55);
+    });
+    if (head && !junk) head.position.y = hy; s.position.y = 0; s.rotation.z = ry;
     mat.emissiveIntensity = 0;
     return this.values[i];
   }
+
+  // show a junk pen's number without the read animation (stepping back to a frame where it was read)
+  revealJunk(i, value) { const j = this.junk[i]; if (!j) return; this.values[i] = value; j.userData.junk = value; relabel(j, "?" + value); }
 
   // flock[to] = flock[from]: a SECOND sheep like the one in `from` walks over; whatever was in `to` is gone
   async copy(from, to) {
@@ -259,13 +286,18 @@ export class PenRow {
     twin.position.set(this.px(from), 0, 0.45); this.group.add(twin);
     twin.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.5; } });
     const old = this.sheep[to] ?? this.junk[to];
-    await this.over(0.55, k => {
+    // the overwritten sheep leaves FIRST, so the empty pen is seen for a moment (a deletion reads as a
+    // physical gap that the next sheep then closes), and only then does the copy hop in
+    if (old) {
+      own(old);
+      await this.over(0.22, k => { old.position.z = -0.35 * k; old.traverse(o => { if (o.isMesh) o.material.opacity = 1 - k; }); });
+      this._remove(old); if (old === this.junk[to]) this.junk[to] = null;
+    }
+    await this.over(0.5, k => {
       const e = k * k * (3 - 2 * k);
       twin.position.x = this.px(from) + (this.px(to) - this.px(from)) * e;
       twin.position.y = Math.sin(Math.PI * k) * 0.25;
-      if (old) old.traverse(o => { if (o.isMesh) { o.material.transparent = true; o.material.opacity = 1 - e; } });
     });
-    if (old) { this._remove(old); if (old === this.junk[to]) this.junk[to] = null; }
     twin.traverse(o => { if (o.isMesh) o.material.opacity = 1; });
     twin.position.z = 0;
     this._put(to, twin);
@@ -275,6 +307,7 @@ export class PenRow {
   async write(i, v) {
     const s = makeSheep(v);
     const old = this.sheep[i] ?? this.junk[i];
+    if (old) own(old);                                      // fade only THIS one (the face material is shared by every sheep)
     s.position.set(this.px(i), 0, 2.4); this.group.add(s);
     await this.over(0.6, k => {
       const e = k * k * (3 - 2 * k);
@@ -294,6 +327,7 @@ export class PenRow {
     return s;
   }
   async dropOff(s) {           // a lifted sheep leaves the scene
+    own(s);
     await this.over(0.5, k => { s.position.z += 0.05; s.traverse(o => { if (o.isMesh) { o.material.transparent = true; o.material.opacity = 1 - k; } }); });
     this._remove(s);
   }

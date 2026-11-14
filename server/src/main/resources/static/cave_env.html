@@ -16,21 +16,10 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
   #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #050403; z-index: 40; transition: opacity 1s; }
   #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 30px; color: #f2c230; }
   #loading p { margin: 0; color: #8a979b; font-size: 15px; }
-  #menu { position: fixed; left: 16px; bottom: 16px; z-index: 10; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 32px); }
-  #menu .grp { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  #menu .lbl { font-size: 11px; letter-spacing: 2px; color: #8c7c66; min-width: 64px; }
-  #menu button { min-height: 40px; padding: 0 14px; background: rgba(8, 6, 4, 0.8); color: #efe1c2; border: 1px solid #4a3a28; border-radius: 4px;
-                 font: inherit; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
-  #menu button:hover, #menu button:focus-visible { border-color: #f2c230; color: #f2c230; outline: none; }
-  #menu button.done { border-color: #6a8a58; color: #9fd08a; }
-  #chapter { position: fixed; left: 6%; top: 12%; pointer-events: none; z-index: 10; font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; transition: opacity 1s; }
-  #chapter b { display: block; margin-top: 2px; font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: 46px; letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f; }
-  body.busy #menu, body.busy #chapter { opacity: 0; pointer-events: none; }
   #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.75); color: #efe1c2;
           border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
   #skip.on { display: block; }
   @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
-  body.cinematic #menu, body.cinematic #chapter { display: none; }
   #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
           font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
   #fast.on { display: flex; }
@@ -41,17 +30,26 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 </head>
 <body>
 <div id="loading"><h1>THE CAVE OF POLYPHEMUS</h1><p>carving the pens…</p></div>
-<div id="chapter">CHAPTER TWO<b>THE CAVE OF POLYPHEMUS</b></div>
+<div id="title" class="odx-title"><span class="k">CHAPTER TWO</span><span class="t">The Cave of Polyphemus</span></div>
 <button id="skip">SKIP SCENE ▸▸ (Esc)</button>
 <div id="fast">▸▸</div>
-<div id="menu">
-  <div class="grp"><span class="lbl">FILM</span><button id="open-btn">▶ Opening</button><button id="climax-btn">▶ Climax</button></div>
-  <div class="grp"><span class="lbl">LESSON</span>
-    <button data-part="1">1 · Pens</button><button data-part="2">2 · Walking</button><button data-part="3">3 · Room &amp; gaps</button><button data-part="4">4 · Turning around</button></div>
-  <div class="grp"><span class="lbl">TRIALS</span><button id="trials-btn">Athena's trials · NOON to DAWN</button><button id="lab-btn">⚗ The Lab · your flock, your code</button></div>
-  <div class="grp"><span class="lbl">ARRANGE</span>
-    <button data-arrange="traverse">Sum</button><button data-arrange="insert">Insert</button><button data-arrange="delete">Delete</button><button data-arrange="reverse">Reverse</button></div>
-</div>
+<nav id="doors" class="odx-doors" aria-label="Chapter two">
+  <button class="continue" id="continue-btn" hidden></button>
+  <div class="row">
+    <button class="door lesson" id="door-lesson"><span class="kick" data-ic="book">LEARN</span><span class="name">ATHENA'S LESSON</span>
+      <span class="what">Four short parts on the pens: what an array is, walking it, making room and closing gaps, turning it around. Nothing is graded.</span><span class="prog" id="prog-lesson">4 parts</span></button>
+    <button class="door trials" id="door-trials"><span class="kick" data-ic="sun">BE JUDGED</span><span class="name">ATHENA'S TRIALS</span>
+      <span class="what">Noon to dawn: eight hours of work on the flock, a bonus at midnight, and the escape at dawn.</span><span class="prog" id="prog-trials"></span></button>
+    <button class="door lab" id="door-lab"><span class="kick" data-ic="flask">PLAY</span><span class="name">THE LAB</span>
+      <span class="what">No giant, no clock. Your flock, your code, any array algorithm, step by step.</span><span class="prog">up to 10 sheep</span></button>
+  </div>
+  <div class="extra">
+    <span class="lbl">STORY</span><button id="open-btn" data-ic="film">Opening</button><button id="climax-btn" data-ic="film">Climax</button>
+    <span class="lbl">LESSON</span><button data-part="1">1 Pens</button><button data-part="2">2 Walking</button><button data-part="3">3 Room &amp; gaps</button><button data-part="4">4 Turning around</button>
+    <span class="lbl">ARRANGE</span><button data-arrange="traverse">Sum</button><button data-arrange="insert">Insert</button><button data-arrange="delete">Delete</button><button data-arrange="reverse">Reverse</button>
+    <button id="codex-btn" data-ic="scroll">Codex</button>
+  </div>
+</nav>
 
 <script type="module">
 import * as THREE from "three";
@@ -60,10 +58,12 @@ import { panelW } from "./js/learn/panelWidth.js";
 import { Director } from "./js/engine/director.js";
 import { sound } from "./js/engine/sound.js";
 import { installUI } from "./js/ui/ui.js";
+import { icon } from "./js/ui/icons.js";
 import { PenRow, PEN_W } from "./js/islands/cave/penRow.js";
 import { caveLesson } from "./js/islands/cave/caveLesson.js";
 import { Parsons, CAVE_PARSONS } from "./js/learn/parsons.js";
 import { buildCave, GIANT_AT } from "./js/islands/cave/caveScene.js";
+import { addCaveDetails } from "./js/islands/cave/caveDetails.js";
 import { Cyclops } from "./js/islands/cave/cyclops.js";
 import { Hero } from "./js/engine/hero.js";
 import { Comic } from "./js/engine/comic.js";
@@ -75,16 +75,20 @@ import { CaveTrials } from "./js/islands/cave/caveTrials.js";
 
 const params = new URLSearchParams(location.search);
 const world = new World({ quality: params.get("q") || "auto" });
+world.bloom.strength = 0.3; world.bloom.threshold = 0.9;     // fire glows, but never blooms over the numbers
 world.grade.uniforms.letterbox.value = 0;   // no cinema bars while learning
 
 // ---------- the cave itself (caveScene.js), and Polyphemus dozing at the back by his cheeses
 const scene = world.scene;
 const cave = await buildCave(world);
+addCaveDetails(world, cave);                          // the lived-in details: threshold, pen wall, his corner, the deep cave, moonlight
 const giant = new Cyclops(world, { height: 11 });
 await giant.load();
 giant.place(GIANT_AT.x, 0, GIANT_AT.z, 8, 4); giant.play("idle", 0); giant.open(0.25);   // dozing: one eye, barely open
 
 const pens = new PenRow(world, { pens: 10 });
+// the resting shot: the whole pen row, set high in the frame so the doors at the bottom never cover it
+const REST = [[PEN_W * 4.5, 5.0, 14.5], [PEN_W * 4.5, -0.35, 0], 44];
 pens.set([34, 52, 18, 77, 45, 60, 23, 81]);
 const director = new Director(world);
 const ui = installUI({ chapter: "cave", world });        // tokens, loading, VOYAGE, sound, the EMBER grade
@@ -92,6 +96,22 @@ const comic = new Comic(world, director);
 // Odysseus: by the fire while Athena teaches (the opening walks him in)
 const hero = await new Hero(world, { groundY: 0 }).load();
 hero.teleport(FIRE_AT.x + 1.7, FIRE_AT.z + 1.9, 2.4);
+
+// ---------- the giant is felt even while you work: every half-minute or so, a slow breath from the dark
+// at the back, his head stirs, and one sheep shifts its weight in its pen. Never during a film or a fast run.
+{
+  let next = 20 + Math.random() * 15, stir = 0;
+  world.add({ update(dt) {
+    if (document.body.classList.contains("filming") || world.timeScale > 1.5) return;
+    next -= dt;
+    if (stir > 0) { stir = Math.max(0, stir - dt); giant.roar(0.05 * Math.sin(Math.PI * (1 - stir / 2.4))); if (!stir) giant.roar(0); }
+    if (next > 0) return;
+    next = 25 + Math.random() * 20; stir = 2.4;
+    sound.giant("breath", { level: 0.7 });
+    const live = pens.sheep.filter(Boolean), sh = live[Math.floor(Math.random() * live.length)];
+    if (sh) { const r = sh.rotation.y; pens.over(0.8, k => { sh.rotation.y = r + Math.sin(Math.PI * k) * 0.25; }).then(() => (sh.rotation.y = r)); }
+  } });
+}
 
 // ---------- the opening film (caveOpening.js), and skipping it: fast-forward behind a black card
 let skipping = false, filming = false;
@@ -108,7 +128,7 @@ async function opening() {
     filming = false; skipping = false; director.skipping = false; world.timeScale = 1; document.body.classList.remove("filming"); ui.regrade();
     fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy");
     director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
-    director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
+    director.cut(...REST);
   }
 }
 document.getElementById("open-btn").onclick = () => opening();
@@ -121,7 +141,7 @@ async function climax() {
     filming = false; skipping = false; director.skipping = false; world.timeScale = 1; document.body.classList.remove("filming"); ui.regrade();
     fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy");
     director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
-    director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
+    director.cut(...REST);
   }
 }
 document.getElementById("climax-btn").onclick = () => climax();
@@ -137,7 +157,7 @@ const trials = new CaveTrials({
     if (on) { document.body.classList.add("side-panel", "busy"); shiftForPanel(); addEventListener("resize", shiftForPanel); }
     else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); }
   },
-  onClose: () => { document.body.classList.remove("busy"); director.glide([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44, 1); },
+  onClose: () => { document.body.classList.remove("busy"); director.glide(...REST, 1); refreshMenu(); },
   onLesson: () => { trials.close(); lesson(1); },
   onFinale: async () => { trials.ctx.fast.end(); await climax(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); ui.chapterDone(); },
   skipping: () => trialFast,
@@ -147,26 +167,34 @@ const trials = new CaveTrials({
     end: () => { trialRun = false; trialFast = false; fastEl.classList.remove("on"); skipBtn.classList.remove("on"); skipBtn.textContent = "SKIP SCENE ▸▸ (Esc)"; }
   }
 });
-document.getElementById("trials-btn").onclick = () => trials.open();
-document.getElementById("lab-btn").onclick = () => trials.openLab();
-director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
+document.getElementById("door-trials").onclick = () => trials.open();
+document.getElementById("door-lab").onclick = () => trials.openLab();
+director.cut(...REST);
 
-// ---------- the menu: each lesson part and each warm-up can be opened on its own
-const done = new Set();
+// ---------- the menu (Chapter Three's doors, in stone): CONTINUE, LEARN, BE JUDGED, PLAY, and the small buttons
+const LESSONS_KEY = "odyssey.cave.lessons";
+const seenParts = () => { try { return JSON.parse(localStorage.getItem(LESSONS_KEY)) || []; } catch { return []; } };
+const markPart = n => { try { const s = seenParts(); if (!s.includes(n)) { s.push(n); localStorage.setItem(LESSONS_KEY, JSON.stringify(s)); } } catch { /* storage off */ } };
+let menuBusy = false;                                   // one thing at a time: a second click while something opens is ignored
 async function busy(fn, btn) {
+  if (menuBusy) return; menuBusy = true;
   document.body.classList.add("busy");
   try { await fn(); } finally {
+    menuBusy = false;
     document.body.classList.remove("busy");
-    if (btn) btn.classList.add("done");
-    director.glide([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44, 1);
+    if (btn) btn.classList.add("seen");
+    director.glide(...REST, 1);
+    refreshMenu();
   }
 }
 async function lesson(part, btn) {
   await busy(async () => {
     const player = caveLesson(part, { pens, director });
     window.__lesson = player;
-    await player.open();
-  }, btn);
+    const r = await player.open();
+    if (r && !r.skipped) markPart(part);
+    pens.clearMarkers(); pens.set([34, 52, 18, 77, 45, 60, 23, 81]);            // the lesson leaves the flock as it found it
+  }, btn || document.querySelector(`#doors [data-part="${part}"]`));
 }
 async function arrange(name, btn) {
   await busy(async () => {
@@ -175,8 +203,35 @@ async function arrange(name, btn) {
     await p.open();
   }, btn);
 }
-document.querySelectorAll("#menu [data-part]").forEach(b => b.onclick = () => lesson(+b.dataset.part, b));
-document.querySelectorAll("#menu [data-arrange]").forEach(b => b.onclick = () => arrange(b.dataset.arrange, b));
+document.querySelectorAll("#doors [data-part]").forEach(b => b.onclick = () => lesson(+b.dataset.part, b));
+document.querySelectorAll("#doors [data-arrange]").forEach(b => b.onclick = () => arrange(b.dataset.arrange, b));
+document.querySelectorAll("#doors [data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", icon(el.dataset.ic) + " "));
+document.getElementById("door-lesson").onclick = () => { const s = seenParts(); lesson([1, 2, 3, 4].find(n => !s.includes(n)) || 1); };
+document.getElementById("codex-btn").onclick = async () => { await trials.open(); trials.codex.show(true); };
+
+// what the doors say, from what is saved: lessons seen, trials done, and where CONTINUE goes
+const HOUR_OF = { "cave-1": "NOON", "cave-2": "1 PM", "cave-3": "2 PM", "cave-4": "3 PM", "cave-5": "4 PM", "cave-6": "5 PM", "cave-7": "6 PM", "cave-8": "7 PM", "cave-bonus": "MIDNIGHT", "cave-finale": "DAWN" };
+const TITLE_OF = { "cave-1": "Count the Flock", "cave-2": "Where's the Black Ram?", "cave-3": "The Biggest Ram", "cave-4": "Too Thin to Hide a Man", "cave-5": "Two Lambs Born",
+  "cave-6": "First Out at Dawn", "cave-7": "The Cyclops' Supper", "cave-8": "Back to Front", "cave-bonus": "The Sorted Line", "cave-finale": "Dawn" };
+function refreshMenu() {
+  let d = []; try { d = JSON.parse(localStorage.getItem("odyssey.cave.done")) || []; } catch { /* storage off */ }
+  d = d.filter(id => id in HOUR_OF);
+  const practice = ["cave-1", "cave-2", "cave-3", "cave-4", "cave-5", "cave-6", "cave-7", "cave-8"];
+  const finished = d.includes("cave-finale");
+  const next = practice.find(id => !d.includes(id)) || (finished ? null : "cave-finale");
+  const pt = document.getElementById("prog-trials");
+  pt.textContent = finished ? `${d.length} / 10 done · the men are out` : d.length ? `${d.length} / 10 done · next: ${HOUR_OF[next]}` : "10 trials · start at NOON";
+  pt.classList.toggle("done", finished);
+  const s = seenParts(), pl = document.getElementById("prog-lesson");
+  pl.textContent = s.length >= 4 ? "4 / 4 parts seen" : s.length ? `${s.length} / 4 parts seen · next: part ${[1, 2, 3, 4].find(n => !s.includes(n))}` : "4 parts · start with 1";
+  pl.classList.toggle("done", s.length >= 4);
+  // CONTINUE only when there is something real to go back to: a trial started but the chapter not finished
+  const cont = document.getElementById("continue-btn");
+  cont.hidden = !(d.length && next);
+  if (!cont.hidden) cont.innerHTML = `CONTINUE ${icon("arrow")} <small>${HOUR_OF[next]} · ${TITLE_OF[next]}</small>`;
+}
+document.getElementById("continue-btn").onclick = () => trials.open();
+refreshMenu();
 
 // ---------- start: the world runs on the real clock, or (capture=1) only when a test steps it
 const loading = document.getElementById("loading");

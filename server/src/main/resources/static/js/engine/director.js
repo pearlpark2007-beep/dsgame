@@ -86,7 +86,7 @@ export class Director {
     w.grade.uniforms.freeze.value = 1;
     this.card.querySelector(".nc-name").textContent = name;
     this.card.querySelector(".nc-sub").innerHTML = sub;
-    this.card.classList.add("on");
+    this.card.classList.add("on"); sound.cue("freeze");
     await this._wait(seconds);
     this.card.classList.remove("on");
     w.grade.uniforms.freeze.value = 0;

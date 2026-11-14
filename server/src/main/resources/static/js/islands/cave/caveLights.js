@@ -294,7 +294,7 @@ export function lightCave(world, hall, rockMesh = null) {
 
   // ---------- the colour: Tarantino pushes saturation and keeps the cold blues alive against the reds
   if (world.grade.uniforms.keepBlue) world.grade.uniforms.keepBlue.value = 0.25;
-  world.renderer.toneMappingExposure = 1.4;
+  world.renderer.toneMappingExposure = 1.2;          // lighter than before: fire reads hot without burning the floor orange
 
   world.add({ update: (dt, t) => { for (const f of live) f(dt, t); } });
   // every flame in the cave at once: 0 = all out (embers only), 1 = all burning

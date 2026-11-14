@@ -10,6 +10,7 @@ import { TRIAL_CSS } from "../../learn/trialPanelCss.js";
 import { ArrayBoard } from "../../learn/arrayBoard.js";
 import { Codex } from "../../learn/codex.js";
 import { CAVE_CODEX } from "../../learn/codexContent.js";
+import { icon } from "../../ui/icons.js";
 
 const STORE = "odyssey.cave.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -147,6 +148,8 @@ const css = `
 #trial-panel .lab .labmsg { font-size: 12.5px; margin-top: 5px; color: #9c8a6c; min-height: 16px; }
 #trial-panel .lab .labmsg.bad { color: #ff7a5c; }
 #trial-panel .tab.labtab { border-color: #3f7a52; color: #8fe3a0; }
+#trial-panel .tab.done:not(.on) { color: #9fd08a; }
+#trial-panel .tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 `;
 
 export class CaveTrials {
@@ -260,9 +263,10 @@ export class CaveTrials {
       b.className = "tab" + (l === this.level ? " on" : "");
       b.style.flex = "1 0 30%"; b.style.minHeight = "34px"; b.style.fontSize = "12px";
       const locked = this.locked(l);
-      const hour = l === LAB ? "⚗ LAB" : (HOURS[l.id] || [String(i + 1)])[0].replace(".", "");
+      const hour = l === LAB ? "LAB" : (HOURS[l.id] || [String(i + 1)])[0].replace(".", "");
       if (l === LAB) b.classList.add("labtab");
-      b.textContent = (locked ? "🔒 " : "") + hour + (d.includes(l.id) ? " ✓" : "");
+      b.innerHTML = (locked ? icon("lock", { size: 14 }) + " " : l === LAB ? icon("flask", { size: 14 }) + " " : "") + hour + (d.includes(l.id) ? " " + icon("check", { size: 14 }) : "");
+      if (d.includes(l.id)) b.classList.add("done");
       b.title = l.title;
       b.setAttribute("aria-pressed", l === this.level);
       b.setAttribute("aria-label", l.title + (locked ? " (locked)" : "") + (d.includes(l.id) ? " (done)" : ""));
@@ -417,7 +421,7 @@ export class CaveTrials {
     if (st.action === "READ" || st.action === "JUNK") {
       this.focusI = idx;
       if (st.action === "JUNK") { P.junk = true; world.timeScale = P.speed; }
-      sound.op("tick"); await pens.read(idx);
+      sound.op("tick"); await pens.read(idx, st.action === "JUNK" ? st.value : null);
       P.lastRead = idx;
       this.moves(++P.looked);
     } else if (st.action === "WRITE") {
@@ -449,6 +453,7 @@ export class CaveTrials {
     const { pens } = this.ctx, board = this.board, f = board.frames[Math.max(0, Math.min(board.frames.length - 1, k))];
     const vals = f.values.map((v, i) => (v == null ? 11 + ((i * 37) % 80) : v));
     pens.set(vals.slice(0, f.n), { junk: vals.slice(f.n) });
+    for (let i = f.n; i < pens.cap; i++) if (f.values[i] != null) pens.revealJunk(i, f.values[i]);   // junk already read: its number shows
     for (const [name, v] of Object.entries(f.vars)) {
       if (!board.isPointer(name)) continue;
       if (v >= 0 && v <= pens.cap) pens.marker(name, v, parseInt(board.pointerColor(name).slice(1), 16)); else pens.hideMarker(name);
@@ -478,7 +483,7 @@ export class CaveTrials {
       return;
     }
     const next = this.levels.find(l => !done().includes(l.id) && !this.locked(l));
-    this.status(res.message + (next ? ` Next: ${(HOURS[next.id] || [""])[0]} ${next.title}.` : ""), "good");
+    this.status(res.message + (next ? ` Next: ${(HOURS[next.id] || [""])[0].replace(".", "")} · ${next.title}` : ""), "good");
     await director.stamp("DONE", res.message, { kind: "good", seconds: 2.4 });
   }
   async endGoalNotMet(res, { junk = false } = {}) {

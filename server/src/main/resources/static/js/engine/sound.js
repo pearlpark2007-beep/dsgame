@@ -19,6 +19,19 @@ export class Sound {
     if (this.muted) { this.sea(false); this._stopAmb(); }
     else if (this._ambKind) this.ambience(this._ambKind);
   }
+  // ---------- the film's own cues, the same in every chapter: a freeze-frame card lands with one low hit,
+  // a chapter card with a short rising chord, typed cards with quiet typewriter clicks
+  cue(kind) {
+    const A = this.ctx; if (!A || this.muted) return;
+    if (kind === "freeze") { this.boom({ freq: 62, to: 34, seconds: 0.7, level: 0.32 }); return; }
+    if (kind === "chapter") { this.chord({ notes: 2, seconds: 1.8, level: 0.09 }); return; }
+    if (kind === "type") {
+      const now = performance.now(); if (now - (this._typeAt || 0) < 55) return; this._typeAt = now;
+      const t = A.currentTime, n = this._noise(0.03), f = A.createBiquadFilter(), g = A.createGain();
+      f.type = "bandpass"; f.frequency.value = 3200 + Math.random() * 900; f.Q.value = 2.5;
+      this._env(g, t, 0.05, 0.001, 0.025); n.connect(f).connect(g).connect(this._out); n.start(t);
+    }
+  }
   // ---------- one small sound for one data-structure operation (never more than one every 120 ms, so a
   // fast-forwarded run doesn't turn into noise). kind: thump (a crate set down, a value written),
   // creak (a crate lifted), tick (a value read, a pointer moved), ticket (a ticket printed: enqueue),
@@ -269,6 +282,21 @@ export class Sound {
     const n = this._noise(seconds), fn = A.createBiquadFilter(), gn = A.createGain();
     fn.type = "lowpass"; fn.frequency.setValueAtTime(800, t); fn.frequency.exponentialRampToValueAtTime(300, t + seconds);
     this._env(gn, t, level * 0.5, 0.2, seconds); n.connect(fn).connect(gn).connect(this._out); n.start(t);
+  }
+  // the Cyclops, heard before he is seen: a footstep (a deep thud with grit), a breath (a long low
+  // swell of filtered air), the boulder's stone scrape. All quiet; they build the space, not noise.
+  giant(kind, { level = 1 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime;
+    const noise = (seconds, type, f0, f1, peak, attack) => {
+      const n = this._noise(seconds), f = A.createBiquadFilter(), g = A.createGain(); f.type = type;
+      f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + seconds);
+      this._env(g, t, peak * level, attack, seconds - attack); n.connect(f).connect(g).connect(this._out); n.start(t);
+    };
+    if (kind === "step") { this.boom({ freq: 48, to: 28, seconds: 0.9, level: 0.38 * level }); noise(0.35, "lowpass", 900, 200, 0.08, 0.005); }
+    else if (kind === "breath") { noise(2.4, "bandpass", 260, 140, 0.05, 1.0); }
+    else if (kind === "scrape") { noise(2.6, "bandpass", 420, 180, 0.12, 0.3); this.boom({ freq: 40, to: 30, seconds: 2.4, level: 0.12 * level }); }
+    else if (kind === "slam") { this.boom({ freq: 58, to: 24, seconds: 1.6, level: 0.6 * level }); noise(0.8, "lowpass", 1400, 160, 0.16, 0.004); }
   }
 }
 export const sound = new Sound();

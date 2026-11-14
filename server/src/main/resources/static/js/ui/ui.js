@@ -7,6 +7,7 @@ import { applyGrade } from "./grades.js";
 import { chapter as chapterOf, nextOf, status } from "./progress.js";
 import { voyageTo, arriving } from "./voyage.js";
 import { DEEDS } from "../story/tags.js";
+import { icon } from "./icons.js";
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
@@ -43,14 +44,22 @@ export function installUI({ chapter, world = null, ambience = chapter } = {}) {
   const wake = () => { removeEventListener("pointerdown", wake); removeEventListener("keydown", wake); sound.ctx; if (!sound.muted) sound.ambience(ambience); else sound._ambKind = ambience; };
   addEventListener("pointerdown", wake); addEventListener("keydown", wake);
 
+  // while a film or a run is fast-forwarded (Esc), its sounds hush: forty booms a second is noise, not a film
+  if (world && world.add) world.add({ update() {
+    const fast = world.timeScale >= 6;
+    // the whole mix fades out (not just new sounds: whatever is still ringing too), and back in after
+    if (fast && !sound.muted) { sound.muted = true; sound._hushed = true; sound.silence(0.15); }
+    else if (!fast && sound._hushed) { sound._hushed = false; sound.muted = store.get("odyssey.mute", "0") === "1"; if (!sound.muted) sound.restore(0.6); }
+  } });
+
   // the voyage bar: ☰ VOYAGE and the sound control
   const bar = document.createElement("div"); bar.id = "odx-bar";
-  bar.innerHTML = `<button class="map" aria-label="The voyage map">☰ VOYAGE</button>
+  bar.innerHTML = `<button class="map" aria-label="The voyage map">${icon("map")} VOYAGE</button>
     <div class="vol"><button class="mute" aria-label="Mute (M)"></button><input type="range" min="0" max="1" step="0.05" aria-label="Volume"></div>`;
   document.body.appendChild(bar);
   const muteBtn = bar.querySelector(".mute"), range = bar.querySelector("input");
   range.value = sound.volume;
-  const paint = () => { muteBtn.textContent = sound.muted ? "🔇" : "🔊"; muteBtn.setAttribute("aria-pressed", String(sound.muted)); muteBtn.setAttribute("aria-label", sound.muted ? "Sound off (M)" : "Sound on (M)"); document.body.classList.toggle("odx-muted", sound.muted); };
+  const paint = () => { muteBtn.innerHTML = icon(sound.muted ? "mute" : "sound"); muteBtn.setAttribute("aria-pressed", String(sound.muted)); muteBtn.setAttribute("aria-label", sound.muted ? "Sound off (M)" : "Sound on (M)"); document.body.classList.toggle("odx-muted", sound.muted); };
   const toggle = () => { sound.setMuted(!sound.muted); if (!sound.muted && !sound._ambKind) sound.ambience(ambience); store.set("odyssey.mute", sound.muted ? "1" : "0"); paint(); };
   muteBtn.onclick = toggle;
   range.oninput = () => { sound.setVolume(+range.value); store.set("odyssey.volume", String(range.value)); if (sound.muted && +range.value > 0) toggle(); };
@@ -75,9 +84,9 @@ export function chapterDone(id, { onStay = null } = {}) {
   el.querySelector("h2").textContent = c.title;
   el.querySelector(".deed").textContent = "ODYSSEUS: " + DEEDS[c.tag];
   const row = el.querySelector(".row");
-  const btn = (t, cls, fn) => { const b = document.createElement("button"); b.className = "odx-btn " + cls; b.textContent = t; b.onclick = fn; row.appendChild(b); return b; };
-  const first = next ? btn(`NEXT: ${next.title.toUpperCase()} ▸`, "primary", () => voyageTo(next, { from: id }))
-                     : btn("THE VOYAGE MAP ▸", "primary", () => voyageTo("map"));
+  const btn = (t, cls, fn) => { const b = document.createElement("button"); b.className = "odx-btn " + cls; b.textContent = t; if (cls === "primary") b.insertAdjacentHTML("beforeend", " " + icon("arrow")); b.onclick = fn; row.appendChild(b); return b; };
+  const first = next ? btn(`NEXT: ${next.title.toUpperCase()}`, "primary", () => voyageTo(next, { from: id }))
+                     : btn("THE VOYAGE MAP", "primary", () => voyageTo("map"));
   btn("Stay on the island", "", () => { el.classList.remove("on"); if (onStay) onStay(); });
   el.classList.add("on");
   first.focus();

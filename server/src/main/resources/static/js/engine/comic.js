@@ -2,6 +2,7 @@
 // Panels are real frames grabbed from the 3D scene, slammed onto a paper page with ink borders.
 // Over the live scene it can letter sound effects (KRAAANG!), narration boxes and speed lines,
 // and it can stop the action for one button press (the SWING! moment).
+import { sound } from "./sound.js";
 const css = `
 #comic { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
 #comic .page { position: absolute; inset: 0; background: #efe4c8; opacity: 0; transition: opacity 0.12s; }
@@ -144,7 +145,7 @@ export class Comic {
     const c = document.createElement("div"); c.className = "chapter"; c.innerHTML = "<small></small><b></b>";
     c.querySelector("small").textContent = kicker; c.querySelector("b").textContent = title;
     this.el.appendChild(c);
-    requestAnimationFrame(() => c.classList.add("on"));
+    requestAnimationFrame(() => c.classList.add("on")); sound.cue("chapter");
     await this.hold(seconds);
     c.classList.remove("on");
     await this.hold(0.5);
@@ -220,7 +221,7 @@ export class Comic {
       if (this.skipping) break;
       txt.querySelectorAll("p").forEach(p => p.classList.add("old"));
       const p = document.createElement("p"); txt.appendChild(p);
-      for (let i = 1; i <= para.length; i++) { p.textContent = para.slice(0, i); if (i % 2 === 0) await this.hold(2 / cps); if (this.skipping) { p.textContent = para; break; } }
+      for (let i = 1; i <= para.length; i++) { p.textContent = para.slice(0, i); if (i % 2 === 0) { sound.cue("type"); await this.hold(2 / cps); } if (this.skipping) { p.textContent = para; break; } }
       await this.hold(holdEach);
     }
     await this.hold(holdEnd);
