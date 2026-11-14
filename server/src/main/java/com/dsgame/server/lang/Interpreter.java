@@ -77,9 +77,18 @@ public class Interpreter {
         }
         // a whole C program: run main() (only when nothing at the top level already did the work)
         Function main = functions.get("main");
-        if (main != null && program.stream().allMatch(s -> s instanceof Stmt.FunctionDefStmt || s instanceof Stmt.StructDefStmt)) {
+        if (main != null && program.stream().allMatch(Interpreter::onlyDeclares)) {
             callUser(main, List.of(), main.line());
         }
+    }
+
+    // a top-level line that only sets things up (a function, a struct, a global variable or array):
+    // a program made of these alone is a whole C file, so main() is where it starts
+    private static boolean onlyDeclares(Stmt s) {
+        if (s instanceof Stmt.FunctionDefStmt || s instanceof Stmt.StructDefStmt || s instanceof Stmt.DeclareStmt
+                || s instanceof Stmt.DeclarePointerStmt || s instanceof Stmt.DeclareArrayStmt) return true;
+        if (s instanceof Stmt.ListStmt list) return list.statements().stream().allMatch(Interpreter::onlyDeclares);
+        return false;
     }
 
     // ---------- the player's own functions ----------
@@ -139,11 +148,12 @@ public class Interpreter {
             for (int k = savedArrays.size() - 1; k >= 0; k--) arrayScopes.push(savedArrays.get(k));
         }
         if (ok) {
-            // the function's variables are gone; a name the caller also has shows the caller's value again
-            for (String name : locals) forget(name, line);
+            // first the answer leaves the function; then its variables are gone, and a name the caller
+            // also has (head inside deleteFirst) shows the caller's value again
             String what = fn.returns().equals("void") ? fn.name() + "() is done"
                     : fn.name() + "() returns " + (fn.returns().equals("pointer") ? NodeChain.hex(result) : String.valueOf(result));
             timeline.add(new TimelineStep(fn.name(), "RETURN", depth + 1, result, what, line));
+            for (String name : locals) forget(name, line);
         }
         return result;
     }
@@ -247,13 +257,22 @@ public class Interpreter {
             throw new RunError(Outcome.RUNTIME_ERROR, "'" + name + "' is already declared", line);
         }
         ArrayADT array = new ArrayADT(name, size);
-        if (initial != null) {
+        if (initial == null && scopes.size() == 1 && depth == 0) {
+            // a global array with no values is all zeros in C (only local arrays start with junk)
+            for (int i = 0; i < size; i++) array.set(i, 0);
+            array.clearSteps();
+        } else if (initial != null) {
             // as in C: listed values go first, the rest of the cells become 0
             for (int i = 0; i < size; i++) array.set(i, i < initial.length ? initial[i] : 0);
             array.clearSteps();
         }
         arrayScopes.peek().put(name, array);
         localStepsSeen.put(array, 0);
+        // the game draws the array from its first moment: its size, and every cell's starting value
+        StringBuilder cells = new StringBuilder();
+        List<Integer> start = array.firstN(size);
+        for (int i = 0; i < size; i++) cells.append(i > 0 ? " " : "").append(start.get(i));
+        timeline.add(new TimelineStep(name, "ARRAY", size, 0, "int " + name + "[" + size + "]: " + cells, line));
     }
 
     // the player's own array (innermost first), or a level's array

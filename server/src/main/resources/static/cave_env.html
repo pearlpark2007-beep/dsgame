@@ -49,7 +49,6 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
   <div class="grp"><span class="lbl">LESSON</span>
     <button data-part="1">1 · Pens</button><button data-part="2">2 · Walking</button><button data-part="3">3 · Room &amp; gaps</button><button data-part="4">4 · Turning around</button></div>
   <div class="grp"><span class="lbl">TRIALS</span><button id="trials-btn">Athena's trials · NOON to DAWN</button><button id="lab-btn">⚗ The Lab · your flock, your code</button></div>
-  <div class="grp"><span class="lbl">ISLANDS</span><button onclick="location.href='harbour_env.html'">1 · The Harbour</button><button onclick="location.href='circe_env.html'">3 · Circe's Island ▸</button></div>
   <div class="grp"><span class="lbl">ARRANGE</span>
     <button data-arrange="traverse">Sum</button><button data-arrange="insert">Insert</button><button data-arrange="delete">Delete</button><button data-arrange="reverse">Reverse</button></div>
 </div>
@@ -60,6 +59,7 @@ import { World } from "./js/engine/world.js";
 import { panelW } from "./js/learn/panelWidth.js";
 import { Director } from "./js/engine/director.js";
 import { sound } from "./js/engine/sound.js";
+import { installUI } from "./js/ui/ui.js";
 import { PenRow, PEN_W } from "./js/islands/cave/penRow.js";
 import { caveLesson } from "./js/islands/cave/caveLesson.js";
 import { Parsons, CAVE_PARSONS } from "./js/learn/parsons.js";
@@ -73,7 +73,6 @@ import { nameCard } from "./js/story/tags.js";
 import { FIRE_AT } from "./js/islands/cave/caveScene.js";
 import { CaveTrials } from "./js/islands/cave/caveTrials.js";
 
-sound.muted = true;                         // no music or sound effects for now
 const params = new URLSearchParams(location.search);
 const world = new World({ quality: params.get("q") || "auto" });
 world.grade.uniforms.letterbox.value = 0;   // no cinema bars while learning
@@ -88,6 +87,7 @@ giant.place(GIANT_AT.x, 0, GIANT_AT.z, 8, 4); giant.play("idle", 0); giant.open(
 const pens = new PenRow(world, { pens: 10 });
 pens.set([34, 52, 18, 77, 45, 60, 23, 81]);
 const director = new Director(world);
+const ui = installUI({ chapter: "cave", world });        // tokens, loading, VOYAGE, sound, the EMBER grade
 const comic = new Comic(world, director);
 // Odysseus: by the fire while Athena teaches (the opening walks him in)
 const hero = await new Hero(world, { groundY: 0 }).load();
@@ -102,9 +102,10 @@ addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
 async function opening() {
   if (filming) return;
   filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy");
+  document.body.classList.add("filming");
   try { await playCaveOpening({ world, hero, director, comic, giant, cave, pens, card: nameCard("cyclops"), noCrawl: !!params.get("nocrawl") }); }
   finally {
-    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1; document.body.classList.remove("filming"); ui.regrade();
     fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy");
     director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
     director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
@@ -114,9 +115,10 @@ document.getElementById("open-btn").onclick = () => opening();
 async function climax() {
   if (filming) return;
   filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy");
+  document.body.classList.add("filming");
   try { await playCaveClimax({ world, hero, director, comic, giant, cave, pens, cardAfter: nameCard("cyclops", { done: true }) }); }
   finally {
-    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1; document.body.classList.remove("filming"); ui.regrade();
     fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy");
     director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
     director.cut([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44);
@@ -137,7 +139,7 @@ const trials = new CaveTrials({
   },
   onClose: () => { document.body.classList.remove("busy"); director.glide([PEN_W * 4.5, 4.8, 12.5], [PEN_W * 4.5, 0.5, 0], 44, 1); },
   onLesson: () => { trials.close(); lesson(1); },
-  onFinale: async () => { trials.ctx.fast.end(); await climax(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); },
+  onFinale: async () => { trials.ctx.fast.end(); await climax(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); ui.chapterDone(); },
   skipping: () => trialFast,
   fast: {
     begin: () => { trialRun = true; trialFast = false; skipBtn.textContent = "FAST ▸▸ (Esc)"; skipBtn.classList.add("on"); },

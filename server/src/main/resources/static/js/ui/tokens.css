@@ -1,0 +1,95 @@
+/* tokens.css — The Odyssey of Data's one design system. Every page loads it (js/ui/ui.js adds it).
+   Ink panels, paper text, thin gold rules, red only for danger. Only --chapter changes per island. */
+:root {
+  --ink: #141008;
+  --paper: #f4ead2;
+  --gold: #f2c230;
+  --blood: #c8261e;
+  --rule: #3a2c18;
+  --dim: #8a7a5a;
+  --panel: rgba(20, 16, 8, 0.94);
+  --chapter: #f2c230;
+  --display: Anton, Impact, sans-serif;
+  --mono: 'Courier Prime', 'Courier New', monospace;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+  --t-fast: 200ms;
+  --t-mid: 300ms;
+  --t-card: 600ms;
+}
+body[data-chapter="harbour"] { --chapter: #b98a3e; }
+body[data-chapter="cave"] { --chapter: #e0782a; }
+body[data-chapter="circe"] { --chapter: #1d3fd1; }
+body[data-chapter="underworld"] { --chapter: #d7261e; }
+
+/* ---------- result stamps: one family for the whole game (director.stamp) */
+body.odx .stamp { top: 40%; transform: translate(-50%, -50%) scale(1.04); width: max-content; min-width: 300px; max-width: min(80vw, 900px); padding: 16px 28px 18px; border-radius: 4px;
+  background: rgba(20, 16, 8, 0.95); border-top: 6px solid var(--gold); box-shadow: 0 10px 40px rgba(0, 0, 0, .45); transition: opacity var(--t-fast), transform var(--t-mid) var(--ease); }
+body.odx .stamp.on { transform: translate(-50%, -50%) scale(1); }
+body.odx .stamp.bad { border-top-color: var(--blood); }
+body.odx .stamp .st-t { font-family: var(--display); font-size: clamp(34px, 4.6vw, 62px); letter-spacing: 3px; border: 0; padding: 0; background: none; text-shadow: none; }
+body.odx .stamp.long .st-t { font-size: clamp(26px, 3.3vw, 46px); white-space: nowrap; }
+body.odx .stamp.good .st-t { color: var(--gold); }
+body.odx .stamp.bad .st-t { color: #ff5a40; }
+body.odx .stamp .st-s { margin: 8px auto 0; font-size: clamp(14px, 1.3vw, 17px); line-height: 1.4; color: var(--paper); text-shadow: none; max-width: 60ch; }
+
+/* ---------- chapter cards (comic.chapter): the number small in the chapter's accent, the title in paper under a gold rule */
+body.odx #comic .chapter small { font-family: var(--mono); font-weight: 700; letter-spacing: 6px; font-size: clamp(13px, 1.3vw, 16px); color: var(--chapter); margin-bottom: 16px; }
+body[data-chapter="circe"] #comic .chapter small { color: #8fa6ff; }
+body.odx #comic .chapter b { color: var(--paper); border-top: 2px solid var(--gold); padding-top: 18px; font-size: clamp(40px, 7vw, 96px); }
+
+/* ---------- loading: one template, which is also the chapter card when arriving from another island */
+body.odx #loading { background: #050403 !important; gap: 0 !important; transition: opacity .45s var(--ease) !important; }
+body.odx #loading .odx-k { font: 700 clamp(12px, 1.2vw, 15px) var(--mono); letter-spacing: 6px; color: var(--chapter); margin-bottom: 16px; text-transform: uppercase; }
+body[data-chapter="circe"] #loading .odx-k { color: #8fa6ff; }
+body.odx #loading h1 { font-family: var(--display) !important; font-weight: 400; color: var(--paper) !important; font-size: clamp(34px, 5.5vw, 76px) !important; letter-spacing: 3px !important;
+  border-top: 2px solid var(--gold); padding-top: 16px; margin: 0 5% !important; text-align: center; line-height: 1.05; text-transform: uppercase; }
+body.odx #loading .odx-bar { width: min(320px, 60vw); height: 2px; background: #241c10; margin-top: 26px; overflow: hidden; position: relative; }
+body.odx #loading .odx-bar i { position: absolute; inset: 0; width: 30%; background: var(--gold); animation: odx-load 1.4s var(--ease) infinite; }
+body.odx #loading .bar { width: min(320px, 60vw) !important; background: #241c10 !important; margin-top: 26px; }
+body.odx #loading .bar div { background: var(--gold) !important; }
+body.odx #loading p { font: 15px var(--mono) !important; color: var(--dim) !important; margin-top: 14px !important; }
+@keyframes odx-load { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+
+/* ---------- the voyage bar: VOYAGE (the map) and the sound control, top-right of the stage */
+#odx-bar { position: fixed; z-index: 40; top: 12px; right: 16px; display: flex; align-items: center; gap: 6px; transition: opacity var(--t-mid); }
+@media (min-width: 901px) { body.side-panel #odx-bar { right: calc(var(--pw, 520px) + 12px); } }
+body[data-chapter="circe"].side-panel #odx-bar { top: 60px; }
+body.cinematic #odx-bar, body.filming #odx-bar { opacity: 0; pointer-events: none; }
+#odx-bar button { height: 34px; min-width: 34px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--rule); background: rgba(20, 16, 8, .88); color: var(--paper);
+  font: 700 12px var(--mono); letter-spacing: 1.5px; cursor: pointer; }
+#odx-bar button:hover { border-color: var(--gold); }
+#odx-bar button:focus-visible, #odx-bar input:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#odx-bar .vol { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px 0 4px; border: 1px solid var(--rule); border-radius: 4px; background: rgba(20, 16, 8, .88); }
+#odx-bar .vol button { border: 0; background: none; padding: 0 4px; min-width: 26px; }
+#odx-bar input[type=range] { width: 70px; accent-color: var(--gold); }
+body.odx-muted #odx-bar input[type=range] { opacity: .35; }
+
+/* ---------- a chapter is done: the shared epilogue panel */
+#odx-done { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center; background: rgba(5, 4, 3, .82); }
+#odx-done.on { display: flex; animation: odx-in var(--t-card) var(--ease) both; }
+#odx-done .box { width: min(560px, 90vw); background: var(--ink); border-top: 6px solid var(--gold); border-radius: 4px; padding: 26px 30px 24px; color: var(--paper); font-family: var(--mono); }
+#odx-done .k { font: 700 13px var(--mono); letter-spacing: 6px; color: var(--chapter); }
+body[data-chapter="circe"] #odx-done .k { color: #8fa6ff; }
+#odx-done h2 { font: 400 clamp(32px, 4vw, 48px)/1.05 var(--display); letter-spacing: 2px; margin: 8px 0 14px; text-transform: uppercase; }
+#odx-done .deed { font-size: 16px; line-height: 1.45; color: var(--gold); margin-bottom: 18px; }
+#odx-done .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.odx-btn { min-height: 42px; padding: 0 18px; border-radius: 4px; font: 700 14px var(--mono); letter-spacing: 1.5px; cursor: pointer; border: 1px solid var(--paper); background: transparent; color: var(--paper); }
+.odx-btn.primary { background: var(--gold); border-color: var(--gold); color: var(--ink); }
+.odx-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+@keyframes odx-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- the chapter transition (js/ui/voyage.js) */
+#odx-voyage { position: fixed; inset: 0; z-index: 60; background: #050403; opacity: 0; pointer-events: none; transition: opacity var(--t-card) var(--ease);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--paper); font-family: var(--mono); }
+#odx-voyage.on { opacity: 1; pointer-events: auto; }
+#odx-voyage svg { width: min(440px, 80vw); height: auto; margin-bottom: 34px; overflow: visible; }
+#odx-voyage p { margin: 0; max-width: 40ch; text-align: center; font: 700 clamp(20px, 2.4vw, 32px)/1.35 var(--mono); min-height: 2.7em; }
+#odx-voyage .skip { position: absolute; right: 22px; bottom: 18px; font: 12px var(--mono); color: var(--dim); letter-spacing: 1px; }
+
+/* ---------- the FPS meter (?fps=1, or Shift+F) */
+#odx-fps { position: fixed; left: 8px; bottom: 8px; z-index: 70; background: rgba(0, 0, 0, .78); color: #7dffb0; font: 12px/1.35 var(--mono); padding: 6px 9px; border-radius: 4px; pointer-events: none; white-space: pre; }
+
+@media (prefers-reduced-motion: reduce) {
+  #odx-voyage, #odx-done.on, body.odx .stamp { transition: none; animation: none; }
+  body.odx #loading .odx-bar i { animation: none; width: 100%; opacity: .5; }
+}

@@ -1,25 +1,283 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DS Game – Stack Demo</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Odyssey of Data</title>
+<script>
+// opened from IntelliJ's built-in preview (port 63342)? That server has no game API: go to the real one.
+if (location.port === "63342") { const page = location.pathname.split("/static/")[1] || ""; location.replace("http://localhost:8081/" + page + location.search + location.hash); }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="js/ui/tokens.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: var(--paper); font-family: var(--mono); }
+  canvas { display: block; }
+  /* ---------- the title: it arrives, it isn't plastered on */
+  #title { position: fixed; left: 7%; top: 13%; z-index: 5; pointer-events: none; opacity: 0; transform: translateY(10px); transition: opacity 1.6s var(--ease), transform 1.6s var(--ease); }
+  #title.on { opacity: 1; transform: none; }
+  #title h1 { margin: 0; font: 400 clamp(54px, 8.6vw, 132px)/0.9 var(--display); letter-spacing: 4px; color: var(--paper); text-transform: uppercase; text-shadow: 0 6px 40px rgba(0,0,0,.45); }
+  #title h1 span { display: block; }
+  #title .rule { width: min(420px, 60vw); height: 2px; background: var(--gold); margin: 22px 0 16px; transform-origin: left; transform: scaleX(0); transition: transform 1.2s var(--ease) .5s; }
+  #title.on .rule { transform: scaleX(1); }
+  #title .sub { font: 700 clamp(13px, 1.25vw, 17px) var(--mono); letter-spacing: 4px; color: var(--paper); opacity: .85; }
+  /* ---------- the menu */
+  #menu { position: fixed; left: 7%; bottom: 12%; z-index: 6; display: flex; flex-direction: column; gap: 4px; opacity: 0; transition: opacity 1s var(--ease) .3s; }
+  #menu.on { opacity: 1; }
+  #menu button { all: unset; cursor: pointer; display: flex; align-items: baseline; gap: 14px; padding: 7px 14px 7px 0; font: 400 clamp(20px, 2vw, 28px) var(--display); letter-spacing: 3px; color: var(--paper); opacity: .78; transition: opacity var(--t-fast), transform var(--t-fast) var(--ease); }
+  #menu button::before { content: ""; width: 0; height: 2px; background: var(--gold); align-self: center; transition: width var(--t-fast) var(--ease); }
+  #menu button:hover, #menu button:focus-visible { opacity: 1; transform: translateX(4px); }
+  #menu button:hover::before, #menu button:focus-visible::before { width: 26px; }
+  #menu button:focus-visible { outline: none; color: var(--gold); }
+  #menu button small { font: 700 12px var(--mono); letter-spacing: 1.5px; color: var(--gold); opacity: .9; }
+  #menu button[hidden] { display: none; }
+  #hint { position: fixed; right: 22px; bottom: 16px; z-index: 6; font: 12px var(--mono); color: var(--dim); letter-spacing: 1px; }
+  /* ---------- sheets over the sea: the voyage map, credits & controls */
+  .sheet { position: fixed; inset: 0; z-index: 20; display: none; background: rgba(5,4,3,.95); overflow: auto; }
+  .sheet.on { display: block; animation: odx-in var(--t-card) var(--ease) both; }
+  .sheet .inner { max-width: 1180px; margin: 0 auto; padding: 34px 28px 40px; box-sizing: border-box; }
+  .sheet header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--gold); padding-bottom: 12px; margin-bottom: 20px; }
+  .sheet h2 { margin: 0; font: 400 clamp(32px, 4vw, 52px) var(--display); letter-spacing: 3px; text-transform: uppercase; }
+  .sheet .close { all: unset; cursor: pointer; font: 700 13px var(--mono); letter-spacing: 2px; color: var(--paper); border: 1px solid var(--paper); padding: 8px 14px; border-radius: 4px; }
+  .sheet .close:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  /* the chart */
+  #chart { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 26px; align-items: start; }
+  #chart svg { width: 100%; height: auto; background: #efe3c6; border-radius: 4px; box-shadow: inset 0 0 80px rgba(110, 80, 40, .35); }
+  #chart svg .isle { cursor: pointer; }
+  #chart svg .isle:focus { outline: none; }
+  #chart svg .isle:focus .ring, #chart svg .isle:hover .ring { stroke: #c8261e; stroke-width: 3; }
+  #isles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  #isles li button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: block; padding: 12px 14px; background: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--c); border-radius: 4px; }
+  #isles li button:hover, #isles li button:focus-visible { border-color: var(--gold); border-left-color: var(--c); outline: none; }
+  #isles .k { font: 700 11px var(--mono); letter-spacing: 3px; color: var(--c); }
+  #isles .t { font: 400 22px/1.1 var(--display); letter-spacing: 2px; text-transform: uppercase; margin: 3px 0 4px; color: var(--paper); }
+  #isles .m { font: 13px var(--mono); color: var(--dim); }
+  #isles .m b { color: var(--paper); font-weight: 700; }
+  #isles .deed { margin-top: 6px; font: 700 13px var(--mono); color: var(--gold); }
+  #isles .beyond { padding: 12px 14px; border: 1px dashed var(--rule); border-radius: 4px; color: var(--dim); font: 13px var(--mono); }
+  #namecard { margin-top: 24px; border-top: 1px solid var(--rule); padding-top: 16px; }
+  #namecard .n { font: 400 40px/0.95 var(--display); color: var(--gold); letter-spacing: 2px; }
+  #namecard .s { font: 15px/1.5 var(--mono); color: var(--paper); margin-top: 6px; }
+  /* credits & controls */
+  #info .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+  #info h3 { font: 700 13px var(--mono); letter-spacing: 4px; color: var(--gold); margin: 0 0 10px; }
+  #info table { border-collapse: collapse; width: 100%; font: 14px/1.4 var(--mono); }
+  #info td { padding: 6px 8px 6px 0; border-bottom: 1px solid #241c10; vertical-align: top; }
+  #info td:first-child { white-space: nowrap; color: var(--gold); font-weight: 700; padding-right: 16px; }
+  #info p { font: 14px/1.55 var(--mono); margin: 0 0 10px; color: var(--paper); }
+  #info a { color: var(--gold); }
+  @media (max-width: 860px) { #chart { grid-template-columns: 1fr; } #title { top: 8%; } }
+  @media (prefers-reduced-motion: reduce) { #title, #title .rule, #menu { transition: none; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
 </head>
 <body>
-<h1>Stack Visualizer</h1>
-<p id="message">Press Play to start</p>
+<div id="title" aria-hidden="false"><h1><span>The Odyssey</span><span>of Data</span></h1><div class="rule"></div><div class="sub">FOUR WORLDS. FOUR STRUCTURES. ONE WAY HOME.</div></div>
+<nav id="menu" aria-label="Main menu">
+  <button id="m-continue" hidden>Continue voyage <small></small></button>
+  <button id="m-begin">Begin voyage</button>
+  <button id="m-map">Chapter select</button>
+  <button id="m-info">Credits &amp; controls</button>
+</nav>
+<div id="hint">↑ ↓ · Enter</div>
 
-<div id="stack" class="stack"></div>
+<section class="sheet" id="map" role="dialog" aria-modal="true" aria-labelledby="map-h">
+  <div class="inner">
+    <header><h2 id="map-h">The Voyage</h2><button class="close" data-close>CLOSE · Esc</button></header>
+    <div id="chart">
+      <svg viewBox="0 0 1000 620" role="img" aria-label="A sea chart: Troy, then the four islands of the voyage, and the sea beyond"></svg>
+      <div><ul id="isles"></ul><div id="namecard"><div class="n">ODYSSEUS</div><div class="s"></div></div></div>
+    </div>
+  </div>
+</section>
 
-<div class="controls">
-    <button id="playBtn">▶ Play</button>
-    <button id="nextBtn">Next step</button>
-    <button id="resetBtn">Reset</button>
-</div>
+<section class="sheet" id="info" role="dialog" aria-modal="true" aria-labelledby="info-h">
+  <div class="inner">
+    <header><h2 id="info-h">Credits &amp; Controls</h2><button class="close" data-close>CLOSE · Esc</button></header>
+    <div class="cols">
+      <div>
+        <h3>CONTROLS</h3>
+        <table>
+          <tr><td>Space · →</td><td>next line / next step</td></tr>
+          <tr><td>←</td><td>step back</td></tr>
+          <tr><td>P</td><td>play the steps on their own</td></tr>
+          <tr><td>Esc</td><td>skip a film · FAST through a run</td></tr>
+          <tr><td>A</td><td>Athena's code guide on / off (Circe's lessons)</td></tr>
+          <tr><td>+ − · [ ]</td><td>Odysseus's pace (the Harbour)</td></tr>
+          <tr><td>M</td><td>sound on / off (the slider sets the volume)</td></tr>
+          <tr><td>Shift + F</td><td>frame-rate meter</td></tr>
+          <tr><td>Tab · Enter</td><td>every button works from the keyboard</td></tr>
+        </table>
+        <p style="margin-top:14px">Reduced motion is respected: with it on in your system settings, slides become fades and camera moves become cuts.</p>
+      </div>
+      <div>
+        <h3>CREDITS</h3>
+        <!-- TEAM: put the team's names in the next line -->
+        <p><b>The Odyssey of Data</b>: an OOP course mini-project, 2026.</p>
+        <p>After Homer's <i>Odyssey</i>. Every data structure runs as real C in our own interpreter, written in Java.</p>
+        <p><b>Built with</b> Java · Spring Boot · Three.js · the Web Audio API.</p>
+        <p><b>Polyphemus</b>: "Cyclops Rig" by DM-913 (<a href="https://sketchfab.com/3d-models/cyclops-rig-e5cc86878c314f5bae6d7268bb7541d9" target="_blank" rel="noopener">Sketchfab</a>), licensed <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>; textures resized, helper shapes removed.</p>
+        <p><b>Odysseus and the Laestrygonians</b>: animated with Mixamo characters and motion clips.</p>
+        <p><b>Fonts</b>: Anton and Courier Prime (Google Fonts, SIL Open Font License).</p>
+        <p>Everything else, from the sea to the sound, is made in code.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-<ol id="log"></ol>
+<script type="module">
+import * as THREE from "three";
+import { World } from "./js/engine/world.js";
+import { Sea } from "./js/engine/sea.js";
+import { buildTrireme } from "./js/islands/harbour/trireme.js";
+import { installUI } from "./js/ui/ui.js";
+import { CHAPTERS, BEYOND, status, anyProgress, continueTo, deeds } from "./js/ui/progress.js";
+import { voyageTo, arriving } from "./js/ui/voyage.js";
+import { DEEDS, TITLES } from "./js/story/tags.js";
 
-<script src="app.js"></script>
+const params = new URLSearchParams(location.search);
+// ---------- the shot: dusk at sea, a ship heading for a dark island with one light on it
+const world = new World({ quality: params.get("q") || "auto" });
+world.grade.uniforms.letterbox.value = 0;
+const ui = installUI({ chapter: "title", world, ambience: "title" });
+const scene = world.scene;
+scene.fog = new THREE.Fog(0x3a2a2c, 260, 1500);
+// the sky: deep navy above, amber at the horizon, where the sun has just gone
+const sky = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { top: { value: new THREE.Color(0x0a1426) }, mid: { value: new THREE.Color(0x3b2a3a) }, low: { value: new THREE.Color(0xd2793c) } },
+  vertexShader: "varying vec3 p; void main(){ p = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
+  fragmentShader: "uniform vec3 top, mid, low; varying vec3 p; void main(){ float y = p.y; float glow = pow(max(0.0, dot(normalize(vec3(p.x, 0.0, p.z)), vec3(0.38, 0.0, -0.92))), 6.0); vec3 c = mix(low, mid, smoothstep(0.0, 0.14, y)); c = mix(c, top, smoothstep(0.12, 0.6, y)); c += vec3(0.9, 0.45, 0.18) * glow * (1.0 - smoothstep(0.0, 0.18, y)) * 0.6; gl_FragColor = vec4(c, 1.0); }"
+}));
+scene.add(sky);
+scene.add(new THREE.HemisphereLight(0x6a6f8c, 0x1a1210, 0.9));
+const sun = new THREE.DirectionalLight(0xffa063, 1.6); sun.position.set(420, 60, -900); scene.add(sun);
+const sea = world.add(new Sea(world, { color: 0x0d1c26, sunDir: new THREE.Vector3(0.38, 0.08, -1), sunColor: 0xd98a4f, distortion: 2.2 }));
+// the island: a dark mass on the horizon, and one warm light
+const isle = new THREE.Group(); isle.position.set(330, 0, -1150); scene.add(isle);
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x16110f, roughness: 1, flatShading: true });
+[[0, 0, 150, 120], [140, 0, 110, 70], [-150, 0, 120, 60], [60, 0, 90, 150]].forEach(([x, z, r, h]) => {
+  const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7, 1), rockMat); m.position.set(x, h / 2 - 6, z); m.rotation.y = x * 0.01; isle.add(m);
+});
+const lamp = new THREE.Mesh(new THREE.SphereGeometry(2.2, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffc070, fog: false })); lamp.position.set(30, 44, 40); isle.add(lamp);
+const lampLight = new THREE.PointLight(0xffa050, 2, 400, 1.5); lampLight.position.copy(lamp.position); isle.add(lampLight);
+// the ship, small in the frame, sailing slowly toward it
+const ship = buildTrireme(); ship.scale.setScalar(0.55); scene.add(ship);
+ship.traverse(o => { if (o.isMesh) o.castShadow = false; });
+const shipStart = new THREE.Vector3(-6, 0, -62);
+ship.position.copy(shipStart);
+ship.rotation.y = Math.atan2(isle.position.x - shipStart.x, isle.position.z - shipStart.z) + Math.PI / 2;   // its bow (+x) toward the island
+const cam = world.camera; cam.fov = 38; cam.updateProjectionMatrix();
+const eye0 = new THREE.Vector3(-14, 7.5, 32), look = new THREE.Vector3(30, 9, -400);
+cam.position.copy(eye0); cam.lookAt(look);
+const dir = new THREE.Vector3().subVectors(isle.position, shipStart).setY(0).normalize();
+world.add({ update(dt, t) {
+  const s = Math.min(t * 0.9, 60);                                        // the ship makes its slow way out
+  ship.position.copy(shipStart).addScaledVector(dir, s);
+  ship.position.y = Math.sin(t * 0.9) * 0.22;
+  ship.rotation.z = Math.sin(t * 0.7) * 0.025; ship.rotation.x = Math.sin(t * 0.55 + 1) * 0.015;
+  cam.position.set(eye0.x + Math.sin(t * 0.05) * 1.2, eye0.y + Math.sin(t * 0.13) * 0.15, eye0.z); cam.lookAt(look);   // the camera barely breathes
+  lampLight.intensity = 1.8 + Math.sin(t * 2.3) * 0.15 + Math.sin(t * 7.1) * 0.08;
+} });
+
+// ---------- the menu, from the saved progress (nothing here unlocks anything)
+const $ = s => document.querySelector(s);
+const cont = $("#m-continue");
+if (anyProgress()) { const c = continueTo(); cont.hidden = false; cont.querySelector("small").textContent = `CHAPTER ${c.word} · ${c.title.toUpperCase()}`; cont.onclick = () => voyageTo(c); }
+$("#m-begin").onclick = () => voyageTo(CHAPTERS[0]);
+$("#m-map").onclick = () => openSheet("map");
+$("#m-info").onclick = () => openSheet("info");
+const items = () => [...document.querySelectorAll("#menu button:not([hidden])")];
+addEventListener("keydown", e => {
+  if (document.querySelector(".sheet.on")) { if (e.key === "Escape") closeSheet(); return; }
+  const list = items(), i = list.indexOf(document.activeElement);
+  if (e.key === "ArrowDown") { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+});
+// the voyage bar's VOYAGE button opens the map here, without leaving the page
+document.querySelector("#odx-bar .map").onclick = () => openSheet("map");
+
+// ---------- the sheets
+let lastFocus = null;
+function openSheet(id) {
+  lastFocus = document.activeElement;
+  document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on"));
+  if (id === "map") drawMap();
+  const el = document.getElementById(id); el.classList.add("on");
+  (el.querySelector("#isles button") || el.querySelector(".close")).focus();
+}
+function closeSheet() { document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on")); if (location.hash) history.replaceState(null, "", location.pathname + location.search); (lastFocus || items()[0]).focus(); }
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheet);
+
+// ---------- the voyage map: a navigator's chart, each island in its own colours
+const SPOTS = { troy: [905, 92], harbour: [720, 190], cave: [560, 372], circe: [355, 205], underworld: [235, 425] };
+function drawMap() {
+  const svg = $("#chart svg"), ink = "#2a2016";
+  const isle = (c, [x, y]) => {
+    const st = status(c), pct = st.done / c.total;
+    const art = {
+      harbour: `<path d="M-46 18 Q-50 -36 0 -40 Q50 -36 46 18" fill="#6e7378" stroke="${ink}" stroke-width="2"/><path d="M-30 14 h60" stroke="#b98a3e" stroke-width="4" stroke-dasharray="6 3"/>`,
+      cave: `<path d="M-50 26 L-8 -40 L14 -12 L26 -28 L54 26 Z" fill="#3a2a22" stroke="${ink}" stroke-width="2"/><circle cx="2" cy="4" r="7" fill="#e0782a"/><circle cx="2" cy="4" r="2.4" fill="#141008"/>`,
+      circe: `<circle r="34" fill="#f2c230" stroke="${ink}" stroke-width="2"/><circle r="22" fill="none" stroke="#1d3fd1" stroke-width="5"/><circle r="6" fill="#1d3fd1"/>`,
+      underworld: `<circle r="34" fill="#141008" stroke="${ink}" stroke-width="2"/><text y="9" text-anchor="middle" font-family="Anton, Impact" font-size="28" fill="#d7261e">7</text>`
+    }[c.id];
+    return `<g class="isle" tabindex="0" role="link" aria-label="Chapter ${c.n}: ${c.title}, ${st.done} of ${c.total} trials${st.finished ? ", finished" : ""}" data-id="${c.id}" transform="translate(${x} ${y})">
+      <circle class="ring" r="52" fill="none" stroke="${ink}" stroke-width="1.5" stroke-dasharray="${(2 * Math.PI * 52 * pct).toFixed(1)} 999" transform="rotate(-90)"/>
+      ${art}
+      <text y="76" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="13" letter-spacing="2" fill="${ink}">${c.word} · ${c.ds.toUpperCase()}</text>
+      <text y="96" text-anchor="middle" font-family="Anton, Impact" font-size="19" letter-spacing="1" fill="${ink}">${c.title.toUpperCase()}</text>
+      ${st.finished ? `<text y="-62" text-anchor="middle" font-family="Anton, Impact" font-size="15" fill="#c8261e" letter-spacing="2">✓ DONE</text>` : ""}
+    </g>`;
+  };
+  const p = [SPOTS.troy, SPOTS.harbour, SPOTS.cave, SPOTS.circe, SPOTS.underworld];
+  const route = "M" + p.map(([x, y]) => `${x} ${y}`).join(" L");
+  svg.innerHTML = `
+    <defs><filter id="paper"><feTurbulence baseFrequency="0.9" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 0.45  0 0 0 0 0.33  0 0 0 0 0.2  0 0 0 0.09 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+      <linearGradient id="fog" x1="1" x2="0"><stop offset="0" stop-color="#efe3c6" stop-opacity="0"/><stop offset="1" stop-color="#efe3c6" stop-opacity="0.95"/></linearGradient></defs>
+    <rect width="1000" height="620" fill="#efe3c6"/><rect width="1000" height="620" filter="url(#paper)"/>
+    <g stroke="#b9a782" stroke-width="1" fill="none" opacity=".7">${Array.from({ length: 9 }, (_, i) => `<path d="M0 ${70 * i + 20} Q 500 ${70 * i + (i % 2 ? 40 : 0)} 1000 ${70 * i + 20}"/>`).join("")}</g>
+    <path d="M1000 0 L1000 170 Q 960 150 930 120 Q 900 60 940 0 Z" fill="#d9c9a4" stroke="#2a2016" stroke-width="1.5"/>
+    <text x="905" y="58" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="13" letter-spacing="3" fill="#2a2016">TROY</text>
+    <path d="${route}" fill="none" stroke="#2a2016" stroke-width="2" stroke-dasharray="7 7"/>
+    <path d="M${SPOTS.underworld[0]} ${SPOTS.underworld[1]} Q 150 520 70 560" fill="none" stroke="#2a2016" stroke-width="2" stroke-dasharray="7 7" opacity=".4"/>
+    <rect x="0" y="440" width="240" height="180" fill="url(#fog)"/>
+    ${BEYOND.map((name, i) => `<g opacity=".55" transform="translate(${130 - i * 45} ${505 + i * 30})"><circle r="9" fill="none" stroke="#2a2016" stroke-dasharray="3 3"/></g>`).join("")}
+    <text x="40" y="604" font-family="Courier Prime, monospace" font-weight="700" font-size="12" letter-spacing="3" fill="#2a2016" opacity=".7">BEYOND THE VOYAGE</text>
+    ${CHAPTERS.map(c => isle(c, SPOTS[c.id])).join("")}
+    <g transform="translate(940 560)" stroke="#2a2016" fill="none"><circle r="26"/><path d="M0 -34 L6 0 L0 34 L-6 0 Z" fill="#2a2016"/><text y="-40" text-anchor="middle" font-family="Courier Prime" font-size="12" fill="#2a2016" stroke="none">N</text></g>`;
+  svg.querySelectorAll(".isle").forEach(g => {
+    const go = () => voyageTo(g.dataset.id);
+    g.onclick = go; g.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  });
+  // the same islands as a list (readable, keyboard-first), each in its own colour
+  const ul = $("#isles"); ul.innerHTML = "";
+  for (const c of CHAPTERS) {
+    const st = status(c), li = document.createElement("li"), b = document.createElement("button");
+    b.style.setProperty("--c", c.id === "circe" ? "#8fa6ff" : c.accent);
+    b.innerHTML = `<div class="k">CHAPTER ${c.word} · ${c.ds.toUpperCase()}</div><div class="t"></div><div class="m"><b>${st.done} / ${c.total}</b> trials${st.finished ? " · <b>finished</b>" : st.started ? "" : " · not yet visited"}</div>` + (st.finished ? `<div class="deed"></div>` : "");
+    b.querySelector(".t").textContent = c.title;
+    if (st.finished) b.querySelector(".deed").textContent = DEEDS[c.tag];
+    b.onclick = () => voyageTo(c);
+    li.appendChild(b); ul.appendChild(li);
+  }
+  const li = document.createElement("li"); li.innerHTML = `<div class="beyond">Beyond the Underworld: ${BEYOND.join(" · ")}. Not on this voyage.</div>`; ul.appendChild(li);
+  $("#namecard .s").innerHTML = [TITLES.join(" "), ...deeds()].map(t => t.replace(/</g, "&lt;")).join("<br>");
+}
+
+// ---------- start: the sea first, then the title arrives, then the menu
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const arrived = arriving();
+if (params.get("capture")) {
+  window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  world.step(1 / 30);
+} else world.start();
+setTimeout(() => $("#title").classList.add("on"), reduced || arrived ? 0 : 1800);
+setTimeout(() => { $("#menu").classList.add("on"); items()[0].focus({ preventScroll: true }); }, reduced || arrived ? 200 : 3000);
+if (location.hash === "#map" || arrived === "map") openSheet("map");
+window.__ready = true; window.__world = world;
+</script>
 </body>
 </html>

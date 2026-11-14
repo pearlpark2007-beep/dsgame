@@ -329,13 +329,13 @@ export class TrialMode {
         if (st.action === "PUSH") {
           await this.obtain(st.value);
           await this.goTo(pile);
-          trial.pushed(pile, await hero.place(trial.slot(pile, st.index), 0));
+          trial.pushed(pile, await hero.place(trial.slot(pile, st.index), 0)); sound.op("thump");
           this.moves(++moves);
         } else if (st.action === "POP") {
           await this.freeHands();
           await this.goTo(pile);
           const c = trial.top(pile);
-          await hero.lift(c);
+          await hero.lift(c); sound.op("creak");
           trial.popped(pile);
           this.moves(++moves);
           // does the very next stack step push this same value? then he keeps it in his hands

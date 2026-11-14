@@ -14,11 +14,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1280, 720) },
-    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }, keepBlue: { value: 0 }, burn: { value: 1 }, halo: { value: 1 }, focusOn: { value: 0 }, focusAt: { value: new THREE.Vector2(0.5, 0.5) }
+    grain: { value: 0.075 }, flash: { value: 0 }, letterbox: { value: 1 }, strength: { value: 1 }, freeze: { value: 0 }, keepBlue: { value: 0 }, burn: { value: 1 }, mono: { value: 0 }, halo: { value: 1 }, print: { value: 1 }, sat: { value: 1 }, lift: { value: new THREE.Vector3(0, 0, 0) }, gain: { value: new THREE.Vector3(1, 1, 1) }, focusOn: { value: 0 }, focusAt: { value: new THREE.Vector2(0.5, 0.5) }
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze, keepBlue, burn, halo, focusOn; uniform vec2 focusAt;
+    uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, grain, flash, letterbox, strength, freeze, keepBlue, burn, mono, halo, focusOn, print, sat; uniform vec2 focusAt; uniform vec3 lift, gain;
     varying vec2 vUv;
     float rand(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
     float luma(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
@@ -32,6 +32,7 @@ const GradeShader = {
       for (int i = 0; i < 8; i++) { float a = float(i) * 0.785; h += max(texture2D(tDiffuse, uv + vec2(cos(a), sin(a)) * 5.0 / res).rgb - 0.75, 0.0); }
       c += h / 8.0 * vec3(1.0, 0.32, 0.12) * 1.4 * halo;
       float l = luma(c);
+      vec3 pre = c;
       // the print: blues die, reds and yellows stay, mids lean magenta, blacks lift to brown
       c.b = mix(c.b, l * 0.82, 0.35 * (1.0 - keepBlue));      // (a scene can keep its blues: the cave does)
       c.g = mix(c.g, l, 0.12);
@@ -41,7 +42,15 @@ const GradeShader = {
       c *= mix(vec3(1.0), vec3(1.08, 1.0, 0.8), smoothstep(0.3, 0.9, l));               // golden, sodium-lamp highlights
       c = c * vec3(0.94, 0.91, 0.87) + vec3(0.045, 0.03, 0.025);                           // lifted, faded blacks
       c = mix(c, vec3(1.0, 0.93, 0.8), smoothstep(0.75, 1.15, l) * 0.35);                  // creamy highlights
+      // each chapter's profile (js/ui/grades.js): how much of the print tint, saturation, a shadow tint, a highlight tint
+      c = mix(smoothstep(vec3(0.02), vec3(0.95), pre), c, print);
+      c = mix(vec3(luma(c)), c, sat);
+      c += lift * (1.0 - smoothstep(0.0, 0.6, luma(c)));
+      c *= mix(vec3(1.0), gain, smoothstep(0.35, 0.95, luma(c)));
       c = mix(src, c, strength);
+      // black and white, blood excepted (the Underworld: Kill Bill's House of Blue Leaves): only reds keep their colour
+      float red = smoothstep(0.12, 0.35, c.r - max(c.g, c.b));
+      c = mix(c, vec3(luma(c)) * vec3(0.96, 0.98, 1.02), mono * (1.0 - red));
       c *= 1.0 + (rand(vec2(frame, 7.0)) - 0.5) * 0.045 * strength;                          // projector flicker
       vec2 g = floor(vUv * res / 1.5);                                                      // chunky film grain
       c += (rand(g + frame * 1.37) - 0.5) * grain * (1.15 - l * 0.7) * strength;
@@ -144,7 +153,7 @@ export class World {
   applyQuality() {
     const high = this.quality === "high";
     this.renderer.setPixelRatio(high ? Math.min(devicePixelRatio, 1.75) : 1);
-    this.bloom.enabled = high;
+    this.bloom.enabled = high && !this.noBloom;          // a page can turn the glow off for good (Circe: clarity first)
     this.resize();
     this.updaters.forEach(u => u.onQuality && u.onQuality(this.quality));
   }
@@ -163,7 +172,7 @@ export class World {
   setComic(k) {
     this.comicPass.uniforms.amount.value = k;
     this.comicPass.enabled = k > 0;
-    this.grade.uniforms.grain.value = 0.075 * (1 - k * 0.6);
+    this.grade.uniforms.grain.value = (this.gradeGrain ?? 0.075) * (1 - k * 0.6);   // from the chapter grade (js/ui/grades.js), if one is set
   }
 
   // Anything with update(dt, time) gets called every frame.

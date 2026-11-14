@@ -4,6 +4,7 @@
 // This file acts those steps out on the pens, one by one, with a camera that stays on the pens being
 // used. The browser never decides if the code is right: Java does.
 // Each trial opens on a black hour card (NOON ... DAWN): the cave chapter runs on a clock.
+import { sound } from "../../engine/sound.js";
 import * as THREE from "three";
 import { TRIAL_CSS } from "../../learn/trialPanelCss.js";
 import { ArrayBoard } from "../../learn/arrayBoard.js";
@@ -416,7 +417,7 @@ export class CaveTrials {
     if (st.action === "READ" || st.action === "JUNK") {
       this.focusI = idx;
       if (st.action === "JUNK") { P.junk = true; world.timeScale = P.speed; }
-      await pens.read(idx);
+      sound.op("tick"); await pens.read(idx);
       P.lastRead = idx;
       this.moves(++P.looked);
     } else if (st.action === "WRITE") {
@@ -425,6 +426,7 @@ export class CaveTrials {
       // otherwise (a value held in a variable, or a new lamb) a sheep walks in from the front
       let from = -1;
       if (P.lastRead >= 0 && P.lastRead !== idx && pens.values[P.lastRead] === st.value && (pens.sheep[P.lastRead] || pens.junk[P.lastRead])) from = P.lastRead;
+      sound.op("thump");
       if (from >= 0) await pens.copy(from, idx); else await pens.write(idx, st.value);
       P.lastRead = -1;
     } else if (st.action === "LENGTH") {

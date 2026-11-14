@@ -58,8 +58,10 @@ export class Director {
     const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3());
     const f = m.dir.clone().negate(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, f);
     // the part of the screen not covered by a side panel (the picture's centre is already shifted into it)
-    const v = this.cam.view, visible = v && v.enabled ? Math.max(0.4, 1 - 2 * v.offsetX / v.fullWidth) : 1;
-    const visV = v && v.enabled ? Math.max(0.4, 1 - 2 * v.offsetY / v.fullHeight) : 1;      // a board docked at the bottom
+    const v = this.cam.view, ins = this.insets;
+    // the part of the stage nothing covers: a page can say exactly (insets: a side panel, a board below, a strip on top)
+    const visible = ins ? Math.max(0.4, 1 - (ins.left + ins.right) / innerWidth) : v && v.enabled ? Math.max(0.4, 1 - 2 * v.offsetX / v.fullWidth) : 1;
+    const visV = ins ? Math.max(0.4, 1 - (ins.top + ins.bottom) / innerHeight) : v && v.enabled ? Math.max(0.4, 1 - 2 * v.offsetY / v.fullHeight) : 1;      // a board docked at the bottom
     const tv = Math.tan(THREE.MathUtils.degToRad(this.cam.fov) / 2) * visV, th = Math.tan(THREE.MathUtils.degToRad(this.cam.fov) / 2) * this.cam.aspect * visible;
     let d = m.minDist;
     for (const p of pts) {

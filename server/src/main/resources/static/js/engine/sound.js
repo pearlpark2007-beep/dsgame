@@ -12,6 +12,87 @@ export class Sound {
       return this._ctx;
     } catch { return null; }
   }
+  // ---------- one volume and one mute for the whole game (the shared sound control sets these)
+  setVolume(v) { this.volume = Math.max(0, Math.min(1, v)); if (this._out && this._ctx) this._out.gain.setTargetAtTime(this.volume, this._ctx.currentTime, 0.05); }
+  setMuted(m) {
+    this.muted = !!m;
+    if (this.muted) { this.sea(false); this._stopAmb(); }
+    else if (this._ambKind) this.ambience(this._ambKind);
+  }
+  // ---------- one small sound for one data-structure operation (never more than one every 120 ms, so a
+  // fast-forwarded run doesn't turn into noise). kind: thump (a crate set down, a value written),
+  // creak (a crate lifted), tick (a value read, a pointer moved), ticket (a ticket printed: enqueue),
+  // bell (the counter bell: dequeue), buzz (full / empty: refused)
+  op(kind) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const now = performance.now(); if (now - (this._opAt || 0) < 120) return; this._opAt = now;
+    const t = A.currentTime, out = this._out;
+    const tone = (type, f0, f1, level, dur, at = 0) => { const o = A.createOscillator(), g = A.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t + at); o.frequency.exponentialRampToValueAtTime(f1, t + at + dur); this._env(g, t + at, level, 0.004, dur); o.connect(g).connect(out); o.start(t + at); o.stop(t + at + dur + 0.05); };
+    const hiss = (type, freq, q, level, dur) => { const n = this._noise(dur + 0.05), f = A.createBiquadFilter(), g = A.createGain(); f.type = type; f.frequency.value = freq; f.Q.value = q; this._env(g, t, level, 0.004, dur); n.connect(f).connect(g).connect(out); n.start(t); };
+    if (kind === "thump") { tone("sine", 120, 60, 0.28, 0.18); hiss("lowpass", 700, 0.7, 0.08, 0.08); }
+    else if (kind === "creak") { hiss("bandpass", 650, 8, 0.12, 0.22); }
+    else if (kind === "tick") { tone("sine", 1300, 700, 0.09, 0.05); }
+    else if (kind === "ticket") { tone("square", 1800, 1600, 0.035, 0.03); tone("square", 1800, 1600, 0.035, 0.03, 0.06); }
+    else if (kind === "bell") { tone("triangle", 1568, 1560, 0.12, 0.9); tone("sine", 3136, 3120, 0.04, 0.5); }
+    else if (kind === "buzz") { tone("sawtooth", 110, 104, 0.08, 0.35); }
+  }
+  // ---------- each place's ambience: quiet, looping, made from filtered noise and tones; one at a time.
+  // kind: "title" (sea and wind) | "harbour" (rain and gusts) | "cave" (fire, drips, a low rumble) |
+  //       "underworld" (the fluorescent hum, the odd ticket click) | null (stop)
+  ambience(kind) {
+    this._ambKind = kind || null;
+    this._stopAmb();
+    if (!kind || this.muted) return;
+    if (kind === "circe") { this.sea(true); this._amb = { sea: true }; return; }   // Aeaea: the sea (its own other sounds play on events)
+    const A = this.ctx; if (!A) return;
+    const bus = A.createGain(); bus.gain.value = 0.0001; bus.connect(this._out);
+    bus.gain.exponentialRampToValueAtTime(1, A.currentTime + 2.5);
+    const nodes = [], timers = [];
+    const loopNoise = (type, freq, q, level) => {
+      const n = this._noise(4); n.loop = true;
+      const f = A.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
+      const g = A.createGain(); g.gain.value = level;
+      n.connect(f).connect(g).connect(bus); n.start(); nodes.push(n);
+      return { f, g };
+    };
+    const swell = (param, depth, rate) => { const l = A.createOscillator(), lg = A.createGain(); l.frequency.value = rate; lg.gain.value = depth; l.connect(lg).connect(param); l.start(); nodes.push(l); };
+    const every = (ms, jitter, fn) => { const tick = () => { if (!this.muted) fn(); timers.push(setTimeout(tick, ms + Math.random() * jitter)); }; timers.push(setTimeout(tick, ms * Math.random())); };
+    const blip = (freq, to, level, dur, type = "sine") => {
+      const t = A.currentTime, o = A.createOscillator(), g = A.createGain(); o.type = type;
+      o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(to, t + dur);
+      this._env(g, t, level, 0.003, dur); o.connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.05);
+    };
+    if (kind === "title" || kind === "harbour") {
+      const sea = loopNoise("lowpass", 480, 0, kind === "title" ? 0.05 : 0.035); swell(sea.g.gain, 0.025, 0.09);   // the sea, breathing
+      const wind = loopNoise("bandpass", 700, 0.6, 0.018); swell(wind.f.frequency, 260, 0.05);                      // wind, rising and falling
+    }
+    if (kind === "harbour") {
+      loopNoise("highpass", 3200, 0, 0.03);                                                                           // rain
+      every(14000, 16000, () => this.boom({ freq: 46, to: 26, seconds: 2.2, level: 0.18 }));                         // distant thunder
+    }
+    if (kind === "cave") {
+      const fire = loopNoise("bandpass", 260, 0.8, 0.03); swell(fire.g.gain, 0.012, 0.7);                             // the hearth's roar
+      every(180, 420, () => { if (Math.random() < 0.55) blip(2200 + Math.random() * 1800, 900, 0.02, 0.025, "square"); });   // crackles
+      every(2600, 3400, () => blip(1500 + Math.random() * 500, 700, 0.05, 0.14));                                     // water dripping into the pool
+      const low = A.createOscillator(), lg = A.createGain(); low.frequency.value = 38; lg.gain.value = 0.025; low.connect(lg).connect(bus); low.start(); nodes.push(low);   // the rock itself
+    }
+    if (kind === "underworld") {
+      [[50, 0.02], [100, 0.012], [150, 0.006], [300, 0.003]].forEach(([fq, lv]) => { const o = A.createOscillator(), g = A.createGain(); o.type = "sawtooth"; o.frequency.value = fq; g.gain.value = lv; o.connect(g).connect(bus); o.start(); nodes.push(o); });   // the tubes' hum
+      loopNoise("lowpass", 900, 0, 0.008);                                                                            // the room
+      every(7000, 9000, () => blip(1800, 1400, 0.03, 0.04, "square"));                                                // somewhere, a ticket machine
+    }
+    this._amb = { bus, nodes, timers };
+    if (!this._ambHooked) { this._ambHooked = true; addEventListener("pagehide", () => this._stopAmb(0)); }
+  }
+  _stopAmb(fade = 0.8) {
+    const a = this._amb; if (!a) return; this._amb = null;
+    if (a.sea) { this.sea(false); return; }
+    a.timers.forEach(clearTimeout);
+    const A = this._ctx; if (!A) return;
+    const t = A.currentTime;
+    a.bus.gain.cancelScheduledValues(t); a.bus.gain.setValueAtTime(Math.max(a.bus.gain.value, 0.0001), t); a.bus.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.02, fade));
+    a.nodes.forEach(n => { try { n.stop(t + fade + 0.05); } catch { /* already stopped */ } });
+  }
   _noise(seconds) {
     const A = this.ctx, b = A.createBuffer(1, Math.ceil(A.sampleRate * seconds), A.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -110,6 +191,61 @@ export class Sound {
     const os = [55, 55.35, 82.4].map(fr => { const o = A.createOscillator(); o.type = "sawtooth"; o.frequency.value = fr; o.connect(f); o.start(t); return o; });
     f.connect(g).connect(this._out);
     return (fade = 1.2) => { const e = A.currentTime; g.gain.cancelScheduledValues(e); g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), e); g.gain.exponentialRampToValueAtTime(0.0001, e + fade); os.forEach(o => o.stop(e + fade + 0.1)); };
+  }
+  // ---------- Aeaea's small sounds (all made here, no files)
+  // the sea: slow swells of filtered noise, very quiet. sea(true) starts it, sea(false) fades it out
+  sea(on, { level = 0.05 } = {}) {
+    const A = this.ctx; if (!A) return;
+    if (!on) { if (this._sea) { const e = A.currentTime, g = this._sea.g; g.gain.cancelScheduledValues(e); g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), e); g.gain.exponentialRampToValueAtTime(0.0001, e + 1.5); this._sea.n.stop(e + 1.6); this._sea.l.stop(e + 1.6); this._sea = null; } return; }
+    if (this._sea || this.muted) return;
+    const n = this._noise(4); n.loop = true;
+    const f = A.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 520;
+    const g = A.createGain(); g.gain.value = 0.0001; g.gain.exponentialRampToValueAtTime(level, A.currentTime + 3);
+    const l = A.createOscillator(), lg = A.createGain(); l.frequency.value = 0.11; lg.gain.value = level * 0.6; l.connect(lg).connect(g.gain);   // the swell
+    n.connect(f).connect(g).connect(this._out); n.start(); l.start();
+    this._sea = { n, l, g };
+  }
+  // the loudspeaker: a two-note chime, then a short crackle
+  chime({ level = 0.18 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime;
+    [[784, 0], [587, 0.22]].forEach(([fr, at]) => { const o = A.createOscillator(), g = A.createGain(); o.type = "triangle"; o.frequency.value = fr; this._env(g, t + at, level, 0.01, 0.5); o.connect(g).connect(this._out); o.start(t + at); o.stop(t + at + 0.6); });
+    const n = this._noise(0.25), f = A.createBiquadFilter(), g = A.createGain(); f.type = "bandpass"; f.frequency.value = 2400; f.Q.value = 0.8;
+    this._env(g, t + 0.75, level * 0.35, 0.005, 0.2); n.connect(f).connect(g).connect(this._out); n.start(t + 0.75);
+  }
+  // a rope pulled tight: a short creak, noise through a falling resonance
+  rope({ level = 0.22 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime, n = this._noise(0.3), f = A.createBiquadFilter(), g = A.createGain();
+    f.type = "bandpass"; f.Q.value = 9; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(320, t + 0.25);
+    this._env(g, t, level, 0.01, 0.24); n.connect(f).connect(g).connect(this._out); n.start(t);
+  }
+  // a soft wooden tick: a pointer moves on
+  tick({ level = 0.12 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime, o = A.createOscillator(), g = A.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(1300, t); o.frequency.exponentialRampToValueAtTime(700, t + 0.05);
+    this._env(g, t, level, 0.002, 0.06); o.connect(g).connect(this._out); o.start(t); o.stop(t + 0.1);
+  }
+  // a warm chord. notes: how many voices (one is added per man in the finale); up = rising (success) or one low note (failure)
+  chord({ notes = 3, up = true, level = 0.12, seconds = 1.6 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime, scale = [220, 277.2, 329.6, 440, 554.4, 659.3, 880];
+    const fr = up ? scale.slice(0, Math.max(1, Math.min(notes, scale.length))) : [110];
+    fr.forEach((f0, i) => { const o = A.createOscillator(), g = A.createGain(); o.type = "triangle"; o.frequency.value = f0; this._env(g, t + i * 0.04, level / Math.sqrt(fr.length), 0.08, seconds); o.connect(g).connect(this._out); o.start(t + i * 0.04); o.stop(t + seconds + 0.3); });
+  }
+  // a low drone that rises one step each time step() is called (the banquet's rope turning); stop() fades it
+  riser({ level = 0.07 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return { step() {}, stop() {} };
+    const g = A.createGain(), f = A.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 500;
+    g.gain.setValueAtTime(0.0001, A.currentTime); g.gain.exponentialRampToValueAtTime(level, A.currentTime + 1.5);
+    const os = [0, 7].map(semi => { const o = A.createOscillator(); o.type = "sawtooth"; o.frequency.value = 55 * Math.pow(2, semi / 12); o.connect(f); o.start(); return o; });
+    f.connect(g).connect(this._out);
+    let n = 0;
+    return {
+      step: () => { n++; const e = A.currentTime; os.forEach((o, i) => o.frequency.setTargetAtTime(55 * Math.pow(2, (n * 2 + i * 7) / 12), e, 0.15)); },
+      stop: (fade = 0.4) => { const e = A.currentTime; g.gain.cancelScheduledValues(e); g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), e); g.gain.exponentialRampToValueAtTime(0.0001, e + fade); os.forEach(o => o.stop(e + fade + 0.1)); }
+    };
   }
   whistle({ level = 0.1 } = {}) {
     const A = this.ctx; if (!A || this.muted) return;

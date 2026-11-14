@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { GATE, PIT } from "./sty.js";
 import { HEAD_COLOR } from "../../learn/listBoard.js";
 import { drawCirce, SIL_W, SIL_H } from "./circeSilhouette.js";
+import { buildRuins } from "./ruins.js";
 
 const DISPLAY = "Anton, Impact, 'Arial Narrow', sans-serif", MONO = "'Courier Prime', 'Courier New', monospace";
 export const COBALT = 0x1d3fd1, GOLD = 0xffd21a, BLOOD = 0xd7261e;
@@ -29,7 +30,7 @@ function labelSprite(draw, w, h, scale) {
 const rnd = (() => { let s = 11; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
 
 // the plaza: x -16..26, z -9..9
-const PX0 = -16, PX1 = 26, PZ0 = -9, PZ1 = 9;
+const PX0 = -16, PX1 = 32, PZ0 = -9, PZ1 = 9;
 const SUN_C = [-1.5, 0.9];            // the inlaid sun sits under the middle of the sty
 
 function plazaTexture() {
@@ -111,12 +112,17 @@ const bannerTex = () => canvasTexture(256, 640, (g, w, h) => {
 });
 
 // the ration board by the gate: yellow, black stencil, a list of men
-const rationTex = () => canvasTexture(1024, 600, (g, w, h) => {
+const RATION = {
+  noon: ["MEN RECEIVED ....... 23", "WALKED AWAY ........  1", "PIGS ON THE ROPE ... 22", "ESCAPES ............  0"],
+  banquet: ["BANQUET GUESTS .....  7", "OF THE CREW ........  5", "OF THE HOUSE .......  2", "WINE ............. YES"],
+  free: ["MEN RECEIVED ....... 23", "WALKED AWAY ........ 22", "PIGS ON THE ROPE ...  0", "ESCAPES ............ 22"]
+};
+const rationTex = (mode = "noon") => canvasTexture(1024, 600, (g, w, h) => {
   g.fillStyle = "#ffd21a"; g.fillRect(0, 0, w, h);
   g.fillStyle = "#141008"; g.fillRect(0, 0, w, 120); g.fillRect(0, h - 18, w, 18);
   g.fillStyle = "#ffd21a"; g.font = `86px ${DISPLAY}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("RATION BOARD", w / 2, 64);
   g.fillStyle = "#141008"; g.font = `bold 46px ${MONO}`; g.textAlign = "left";
-  ["MEN RECEIVED ....... 23", "WALKED AWAY ........  1", "PIGS ON THE ROPE ... 22", "ESCAPES ............  0"].forEach((t, i) => g.fillText(t, 50, 190 + i * 74));
+  RATION[mode].forEach((t, i) => g.fillText(t, 50, 190 + i * 74));
   g.fillStyle = "#c8261e"; g.font = `44px ${DISPLAY}`; g.textAlign = "center"; g.fillText("BY ORDER OF THE DAUGHTER OF THE SUN", w / 2, h - 66, w - 40);
 });
 
@@ -185,7 +191,7 @@ export function buildIsland(world) {
   const skyCanvas = document.createElement("canvas"); skyCanvas.width = 16; skyCanvas.height = 512;
   paintSky(0)(skyCanvas.getContext("2d"), 16, 512);
   scene.background = new THREE.CanvasTexture(skyCanvas); scene.background.colorSpace = THREE.SRGBColorSpace;
-  scene.fog = new THREE.Fog(0xffe8a8, 40, 110);
+  scene.fog = new THREE.Fog(0xffe8a8, 90, 220);     // clear noon air: haze only at the far horizon
 
   // ground: dry yellow grass/sand, and the marble plaza on it
   const sand = sandTexture(); sand.wrapS = sand.wrapT = THREE.RepeatWrapping; sand.repeat.set(10, 10);
@@ -304,6 +310,8 @@ export function buildIsland(world) {
   // the ration board on legs, left of the gate
   const board = new THREE.Group(); board.position.set(PX0 - 4.5, 0, -3.5); board.rotation.y = 0.55;
   const face = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 3.05), new THREE.MeshStandardMaterial({ map: rationTex(), roughness: 0.8 })); face.position.y = 3.2; board.add(face);
+  let rationMode = "noon";
+  const setRation = mode => { if (mode === rationMode || !RATION[mode]) return; rationMode = mode; face.material.map.dispose(); face.material.map = rationTex(mode); face.material.needsUpdate = true; };
   for (const x of [-2.1, 2.1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.6, 0.16), iron); leg.position.set(x, 1.8, -0.1); board.add(leg); }
   scene.add(board);
 
@@ -367,11 +375,43 @@ export function buildIsland(world) {
     machine.position.y = machineY - 9 * k * k;
   }
 
+  // ---------- the banquet table at the foot of the steps (only laid for the banquet): marble, cream cloth, gold
+  const feast = new THREE.Group(); feast.position.set(2, 0, -6.2); feast.visible = false; scene.add(feast);
+  {
+    const gold = new THREE.MeshStandardMaterial({ color: 0xf2c230, metalness: 0.65, roughness: 0.32 });
+    const cloth = new THREE.MeshStandardMaterial({ color: 0xf4ead2, roughness: 0.9 });
+    const wine = new THREE.MeshStandardMaterial({ color: 0x5a0e14, roughness: 0.3 });
+    const grape = new THREE.MeshStandardMaterial({ color: 0x3a1a4a, roughness: 0.5 });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(13, 0.2, 1.7), marble); top.position.y = 1.05; top.castShadow = top.receiveShadow = true; feast.add(top);
+    const runner = new THREE.Mesh(new THREE.BoxGeometry(13.2, 0.04, 0.9), cloth); runner.position.y = 1.17; feast.add(runner);
+    for (const x of [-5.6, -1.9, 1.9, 5.6]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.95, 1.1), shade); leg.position.set(x, 0.48, 0); leg.castShadow = true; feast.add(leg); }
+    for (let i = 0; i < 7; i++) {                                  // seven places: five for the crew, two for the house
+      const x = -5.4 + i * 1.8;
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.26, 0.04, 20), gold); plate.position.set(x, 1.21, 0.42); feast.add(plate);
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.07, 0.3, 12), gold); cup.position.set(x + 0.42, 1.34, 0.3); cup.castShadow = true; feast.add(cup);
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.02, 12), wine); w.position.set(x + 0.42, 1.47, 0.3); feast.add(w);
+    }
+    for (const x of [-3.6, 0, 3.6]) {                              // bowls of grapes and a tall jug between the places
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), gold); bowl.position.set(x, 1.52, -0.25); feast.add(bowl);
+      for (let k = 0; k < 9; k++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), grape); b.position.set(x + Math.cos(k * 2.4) * 0.17 * (k % 3 ? 1 : 0.4), 1.55 + (k % 3) * 0.05, -0.25 + Math.sin(k * 2.4) * 0.17 * (k % 3 ? 1 : 0.4)); feast.add(b); }
+      const jug = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.16, 0.02], [0.2, 0.25], [0.12, 0.5], [0.09, 0.62], [0.12, 0.66]].map(([r, y]) => new THREE.Vector2(r, y)), 16), gold);
+      jug.position.set(x + 0.9, 1.19, -0.35); jug.castShadow = true; feast.add(jug);
+    }
+  }
+  const banquet = on => { feast.visible = !!on; setRation(on ? "banquet" : "noon"); };
+
+  // how closely the island is watching (0 = asleep at noon, 1 = the banquet): lamps and lions follow it
+  let tension = 0, lionLift = 0;
+  const setTension = k => { tension = Math.max(0, Math.min(1, k)); };
+  const ruins = buildRuins(scene, { TZ, TH, machine, PX0, PX1, PZ0, PZ1 });
   world.add({ update: (dt, t) => {
+    ruins.update(dt, t);
     ring.rotation.z = t * 0.06;
-    lamps.forEach((l, i) => l.material.color.setHex(((i + Math.floor(t * 3)) % 6 === 0) ? 0xff8a70 : BLOOD));
+    lamps.forEach((l, i) => l.material.color.setHex(((i + Math.floor(t * (2 + 7 * tension))) % 6 === 0) ? 0xff8a70 : BLOOD));   // the lamps run faster as Circe pays attention
     flames.forEach((f, i) => { const s = 1 + Math.sin(t * 11 + i * 2) * 0.12; f.scale.set(s, 1 + Math.sin(t * 7 + i) * 0.2, s); });
-    lions.forEach((l, i) => l.userData.head.rotation.z = Math.sin(t * 0.9 + i * 2) * 0.06);   // the heads breathe
+    lionLift += (tension - lionLift) * Math.min(1, dt * 1.5);
+    lions.forEach((l, i) => l.userData.head.rotation.z = -0.32 * lionLift + Math.sin(t * 0.9 + i * 2) * 0.06);   // the heads breathe; they lift as the trials go on
   } });
-  return { gate, pit, pitGlow, circe, lions, machine, setHead, setDusk, get dusk() { return dusk; }, doorAt: new THREE.Vector3(2, TH, TZ + 2.2) };
+  return { gate, pit, pitGlow, circe, lions, machine, setHead, setDusk, get dusk() { return dusk; }, doorAt: new THREE.Vector3(2, TH, TZ + 2.2),
+    banquet, setRation, setTension, feastAt: feast.position, rationAt: new THREE.Vector3(PX0 - 4.5, 3.2, -3.5) };
 }

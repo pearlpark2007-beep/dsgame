@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+// opened from IntelliJ's built-in preview (port 63342)? That server has no game API (every call answers 404).
+// Jump to the same page on Spring Boot instead.
+if (location.port === "63342") { const page = location.pathname.split("/static/")[1] || ""; location.replace("http://localhost:8081/" + page + location.search); }
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Underworld</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --sun: #f2f1ee; --ink: #0b0b0c; --blood: #d7261e; --cobalt: #1d3fd1; --paper: #ecebe8; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: var(--paper); font-family: 'Courier Prime', monospace; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #0b0b0c; z-index: 40; transition: opacity 1s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 34px; color: var(--blood); }
+  #loading p { margin: 0; color: var(--paper); font-size: 15px; }
+
+  /* the chapter mark: Kill Bill black bands on a bright picture */
+  #title { position: fixed; left: 0; top: 7%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: opacity 0.6s; }
+  #title span { background: var(--ink); padding: 4px 18px 4px max(18px, 4vw); }
+  #title .k { font-size: 15px; letter-spacing: 4px; color: var(--paper); }
+  #title .t { font-family: Anton, Impact, sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: 1.05; color: var(--paper); letter-spacing: 1px; }
+  #title .t em { font-style: normal; color: var(--blood); }
+
+  /* three doors: three colours, three jobs */
+  #doors { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 0 max(16px, 3vw) 18px; display: flex; flex-direction: column; gap: 10px; transition: opacity 0.6s; }
+  #doors .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .door { position: relative; text-align: left; border: 0; border-top: 10px solid var(--c); background: rgba(14, 10, 7, 0.92); color: var(--paper); padding: 14px 16px 16px; cursor: pointer;
+          font: inherit; display: flex; flex-direction: column; gap: 6px; min-height: 150px; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 6px 6px 0 var(--ink); }
+  .door:hover, .door:focus-visible { transform: translate(-2px, -3px); box-shadow: 9px 10px 0 var(--ink); outline: none; }
+  .door:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
+  .door .kick { font-size: 12px; letter-spacing: 3px; color: var(--c); font-weight: 700; }
+  .door .name { font-family: Anton, Impact, sans-serif; font-size: clamp(26px, 2.8vw, 38px); line-height: 1; letter-spacing: 1px; }
+  .door .what { font-size: 14px; line-height: 1.4; color: #d8ccb2; }
+  .door .prog { margin-top: auto; font-size: 12.5px; color: var(--c); font-weight: 700; letter-spacing: 1px; }
+  .door.lesson { --c: #3b62ff; } .door.trials { --c: var(--blood); } .door.lab { --c: #f2c230; }
+  #doors .extra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #doors .extra button, #doors .extra a { min-height: 36px; padding: 0 14px; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); font: inherit; font-size: 13px;
+          letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }
+  #doors .extra button:hover, #doors .extra a:hover, #doors .extra :focus-visible { border-color: var(--sun); color: var(--sun); outline: none; }
+  #doors .extra .lbl { font-size: 11px; letter-spacing: 2px; color: var(--ink); background: var(--paper); padding: 2px 8px; font-weight: 700; }
+  @media (max-width: 760px) { #doors .row { grid-template-columns: minmax(0, 1fr); } .door { min-height: 0; } .door .what { display: none; } }
+
+  body.busy #doors, body.busy #title { opacity: 0; pointer-events: none; }
+  body.cinematic #doors, body.cinematic #title { display: none; }
+
+  /* the prologue: typed title cards on black */
+  #lore { position: fixed; inset: 0; z-index: 33; background: #050403; display: none; flex-direction: column; justify-content: center; padding: 0 12vw; pointer-events: none; }
+  #lore.on { display: flex; }
+  #lore p { margin: 0; max-width: 46ch; font-family: 'Courier Prime', monospace; font-weight: 700; font-size: clamp(22px, 2.7vw, 38px); line-height: 1.35; color: var(--paper); min-height: 2.7em; }
+  #lore p.red { font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: clamp(44px, 7vw, 96px); letter-spacing: 2px; color: var(--blood); line-height: 1; }
+  #lore p::after { content: "▌"; color: var(--sun); animation: blink 0.8s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #lore p::after { animation: none; } .door { transition: none; } }
+
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.8); color: var(--paper);
+          border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
+  #skip.on { display: block; }
+  @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
+  #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: var(--sun); }
+  #fast.on { display: flex; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="loading"><h1>THE OFFICE OF HADES</h1><p>please take a number…</p></div>
+<div id="title"><span class="k">CHAPTER FOUR</span><span class="t">THE DEAD <em>TAKE A NUMBER</em></span></div>
+<div id="lore" aria-live="polite"><p></p></div>
+<button id="skip">SKIP SCENE ▸▸ (Esc)</button>
+<div id="fast">▸▸</div>
+<nav id="doors" aria-label="Chapter four">
+  <div class="row">
+    <button class="door lesson" id="door-lesson"><span class="kick">LEARN</span><span class="name">ATHENA'S LESSON</span>
+      <span class="what">The linear queue and its fake FULL, the circular queue that fixes it, a deque and a priority queue. C, line by line. Nothing is graded.</span><span class="prog" id="prog-lesson">11 lessons</span></button>
+    <button class="door trials" id="door-trials"><span class="kick">BE JUDGED</span><span class="name">THE OFFICE</span>
+      <span class="what">Four trials and closing time. Serve the wrong soul first and the whole line knows it.</span><span class="prog" id="prog-trials"></span></button>
+    <button class="door lab" id="door-lab"><span class="kick">PLAY</span><span class="name">THE LAB</span>
+      <span class="what">No judge, no story. Your queue, your code, or the whole queue program.</span><span class="prog">3 to 8 places</span></button>
+  </div>
+  <div class="extra"><button id="open-btn">▶ PROLOGUE</button></div>
+</nav>
+
+<script type="module">
+import * as THREE from "three";
+import { World } from "./js/engine/world.js";
+import { panelW } from "./js/learn/panelWidth.js";
+import { Director } from "./js/engine/director.js";
+import { sound } from "./js/engine/sound.js";
+import { installUI } from "./js/ui/ui.js";
+import { Comic } from "./js/engine/comic.js";
+import { Hero } from "./js/engine/hero.js";
+import { nameCard } from "./js/story/tags.js";
+import { buildHall, Hall } from "./js/islands/underworld/hall.js";
+import { UnderworldTrials } from "./js/islands/underworld/underworldTrials.js";
+
+const params = new URLSearchParams(location.search);
+const world = new World({ quality: params.get("q") || "auto" });
+world.grade.uniforms.letterbox.value = 0;
+world.grade.uniforms.mono.value = 1;            // black and white: only red survives (the neon, the ropes)
+world.grade.uniforms.halo.value = 0.6;
+if (world.grade.uniforms.burn) world.grade.uniforms.burn.value = 0.7;
+world.renderer.toneMappingExposure = 1.05;
+
+try { await Promise.race([Promise.all([document.fonts.load("40px Anton"), document.fonts.load("bold 40px 'Courier Prime'")]), new Promise(r => setTimeout(r, 2500))]); } catch { /* fonts blocked: fallbacks */ }
+
+const office = buildHall(world);
+const pit = new Hall(world, office);              // the queue's seats and the dead in them
+const director = new Director(world);
+const ui = installUI({ chapter: "underworld", world });  // tokens, loading, VOYAGE, sound (the hum), the MONOCHROME grade
+const comic = new Comic(world, director);
+const hero = await new Hero(world, { groundY: 0 }).load();
+hero.teleport(7.2, 6.4, -2.3);                    // Odysseus just inside the door, by the ticket machine
+// the title shot: down the hall from the door, the carousel, the counter and the red sign at the back
+const POSTCARD = [[0, 6.0, 17], [0, 3.2, -10], 52];
+
+// ---------- skipping
+let skipping = false, filming = false, trialRun = false, trialFast = false;
+const skipBtn = document.getElementById("skip"), fastEl = document.getElementById("fast"), lore = document.getElementById("lore");
+function skip() { if (trialRun) { if (!trialFast) { trialFast = true; world.timeScale = 8; fastEl.classList.add("on"); } return; } if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; fastEl.classList.add("on"); }
+skipBtn.onclick = skip;
+addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
+async function film(fn, { back = true } = {}) {
+  if (filming) return;
+  filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy", "cinematic");
+  try { await fn(); }
+  finally {
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("cinematic");
+    if (!trials.el.classList.contains("on")) document.body.classList.remove("busy");
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0; comic.clear(); lore.classList.remove("on");
+    if (back) director.cut(...POSTCARD);
+  }
+}
+
+// ---------- the prologue: typed cards on black, then the office
+const LORE = [
+  ["Circe let them go. She also told him where to go next."],
+  ["Not home. Down."],
+  ["The blind prophet Tiresias knows the way back to Ithaca. Tiresias is dead."],
+  ["So Odysseus goes to the dead."],
+  ["THEY HAVE AN OFFICE.", "red"],
+  ["Marble floors. Humming lights. A clock with no hands."],
+  ["Everybody takes a number. Kings, slaves, heroes. Achilles took a number."],
+  ["You are served in the order you arrived. Nobody pushes in."],
+  ["NOBODY.", "red"]
+];
+async function typeCard(text, cls = "") {
+  const p = lore.querySelector("p"); p.className = cls; p.textContent = "";
+  const n = text.length, t = cls ? 0.5 : Math.min(2.4, 0.035 * n);
+  await pit._tween(t, k => { p.textContent = text.slice(0, Math.ceil(n * k)); });
+  p.textContent = text;
+  await pit.wait(cls ? 1.4 : Math.max(1.3, 0.022 * n));
+}
+async function opening() {
+  await film(async () => {
+    office.clearServing();
+    lore.classList.add("on");
+    for (const [text, cls] of LORE) await typeCard(text, cls);
+    lore.classList.remove("on");
+    director.cut([0, 3.2, 18], [0, 4.2, -10], 50);
+    await comic.chapter("CHAPTER FOUR", "THE DEAD TAKE A NUMBER", 2.6);
+    await director.glide([0, 6.2, -2.5], [0, 6.6, -12], 44, 2.6);
+    office.setServing(7);
+    await director.freeze("THE CLERK", "Has served the dead for three thousand years.<br>Has never once hurried.", 3.0);
+    await director.glide([0, 13.5, 9.5], [0, 0, -0.6], 46, 2.6);
+    comic.caption("A queue. You join at the REAR. You're served from the FRONT. Nobody cuts in.", { seconds: 3.6 });
+    await pit.wait(3.6);
+    await director.glide([4.6, 2.4, 11.5], [7.6, 1.4, 6.0], 42, 2.0);
+    const c = nameCard("underworld");
+    await director.freeze(c.name, c.sub, 2.6);
+    comic.caption("He took a number like everyone else. He wants to see a dead man about a way home.", { seconds: 3.4 });
+    await pit.wait(3.4);
+  });
+  try { localStorage.setItem("odyssey.underworld.prologue", "1"); } catch { /* storage off */ }
+}
+document.getElementById("open-btn").onclick = () => opening();
+
+// ---------- the finale film (after closing time): Tiresias walks out of the ferry door
+async function finale() {
+  await film(async () => {
+    world.grade.uniforms.freeze.value = 0;
+    await director.glide([1.5, 2.6, 4.0], [0, 2.4, -3.6], 40, 2.2);
+    comic.caption("\"You'll get home. Late, alone, on a stranger's ship, to a house full of strangers.\"", { seconds: 4.0 });
+    await pit.wait(4.0);
+    await director.freeze("TIRESIAS", "The blind prophet of Thebes.<br>Dead, and still the only one who can see.", 3.0);
+    const c = nameCard("underworld", { done: true });
+    await director.glide([4.6, 2.4, 11.5], [7.6, 1.4, 6.0], 42, 1.6);
+    await director.freeze(c.name, c.sub, 3.2);
+  }, { back: false });
+}
+
+// ---------- the three doors (underworldTrials.js runs all three)
+const shiftForPanel = () => { const w = innerWidth, h = innerHeight; const lb = document.body.classList.contains("board-on") && document.getElementById("queue-board"); if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, lb ? Math.round((lb.offsetHeight + 12) / 2) : 0, w, h); else world.camera.clearViewOffset(); };
+const START = { capacity: 5, structures: [{ name: "line", kind: "queue", capacity: 5, initial: [7, 12, 30], lengthVar: null }] };
+const trials = new UnderworldTrials({
+  world, pit, island: office, director, comic,
+  panelView: on => {
+    if (on) { document.body.classList.add("side-panel", "busy"); shiftForPanel(); addEventListener("resize", shiftForPanel); }
+    else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); }
+  },
+  onClose: () => { document.body.classList.remove("busy"); pit.clearProphecy(); office.clearServing(); trials.setUp(START); director.glide(...POSTCARD, 1.2); progress(); },
+  onFinale: async () => { trials.ctx.fast.end(); await finale(); ui.regrade(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); ui.chapterDone(); },
+  skipping: () => trialFast,
+  fast: {
+    begin: () => { trialRun = true; trialFast = false; skipBtn.textContent = "FAST ▸▸ (Esc)"; skipBtn.classList.add("on"); },
+    land: () => { if (trialFast) { trialFast = false; world.timeScale = 1; fastEl.classList.remove("on"); } },
+    end: () => { trialRun = false; trialFast = false; fastEl.classList.remove("on"); skipBtn.classList.remove("on"); skipBtn.textContent = "SKIP SCENE ▸▸ (Esc)"; }
+  }
+});
+document.getElementById("door-lesson").onclick = () => trials.openLesson();
+document.getElementById("door-trials").onclick = () => trials.open();
+document.getElementById("door-lab").onclick = () => trials.openLab();
+function progress() {
+  let d = []; try { d = JSON.parse(localStorage.getItem("odyssey.underworld.done")) || []; } catch { /* storage off */ }
+  const n = d.filter(id => id.startsWith("underworld-")).length;
+  document.getElementById("prog-trials").textContent = n ? `${n} / 5 done${d.includes("underworld-finale") ? " · Tiresias has spoken" : ""}` : "5 trials · start with ONE";
+}
+progress();
+
+trials.setUp(START);
+director.cut(...POSTCARD);
+
+// ---------- start
+const loading = document.getElementById("loading");
+if (params.get("capture")) {
+  loading.remove();
+  world.resize(); world.step(0.016);
+  window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  window.__world = world; window.__pit = pit; window.__office = office; window.__director = director; window.__trials = trials; window.__opening = opening; window.__finale = finale; window.__skip = skip;
+  window.__ready = true;
+} else {
+  world.start();
+  loading.style.opacity = 0; setTimeout(() => loading.remove(), 1000);
+  let seen = false; try { seen = !!localStorage.getItem("odyssey.underworld.prologue"); } catch { /* storage off */ }
+  if (params.get("opening") || (!seen && !params.get("trials") && !params.get("lab") && !params.get("lesson"))) opening();
+  else if (params.get("trials")) trials.open();
+  else if (params.get("lab")) trials.openLab();
+  else if (params.get("lesson")) trials.openLesson();
+}
+
+</script>
+</body>
+</html>

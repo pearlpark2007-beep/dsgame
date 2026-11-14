@@ -26,6 +26,11 @@ const css = `
 body.side-panel #list-board { right: calc(var(--pw, 520px) + 12px); }
 #list-board.on { display: block; }
 #list-board .lb-head { display: flex; align-items: baseline; gap: 12px; min-height: 22px; }
+#list-board .lb-key { position: absolute; left: 0; bottom: 100%; margin-bottom: 6px; background: rgba(18,12,6,.92); border: 1px solid #3a2c18; border-radius: 4px; padding: 4px 8px; font: 700 10px 'Courier Prime', monospace; color: #8a7a5a; letter-spacing: .5px; white-space: nowrap; }
+#list-board .lb-key i { font-style: normal; padding: 0 5px; border-radius: 4px; color: #1a1006; }
+#list-board .lb-key .ka { background: #ffd21a; }
+#list-board .lb-key .kn { background: #fff8ea; }
+#list-board .lb-key b { color: #e8dcc0; }
 #list-board .lb-title { font-family: Anton, Impact, sans-serif; color: #f2c230; letter-spacing: 1px; font-size: 17px; white-space: nowrap; }
 #list-board .lb-say { font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #list-board .lb-say b { color: #f2c230; } #list-board .lb-say .w { color: #8fe3a0; } #list-board .lb-say .bad { color: #ff7a5c; } #list-board .lb-say .dim { opacity: 0.55; }
@@ -90,7 +95,7 @@ export function walkFrom(f, start) {
 export function lostNodes(f) {
   const reach = new Set();
   for (const a of Object.values(f.ptrs)) walkFrom(f, a).seen.forEach(x => reach.add(x));
-  return f.order.filter(a => !f.nodes[a].freed && !reach.has(a));
+  return f.order.filter(a => !f.nodes[a].freed && !reach.has(a) && a !== f.fresh);   // (a node just made has no pointer YET)
 }
 // where every node goes, in columns and rows: the board and the 3D sty both draw from this, so they
 // always match. Row 0: the rope from head, in order (arrows only ever point right: nothing crosses).
@@ -138,7 +143,7 @@ export class ListBoard {
     if (!document.getElementById("list-board-css")) { const s = document.createElement("style"); s.id = "list-board-css"; s.textContent = css; document.head.appendChild(s); }
     const el = this.el = document.createElement("section");
     el.id = "list-board"; el.setAttribute("aria-label", "The linked list, step by step");
-    el.innerHTML = `<div class="lb-head"><span class="lb-title">THE ROPE</span><span class="lb-call"></span><span class="lb-say" role="status" aria-live="polite"></span></div>
+    el.innerHTML = `<div class="lb-head"><span class="lb-title">THE ROPE</span><span class="lb-call"></span><span class="lb-say" role="status" aria-live="polite"></span><span class="lb-key">ON THE PIGS · <i class="ka">yellow tag</i> address · <i class="kn">white tag</i> next · <b>number on its back</b> data</span></div>
       <div class="lb-stage"><svg class="lb-arrows"><defs><marker id="lb-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c9b48a"/></marker>
         <marker id="lb-ah-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ff9a5c"/></marker></defs></svg></div>
       <div class="lb-out" aria-live="polite"></div>
@@ -160,7 +165,7 @@ export class ListBoard {
     addEventListener("keydown", e => {
       if (!this.el.classList.contains("on") || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
       if (e.key === "ArrowLeft") { e.preventDefault(); this.$(".back").click(); }
-      else if (e.key === "ArrowRight") { e.preventDefault(); this.$(".fwd").click(); }
+      else if (e.key === "ArrowRight" || (e.key === " " && e.target.tagName !== "BUTTON")) { e.preventDefault(); this.$(".fwd").click(); }
       else if (e.key === "p" || e.key === "P") this.$(".play").click();
     });
     addEventListener("resize", () => this.frames && this.show(this.k));
@@ -185,31 +190,47 @@ export class ListBoard {
     st.say = initial.length ? `${initial.length} pigs on the rope. ${headVar} holds ${hex(FIRST_ADDRESS)}, the first. Press play or step through.` : `The rope is empty: ${headVar} = NULL.`;
     const frames = [st];
     const name = a => (st.nodes[a] ? `[${st.nodes[a].data}]` : hex(a));
+    // a function's parameters and locals HIDE the caller's variables of the same name (head inside
+    // deleteFirst() is not the head outside). On CALL the caller's names are saved; when a local is
+    // dropped the caller's value comes back. A pointer a function returns is held as "f() →" until stored.
+    const saved = [];
     for (const s of steps) {
       const nx = clone(st), a = s.index;
+      // the returned pointer is held until it is stored (head = f(...)) or something else happens
+      const held = Object.keys(nx.ptrs).filter(k => k.endsWith("()"));
+      if (held.length && !(s.action === "VAR" || s.action === "DROP" || (s.action === "PTR" && !held.some(k => nx.ptrs[k] === s.value)))) held.forEach(k => delete nx.ptrs[k]);
       if (s.action === "PTR") {
+        const back = st.calls.length === 0 && Object.keys(st.ptrs).some(k => k.endsWith("()")) && !Object.keys(st.ptrs).some(k => k.endsWith("()") && st.ptrs[k] === s.value);
         nx.ptrs[s.target] = s.value; nx.changed = s.target;
-        nx.say = `${s.target} = ${s.value === NULL ? "<b>NULL</b>" : `<b>${hex(s.value)}</b> ${name(s.value)}`}`;
+        nx.say = `${s.target} = ${s.value === NULL ? "<b>NULL</b>" : `<b>${hex(s.value)}</b> ${name(s.value)}`}` + (back ? ` <span class="dim">· the caller's ${s.target} again: it still holds the old address until the answer is stored</span>` : "");
         if (st.hl && st.hl.kind !== "null") nx.hl = { ...st.hl, dim: true };
       } else if (s.action === "VAR") {
         nx.vars[s.target] = s.value; nx.changed = s.target;
         nx.say = `${s.target} = <b>${s.value}</b>` + (st.lastSay ? ` <span class="dim">· ${st.lastSay}</span>` : "");
         if (st.hl && st.hl.kind !== "null") nx.hl = { ...st.hl, dim: true };
       } else if (s.action === "DROP") {
+        const top = saved[saved.length - 1];
         delete nx.ptrs[s.target]; delete nx.vars[s.target];
+        if (top && s.target in top.ptrs) nx.ptrs[s.target] = top.ptrs[s.target];
+        if (top && s.target in top.vars) nx.vars[s.target] = top.vars[s.target];
         nx.say = `<span class="dim">${s.target} is gone (its block or function ended)</span>`;
         if (st.hl && st.hl.kind !== "null") nx.hl = { ...st.hl, dim: true };
       } else if (s.action === "CALL") {
+        saved.push({ ptrs: { ...nx.ptrs }, vars: { ...nx.vars } });
         nx.calls.push(s.target);
         nx.say = `<b>call</b> ${s.message} <span class="dim">· the function gets COPIES of these</span>`;
       } else if (s.action === "RETURN") {
         nx.calls.pop();
+        const top = saved.pop();
+        void top;   // (Java sends the caller's values back right after this step)
+        const m = /returns (0x[0-9A-F]+|NULL)/i.exec(s.message || "");
+        if (m) nx.ptrs[s.target + "()"] = m[1] === "NULL" ? NULL : parseInt(m[1], 16);
         nx.say = `<b>return</b> · ${s.message}`;
       } else if (s.action === "PRINT") {
         nx.out = (nx.out + s.message).slice(-600);
         nx.say = `printf · <span class="w">${s.message.replace(/</g, "&lt;").replace(/\n/g, "↵")}</span>`;
       } else if (s.action === "NEW") {
-        nx.nodes[a] = { data: s.value, next: NULL, freed: false }; nx.order.push(a);
+        nx.nodes[a] = { data: s.value, next: NULL, freed: false }; nx.order.push(a); nx.fresh = a;
         nx.hl = { a, kind: "new" }; nx.say = `<span class="w">${s.message || `newNode(${s.value}): a new pig at ${hex(a)}, next = NULL`}</span>`;
       } else if (s.action === "READ") {
         nx.hl = { a, kind: "read" }; nx.say = `${s.message.replace(/is (-?\d+)$/, "is <b>$1</b>")}`;
@@ -229,6 +250,9 @@ export class ListBoard {
       nx.lastSay = (s.action === "VAR" || s.action === "PTR" || s.action === "DROP") ? st.lastSay : nx.say;
       frames.push(nx); st = nx;
     }
+    // the program ended: a returned pointer nobody stored is gone (that is how a node gets lost)
+    const last = frames[frames.length - 1];
+    for (const k of Object.keys(last.ptrs)) if (k.endsWith("()")) delete last.ptrs[k];
     this.frames = frames; this.k = 0;
     this.show(0);
   }
@@ -326,6 +350,8 @@ export class ListBoard {
       lab.style.left = (p.x + W / 2) + "px"; lab.style.top = (p.y - 28) + "px";
       lab.innerHTML = names.map(nm => `<span class="lab${f.changed === nm ? " hot" : ""}" style="background:${this.color(nm)}">${nm}</span>`).join("") + `<span class="arr" style="color:${this.color(names[0])}">▼</span>`;
       stage.appendChild(lab);
+      const half = lab.offsetWidth / 2, left = p.x + W / 2;           // several names on one node: keep the group inside the board
+      if (left - half < 4) lab.style.left = (4 + half) + "px";
     }
     if (f.hl && f.hl.kind === "null") stage.querySelectorAll(".lb-null").forEach(e => e.classList.add("bad"));
     // plain variables

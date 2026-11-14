@@ -83,7 +83,7 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
     <button class="door lab" id="door-lab"><span class="kick">PLAY</span><span class="name">THE LAB</span>
       <span class="what">No judge, no story. Your rope, your code, any of your ten functions.</span><span class="prog">up to 8 pigs</span></button>
   </div>
-  <div class="extra"><button id="open-btn">▶ PROLOGUE</button><span class="lbl">ISLANDS</span><a href="harbour_env.html">1 · The Harbour</a><a href="cave_env.html">2 · The Cave</a></div>
+  <div class="extra"><button id="open-btn">▶ PROLOGUE</button></div>
 </nav>
 
 <script type="module">
@@ -92,6 +92,7 @@ import { World } from "./js/engine/world.js";
 import { panelW } from "./js/learn/panelWidth.js";
 import { Director } from "./js/engine/director.js";
 import { sound } from "./js/engine/sound.js";
+import { installUI } from "./js/ui/ui.js";
 import { Comic } from "./js/engine/comic.js";
 import { Hero } from "./js/engine/hero.js";
 import { nameCard } from "./js/story/tags.js";
@@ -99,14 +100,17 @@ import { Sty, GATE } from "./js/islands/circe/sty.js";
 import { buildIsland } from "./js/islands/circe/helios.js";
 import { CirceTrials } from "./js/islands/circe/circeTrials.js";
 
-sound.muted = true;
+// Aeaea has sound again, quietly: the sea, Circe's loudspeakers, ropes pulled tight. One button turns it all off.
 const params = new URLSearchParams(location.search);
 const world = new World({ quality: params.get("q") || "auto" });
+world.noBloom = true; world.applyQuality();      // no glow: on the bright plaza it washed every node into haze
 world.grade.uniforms.letterbox.value = 0;
 world.grade.uniforms.keepBlue.value = 0.85;     // keep Circe's cobalt
-world.grade.uniforms.halo.value = 0.35;         // noon: no halation bleeding round every white thing
+world.grade.uniforms.halo.value = 0.0;          // noon: clear air, no glow bleeding round every white thing
+world.grade.uniforms.strength.value = 0.45;     // only a little of the film print: the colours stay clean and sharp
+world.grade.uniforms.grain.value = 0.025;
 world.renderer.toneMappingExposure = 1.0;
-if (world.grade.uniforms.burn) world.grade.uniforms.burn.value = 0.3;   // only a light burn at the edges: it is the brightest island
+if (world.grade.uniforms.burn) world.grade.uniforms.burn.value = 0.12;  // hardly any burn at the edges: it is the brightest island
 
 // canvas labels (the plaques, the head sign) are drawn with Anton / Courier Prime: wait for them, briefly
 try { await Promise.race([Promise.all([document.fonts.load("40px Anton"), document.fonts.load("bold 40px 'Courier Prime'")]), new Promise(r => setTimeout(r, 2500))]); } catch { /* fonts blocked: fallbacks */ }
@@ -126,6 +130,7 @@ function dusk(to, seconds = 0) {
 }
 const sty = new Sty(world, island);
 const director = new Director(world);
+const ui = installUI({ chapter: "circe", world });       // tokens, loading, VOYAGE, sound (the sea), the HELIOS NOON grade
 const comic = new Comic(world, director);
 const hero = await new Hero(world, { groundY: 0 }).load();
 hero.teleport(GATE.x - 0.5, GATE.z + 1.9, Math.PI * 0.5);     // Odysseus at the gate, facing the sty
@@ -146,7 +151,7 @@ async function film(fn, { back = true } = {}) {
     filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
     fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("cinematic");
     if (!trials.el.classList.contains("on")) document.body.classList.remove("busy");
-    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0; comic.clear(); lore.classList.remove("on");
+    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0; comic.clear(); lore.classList.remove("on"); sty.labels(true);
     if (back) director.cut(...POSTCARD);
   }
 }
@@ -193,30 +198,70 @@ async function opening() {
 }
 document.getElementById("open-btn").onclick = () => opening();
 
-// ---------- the finale film (after the banquet): the men stand on the marble at sunset
+// ---------- the banquet, Act I: the table is laid, Circe asks, Odysseus answers, Athena reads the ration board
+async function banquetIntro() {
+  if (filming || skipping || trialFast) return;
+  trials.el.classList.remove("on"); trials.ctx.panelView(false);
+  await film(async () => {
+    dusk(0.45, 0);
+    director.cut([2, 6.4, 17], [2, 3.0, -8], 44);
+    await director.glide([2, 4.2, 5.0], [2, 2.6, -9], 42, 4.2);                  // over the rope to the table and the palace
+    director.cut([2, 4.3, 0.8], [2, 4.5, -13], 34);                               // Circe on her terrace, the sun window behind her
+    await comic.subtitle("Still counting them?", { speaker: "CIRCE", villain: true, seconds: 2.6 });
+    sty.labels(false);                                                              // a close-up: the pigs' tags would fill the frame
+    director.cut([GATE.x + 2.6, 2.6, GATE.z + 7.2], [GATE.x - 0.4, 1.4, GATE.z + 1.8], 38);   // Odysseus at the gate
+    await comic.subtitle("Making sure I leave with the right number.", { speaker: "ODYSSEUS", seconds: 3.0 });
+    sty.labels(true);
+    const r = island.rationAt; director.cut([r.x + 4.3, r.y + 0.6, r.z + 7.6], [r.x + 0.2, r.y - 0.4, r.z], 38);   // the board: seven guests tonight
+    await comic.subtitle("Two of those aren't ours. Take them off, then turn the rope around.", { speaker: "ATHENA", seconds: 3.6 });
+  }, { back: false });
+  trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true);
+}
+
+// ---------- the banquet, Acts V and VI (after MEN AGAIN): the reunion, the rest of the crew, the sun goes down
 async function finale() {
   await film(async () => {
     world.grade.uniforms.freeze.value = 0;
-    await director.glide([0.5, 2.6, 9.5], [1.0, 2.4, -6], 46, 2.4);   // low, among the men: the palace and the sinking sun behind them
+    island.setRation("free");
+    await director.glide([0.5, 2.3, 7.0], [0.5, 1.7, -2], 44, 2.2);              // low, among the five men on the marble
+    await comic.subtitle("…Captain?", { speaker: "POLITES", seconds: 2.0 });
+    director.cut([2, 4.3, 0.8], [2, 4.5, -13], 34);
+    await comic.subtitle("Take them. All of them.", { speaker: "CIRCE", villain: true, seconds: 2.4 });
+    director.cut([2, 7.5, 10], [2, 1.6, -7], 50);                                  // the colonnade opens: seventeen more walk out
+    await sty.walkOut(17, island.doorAt, { x0: -4, x1: 7.6, z0: -4.6, dz: 1.0, tableX0: -4.5, tableX1: 8.5, foot: -7.0 });
+    await director.glide([1, 3.0, 12.5], [1, 2.6, -8], 50, 2.4);                 // twenty-two men, the palace behind them
     comic.caption("Twenty-two men walked out of Circe's sty. They stayed a year.", { seconds: 3.4 });
     await sty.wait(3.4);
     const c = nameCard("circe", { done: true });
     await director.freeze(c.name, c.sub, 3.2);
+    const y0 = island.machine.position.y;                                          // the last image: the sun goes all the way down
+    await Promise.all([director.glide([1, 2.2, 5.5], [1, 5.0, -20], 46, 4.2), sty._tween(4.2, k => { island.machine.position.y = y0 - 8 * k * k; })]);
+    lore.classList.add("on");
+    await typeCard("Home was still a long way off.");
+    await typeCard("NEXT: THE UNDERWORLD");
+    lore.classList.remove("on");
   }, { back: false });
   // the men stay standing on the marble: the next trial (or the doors) puts the rope back
 }
 
 // ---------- the three doors (circeTrials.js runs all three; the mode decides the panel)
-const shiftForPanel = () => { const w = innerWidth, h = innerHeight; const lb = document.body.classList.contains("board-on") && document.getElementById("list-board"); if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, lb ? Math.round((lb.offsetHeight + 12) / 2) : 0, w, h); else world.camera.clearViewOffset(); };
+const shiftForPanel = () => {
+  // the picture is centred in the part of the stage nothing covers: left of the panel, above the rope board, below Athena's Scroll
+  const w = innerWidth, h = innerHeight, lb = document.body.classList.contains("board-on") && document.getElementById("list-board");
+  const top = typeof trials !== "undefined" && trials.athena ? trials.athena.reserve() : 0, bottom = lb ? lb.offsetHeight + 12 : 0;
+  if (w > 900) { world.camera.setViewOffset(w, h, panelW() / 2, Math.round((bottom - top) / 2), w, h); director.insets = { left: 0, right: panelW(), top, bottom }; }
+  else { world.camera.clearViewOffset(); director.insets = null; }
+};
 const trials = new CirceTrials({
-  world, sty, island, director, comic, dusk,
+  world, sty, island, director, comic, dusk, banquetIntro: () => banquetIntro(),
   panelView: on => {
     if (on) { document.body.classList.add("side-panel", "busy"); shiftForPanel(); addEventListener("resize", shiftForPanel); }
-    else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); }
+    else { document.body.classList.remove("side-panel"); removeEventListener("resize", shiftForPanel); world.camera.clearViewOffset(); director.insets = null; }
   },
-  onClose: () => { document.body.classList.remove("busy"); dusk(0, 1.2); trials.setUp({ structures: [{ initial: [7, 12, 3, 19, 5], lengthVar: "head" }] }); director.glide(...POSTCARD, 1.2); progress(); },
-  onFinale: async () => { trials.ctx.fast.end(); await finale(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); },
+  onClose: () => { document.body.classList.remove("busy"); dusk(0, 1.2); island.banquet(false); trials.setUp({ structures: [{ initial: [7, 12, 3, 19, 5], lengthVar: "head" }] }); director.glide(...POSTCARD, 1.2); progress(); },
+  onFinale: async () => { trials.ctx.fast.end(); await finale(); ui.regrade(); trials.el.classList.add("on"); trials.ctx.panelView(true); trials.view(true); ui.chapterDone(); },
   skipping: () => trialFast,
+  relayout: () => { if (document.body.classList.contains("side-panel")) shiftForPanel(); },
   fast: {
     begin: () => { trialRun = true; trialFast = false; skipBtn.textContent = "FAST ▸▸ (Esc)"; skipBtn.classList.add("on"); },
     land: () => { if (trialFast) { trialFast = false; world.timeScale = 1; fastEl.classList.remove("on"); } },

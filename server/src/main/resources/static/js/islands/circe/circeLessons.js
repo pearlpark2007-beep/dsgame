@@ -76,6 +76,47 @@ export const LESSONS = [
     watch: "-1 means 'not here'. Check for it before you use pos." }
 ];
 
+// the story around each lesson (the learning in the middle is untouched): a line before SHOW ME, Athena's
+// one line when the key line of C runs (key: a piece of that line), and the takeaway after the run.
+// A classic mistake gets its consequence instead of the takeaway.
+const TALES = {
+  createNode: { story: "Circe makes new guests all the time. Watch where they go.", key: ["newNode->next = NULL;", "It exists. Nobody can reach it yet."],
+    take: "A new pig is nobody's until a pointer holds its address." },
+  insertAtBeginning: { story: "A new arrival. Circe wants him at the front.", key: ["newNode->next = head;", "Tie him to the old first pig, then hand head the new address."],
+    take: "The function returns the new head. Store it, or he's lost.",
+    mtake: "The new pig was made and tied, but nobody kept his address. He's still on the island. You'll never find him." },
+  insertAtEnd: { story: "The back of the line. You have to walk there.", key: ["while (temp->next != NULL)", "Follow the rope. Stop where next is NULL."],
+    take: "To reach the end, start at head and walk. There are no shortcuts." },
+  insertAtPosition: { story: "Third place. Two ropes have to change, and the order matters.", key: ["newNode->next = temp->next;", "Two ties. Get the order wrong, and the rest are gone."],
+    take: "Tie the new pig to the rest first, then tie the rest to him.",
+    mtake: "The rope behind him was overwritten before anyone held it. 3, 19 and 5 are cut off, and the new pig is tied to himself." },
+  deleteList: { story: "Circe is clearing a pen. Odysseus does it his way: nobody gets lost first.", key: ["head = head->next;", "Hold the next address before you free this one."],
+    take: "Save next, then free. Freed memory has no rope to follow.",
+    mtake: "The pig was handed back first, then someone tried to read his rope. There is no rope on a freed pig. Move first, free second." },
+  deleteFirst: { story: "The first pig is leaving. The gate has to know.", key: ["head = head->next;", "Move head first. Then let him go."],
+    take: "Head moves before the old first pig is freed.",
+    mtake: "head still holds the address of a pig who has gone. Anything that walks from it reads a pig that no longer exists." },
+  deleteLast: { story: "The last pig. Someone else becomes the end of the line.", key: ["temp->next->next != NULL", "Stop one early. That pig becomes the end."],
+    take: "The second-to-last pig's next becomes NULL." },
+  deleteElement: { story: "Pig 3 is being moved. Close the gap behind him.", key: ["temp->next->data != value", "Stand on the pig before him. Reach past."],
+    take: "Delete = find the one before, skip, free." },
+  display: { story: "Roll call. Every name, in order.", key: ["while (temp != NULL)", "Start at head. Stop at NULL."],
+    take: "Traversal: one pointer, one step at a time, until NULL." },
+  search: { story: "Odysseus is looking for one man.", key: ["temp->data == key", "Look, step, count. Stop when you find him, or at NULL."],
+    take: "Search is traversal that can stop early." },
+};
+// optional predictions, for the lesson's own rope (7 12 3 19 5): a question, the choices, the answer
+const PREDICT = {
+  insertAtBeginning: ["After head = …, which pig is first?", ["22", "7"], "22"],
+  insertAtEnd: ["Where will temp stop?", ["19", "5", "NULL"], "5"],
+  insertAtPosition: ["Which tie comes first?", ["newNode->next = temp->next", "temp->next = newNode"], "newNode->next = temp->next"],
+  deleteFirst: ["After head = head->next, where does head point?", ["7", "12", "NULL"], "12"],
+  deleteLast: ["Where will temp stop?", ["19", "5"], "19"],
+  deleteElement: ["Whose next changes?", ["12", "3", "19"], "12"],
+  search: ["Will it stop before NULL?", ["Yes", "No"], "Yes"],
+};
+for (const l of LESSONS) Object.assign(l, TALES[l.id], PREDICT[l.id] ? { predict: { q: PREDICT[l.id][0], options: PREDICT[l.id][1], answer: PREDICT[l.id][2] } } : {});
+
 // the code a lesson runs: the right code, or its classic mistake
 export function lessonCode(l, mistake = false) {
   const m = mistake && l.mistake;

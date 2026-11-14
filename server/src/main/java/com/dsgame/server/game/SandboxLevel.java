@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 // same play() run it, which is why one abstract class can serve both the story levels and the Lab
 // (inheritance and polymorphism: LevelService never needs to know which kind it is running).
 public class SandboxLevel extends Level {
+    private static final int MAX_STONES = 8;     // places on the carousel in the waiting hall
     // limits the 3D scenes can show: ten pens in the cave, towers up to six crates on the quay
     public static final int MAX_PENS = 10;
     public static final int MAX_STACKS = 3;
@@ -70,6 +71,14 @@ public class SandboxLevel extends Level {
             List<Integer> values = checkValues(specs.get(0).initial(), MAX_NODES, "the chain");
             return new SandboxLevel(island, List.of(StructureSpec.list("sty", "head", values.toArray(new Integer[0]))));
         }
+        if ("underworld".equals(island)) {
+            // one line of souls round the pit: 3 to 8 stones, the souls already waiting front to rear
+            if (specs.size() != 1) throw new IllegalArgumentException("The hall has one queue.");
+            int cap = specs.get(0).capacity();
+            if (cap < 3 || cap > MAX_STONES) throw new IllegalArgumentException("The carousel has 3 to " + MAX_STONES + " places.");
+            List<Integer> values = checkValues(specs.get(0).initial(), cap, "the line");
+            return new SandboxLevel(island, List.of(StructureSpec.queue("line", cap, values.toArray(new Integer[0]))));
+        }
         throw new IllegalArgumentException("There is no Lab on '" + island + "'.");
     }
 
@@ -94,6 +103,8 @@ public class SandboxLevel extends Level {
             } else if (ds instanceof ArrayADT array) {
                 int n = in.getVariable(s.lengthVar(), 0);
                 sb.append(" ").append(s.name()).append(" = ").append(array.firstN(n)).append(", n = ").append(n).append(".");
+            } else if (ds instanceof com.dsgame.server.ds.Queue) {
+                sb.append(" ").append(s.name()).append(", front to rear: ").append(ds.snapshot()).append(".");
             } else {
                 List<Integer> items = ds.snapshot();
                 sb.append(" ").append(s.name()).append(" = ").append(items).append(" (top = ").append(items.size() - 1).append(").");

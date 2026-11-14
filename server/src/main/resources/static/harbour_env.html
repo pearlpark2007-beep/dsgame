@@ -79,6 +79,7 @@ import { nameCard } from "./js/story/tags.js";
 import { stackLesson } from "./js/islands/harbour/stackLesson.js";
 import { ReturnBench } from "./js/islands/harbour/returnBench.js";
 import { Pace } from "./js/engine/pace.js";
+import { installUI } from "./js/ui/ui.js";
 
 const params = new URLSearchParams(location.search);
 manager.onProgress = (url, done, total) => { document.getElementById("bar").style.width = (done / total * 100) + "%"; };
@@ -191,7 +192,7 @@ function skip() {
 }
 skipBtn.onclick = skip;
 // no music or sound effects for now: they come back once the whole theme is built
-sound.muted = true;
+const ui = installUI({ chapter: "harbour", world });     // tokens, loading, VOYAGE, sound (on, with one mute for the game), the STORM grade
 addEventListener("pointerdown", () => sound.ctx, { once: true });
 addEventListener("keydown", () => sound.ctx, { once: true });
 addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
@@ -200,15 +201,15 @@ addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
 const hud = document.getElementById("hud");
 const pb = document.createElement("button"); pb.textContent = "▶ play scene"; pb.className = "play"; pb.onclick = () => { if (!busy) location.search = ""; }; hud.appendChild(pb);
 const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) { trials.close(); lesson(); } }; hud.appendChild(lb);
-const cb = document.createElement("button"); cb.textContent = "climax (preview)"; cb.onclick = () => climaxPreview(); hud.appendChild(cb);
+const cb = document.createElement("button"); cb.textContent = "climax (preview)"; cb.onclick = () => climaxPreview(); if (params.get("dev")) hud.appendChild(cb);
 const tb = document.createElement("button"); tb.textContent = "the trials"; tb.onclick = () => { if (!busy && !inLesson) trialsOpen(); }; hud.appendChild(tb);
-for (const [t, href] of [["2 · the cave ▸", "cave_env.html"], ["3 · circe ▸", "circe_env.html"]]) { const b = document.createElement("button"); b.textContent = t; b.onclick = () => (location.href = href); hud.appendChild(b); }
+if (params.get("dev")) for (const [t, href] of [["2 · the cave ▸", "cave_env.html"], ["3 · circe ▸", "circe_env.html"], ["4 · underworld ▸", "underworld_env.html"]]) { const b = document.createElement("button"); b.textContent = t; b.onclick = () => (location.href = href); hud.appendChild(b); }
 const labBtn = document.createElement("button"); labBtn.textContent = "⚗ the lab"; labBtn.onclick = () => { if (!busy && !inLesson) trialsOpen(true); }; hud.appendChild(labBtn);
-Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
+if (params.get("dev")) Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
 const qb = document.createElement("button");
 const showQ = () => qb.textContent = "quality: " + world.quality;
 qb.onclick = () => { world.autoQuality = false; world.quality = world.quality === "high" ? "low" : "high"; world.applyQuality(); showQ(); };
-hud.appendChild(qb);
+if (params.get("dev")) hud.appendChild(qb);
 let busy = false;
 const skipper = {
   begin() { busy = true; skipBtn.classList.add("on"); },
@@ -280,7 +281,8 @@ async function climax() {
   try { await playClimax({ world, hero, director, comic, giant, chain, trial, harbour, mood, crowd, cardAfter: nameCard("harbour", { done: true }) }); }
   finally { world.timeScale = 1; }
   // the chapter is over: start the harbour fresh, ready to play again
-  if (!params.get("capture")) location.search = "?free=1";
+  ui.regrade();
+  if (!params.get("capture")) ui.chapterDone({ onStay: () => { location.search = "?free=1"; } });   // the deed, and the way on to the Cave
 }
 // preview: put the finale's end state on the quay and play the climax straight away
 async function climaxPreview() {

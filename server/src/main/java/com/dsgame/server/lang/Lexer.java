@@ -35,7 +35,7 @@ public class Lexer {
             } else if (Character.isWhitespace(c)) {
                 pos++;
             } else if (c == '#' && atLineStart()) {
-                skipLineComment();            // #include <stdio.h> and friends: nothing to do on Aeaea
+                readDirective();              // #define SIZE 5 is remembered; #include <stdio.h> and friends: nothing to do
             } else if (c == '"') {
                 readString();
             } else if (c == '/' && peekNext() == '/') {
@@ -52,6 +52,23 @@ public class Lexer {
         }
         tokens.add(new Token(TokenType.EOF, "", line));
         return tokens;
+    }
+
+    // #define NAME 123: from here on, the word NAME is read as the number 123 (a named constant).
+    // Anything else after # (#include ...) is skipped.
+    private final Map<String, String> defines = new java.util.HashMap<>();
+
+    private void readDirective() {
+        int end = source.indexOf('\n', pos);
+        String text = source.substring(pos, end < 0 ? source.length() : end);
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("#\\s*define\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(\\d+)\\s*(//.*|/\\*.*)?").matcher(text.strip());
+        if (m.matches()) {
+            defines.put(m.group(1), m.group(2));
+        } else if (text.strip().matches("#\\s*define\\b.*")) {
+            throw new CompileError("Only simple #define constants work here, like  #define SIZE 5", line);
+        }
+        skipLineComment();
     }
 
     private char peekNext() {
@@ -118,6 +135,10 @@ public class Lexer {
             pos++;
         }
         String word = source.substring(start, pos);
+        if (defines.containsKey(word)) {                 // a #define constant: the number itself
+            tokens.add(new Token(TokenType.NUMBER, defines.get(word), line));
+            return;
+        }
         TokenType type = KEYWORDS.getOrDefault(word, TokenType.IDENTIFIER);
         tokens.add(new Token(type, word, line));
     }

@@ -4,6 +4,7 @@ import com.dsgame.server.game.levels.cave.*;
 import com.dsgame.server.game.levels.circe.*;
 import com.dsgame.server.game.levels.harbour.LoadTheShipLevel;
 import com.dsgame.server.game.levels.harbour.TheChainLevel;
+import com.dsgame.server.game.levels.underworld.*;
 import com.dsgame.server.lang.CodeRunner;
 import com.dsgame.server.lang.Interpreter;
 import com.dsgame.server.lang.Outcome;
@@ -45,6 +46,13 @@ public class LevelService {
         register(new CutLooseLevel());       // delete from the middle
         register(new TurnThemBackLevel());   // reverse
         register(new BanquetLevel());        // finale: delete two values, free them, then reverse
+
+        // the Underworld (queue): the dead drink from the blood pit one at a time, in the order they came
+        register(new FirstCupLevel());       // dequeue from the front
+        register(new WhoIsNextLevel());      // peek and size, nobody leaves
+        register(new TiresiasFirstLevel());  // rotate: dequeue then enqueue
+        register(new PitHoldsFiveLevel());   // isFull before enqueue
+        register(new HourOfTheDeadLevel());  // finale: eight through four places, the rear wraps round
     }
 
     private void register(Level level) {
