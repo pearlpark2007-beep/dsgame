@@ -18,56 +18,59 @@ export const SHADES = { 7: "Elpenor", 12: "Anticleia", 30: "Achilles", 41: "Ajax
 export const shade = v => SHADES[v] || "a soul";
 
 const css = `
-#queue-board { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 29; display: none; background: rgba(8, 8, 9, 0.95);
-  border: 1px solid #4a4a4e; border-radius: 6px; padding: 8px 14px 8px; color: #e8e6e3; font-family: 'Courier Prime', monospace; box-shadow: 0 6px 30px rgba(0,0,0,0.6); box-sizing: border-box; }
+/* the Atlas's route ledger: an indigo frame, ivory cells, brass index plates, cyan for the live interval, ember only on failure */
+#queue-board { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 29; display: none; background: rgba(16, 26, 49, 0.97);
+  border: 1px solid #8b7448; border-radius: 6px; padding: 8px 14px 8px; color: #f1e8d2; font-family: 'Courier Prime', monospace; box-shadow: 0 6px 30px rgba(0,0,0,0.6); box-sizing: border-box; }
 body.side-panel #queue-board { right: calc(var(--pw, 520px) + 12px); }
 #queue-board.on { display: block; }
 #queue-board .qb-head { display: flex; align-items: baseline; gap: 12px; min-height: 22px; }
-#queue-board .qb-title { font-family: Anton, Impact, sans-serif; color: #f4f2ee; letter-spacing: 1px; font-size: 17px; white-space: nowrap; }
+#queue-board .qb-title { font-family: Anton, Impact, sans-serif; color: #d8a84e; letter-spacing: 1px; font-size: 17px; white-space: nowrap; }
 #queue-board .qb-say { font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#queue-board .qb-say b { color: #fff; } #queue-board .qb-say .w { color: #b9e3c4; } #queue-board .qb-say .bad { color: #ff5a48; } #queue-board .qb-say .red { color: #ff5a48; } #queue-board .qb-say .dim { opacity: 0.55; }
-#queue-board .qb-call { display: none; font-size: 12.5px; font-weight: 700; background: #8a1a14; color: #fff; padding: 1px 8px; border-radius: 3px; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+#queue-board .qb-say b { color: #fff; } #queue-board .qb-say .w { color: #8fd3e2; } #queue-board .qb-say .bad { color: #e8806c; } #queue-board .qb-say .red { color: #e8806c; } #queue-board .qb-say .dim { opacity: 0.6; }
+#queue-board .qb-call { display: none; font-size: 12.5px; font-weight: 700; background: #24365e; border: 1px solid #d8a84e; color: #f1e8d2; padding: 0 8px; border-radius: 3px; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 #queue-board .qb-call.on { display: inline-block; }
 #queue-board .qb-main { display: flex; gap: 18px; align-items: flex-start; margin-top: 4px; }
 #queue-board .qb-stage { position: relative; height: 118px; flex: 1; min-width: 0; overflow: hidden; }
 #queue-board svg.qb-wrap { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-#queue-board .qb-cell { position: absolute; top: 30px; height: 46px; box-sizing: border-box; border: 2px solid #55555b; border-radius: 4px; background: #141416; text-align: center; transition: background 0.2s, border-color 0.2s, box-shadow 0.2s; }
-#queue-board .qb-cell .v { font-family: Anton, Impact, sans-serif; font-size: 21px; line-height: 26px; color: #f4f2ee; }
-#queue-board .qb-cell .nm { font-size: 10.5px; line-height: 13px; color: #b8b6b2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
-#queue-board .qb-cell.stale .v { color: #5c5c62; text-decoration: line-through; }
-#queue-board .qb-cell.stale .nm { color: #5c5c62; }
-#queue-board .qb-cell.blank .v { color: #3c3c40; }
-#queue-board .qb-cell.in { border-color: #b9e3c4; box-shadow: 0 0 14px rgba(185,227,196,0.6); background: #16241a; }
-#queue-board .qb-cell.out { border-color: #ff5a48; box-shadow: 0 0 14px rgba(255,90,72,0.7); background: #2a0e0c; }
-#queue-board .qb-cell.read { border-color: #f4f2ee; box-shadow: 0 0 14px rgba(244,242,238,0.6); background: #2a2a2e; }
-#queue-board .qb-cell.full { border-color: #ff5a48; background: #2a0e0c; }
+#queue-board .qb-cell { position: absolute; top: 30px; height: 46px; box-sizing: border-box; border: 2px solid #b3a88e; border-radius: 4px; background: #f1e8d2; text-align: center; transition: background 0.2s, border-color 0.2s; }
+#queue-board .qb-cell .v { font-family: Anton, Impact, sans-serif; font-size: 21px; line-height: 26px; color: #111522; }
+#queue-board .qb-cell .nm { font-size: 10.5px; line-height: 13px; color: #5a5446; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+#queue-board .qb-cell.stale { background: #26324f; border-color: #3b4a70; }
+#queue-board .qb-cell.stale .v { color: #8a93a8; text-decoration: line-through; }
+#queue-board .qb-cell.stale .nm { color: #8a93a8; }
+#queue-board .qb-cell.blank { background: #1b2643; border-color: #3b4a70; }
+#queue-board .qb-cell.blank .v { color: #4f5d80; }
+#queue-board .qb-cell.in { border-color: #57b9d1; box-shadow: 0 0 0 2px #57b9d1; background: #e3f3f6; }
+#queue-board .qb-cell.out { border-color: #c64a36; box-shadow: 0 0 0 2px #c64a36; background: #f6dcd5; }
+#queue-board .qb-cell.read { border-color: #24365e; box-shadow: 0 0 0 2px #d8a84e; background: #fff8e8; }
+#queue-board .qb-cell.full { border-color: #c64a36; background: #f6dcd5; }
 #queue-board .qb-cell.dim { box-shadow: none; }
-#queue-board .qb-idx { position: absolute; top: 79px; text-align: center; font-size: 12px; font-weight: 700; color: #9a989e; }
+#queue-board .qb-idx { position: absolute; top: 79px; text-align: center; font-size: 12px; font-weight: 700; color: #f1e8d2; background: #8c6a38; border-radius: 3px; line-height: 16px; }
 #queue-board .qb-tag { position: absolute; transform: translateX(-50%); font-size: 12px; font-weight: 700; white-space: nowrap; text-align: center; }
-#queue-board .qb-tag .lab { display: inline-block; padding: 0 5px; border-radius: 3px; color: #0a0a0b; margin: 0 1px; }
-#queue-board .qb-tag .lab.hot { box-shadow: 0 0 0 2px #fff; }
-#queue-board .qb-tag .arr { display: block; line-height: 8px; font-size: 11px; }
+#queue-board .qb-tag .lab { display: inline-block; padding: 0 5px; border-radius: 3px; color: #111522; margin: 0 1px; }
+#queue-board .qb-tag .lab.hot { box-shadow: 0 0 0 2px #57b9d1; }
+#queue-board .qb-tag .arr { display: block; line-height: 8px; font-size: 11px; color: #d8a84e; }
 #queue-board .qb-side { width: 210px; flex: none; font-size: 12.5px; line-height: 1.5; }
-#queue-board .qb-side .k { color: #9a989e; letter-spacing: 1px; font-size: 11px; }
-#queue-board .qb-side .line { color: #f4f2ee; font-weight: 700; word-break: break-word; }
-#queue-board .qb-side .drank { color: #ff5a48; font-weight: 700; word-break: break-word; }
+#queue-board .qb-side .k { color: #a9b3c9; letter-spacing: 1px; font-size: 11px; }
+#queue-board .qb-side .line { color: #f1e8d2; font-weight: 700; word-break: break-word; }
+#queue-board .qb-side .drank { color: #8fd3e2; font-weight: 700; word-break: break-word; }
 #queue-board .qb-foot { display: flex; align-items: center; gap: 10px; margin-top: 2px; flex-wrap: wrap; }
 #queue-board .qb-vars { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-height: 24px; }
-#queue-board .qb-var { border: 1px solid #4a4a4e; border-radius: 3px; padding: 1px 7px; font-size: 12.5px; background: #141416; }
-#queue-board .qb-var.changed { background: #2a2a2e; border-color: #f4f2ee; }
+#queue-board .qb-var { border: 1px solid #3b4a70; border-radius: 3px; padding: 1px 7px; font-size: 12.5px; background: #16213d; }
+#queue-board .qb-var.changed { background: #24365e; border-color: #d8a84e; }
 #queue-board .qb-var b { color: #fff; }
-#queue-board .qb-out { display: none; margin-top: 4px; font-size: 13px; background: #050505; border: 1px solid #333; border-radius: 3px; padding: 3px 8px; color: #b9e3c4; white-space: pre-wrap; max-height: 44px; overflow: auto; }
+#queue-board .qb-out { display: none; margin-top: 4px; font-size: 13px; background: #0c1326; border: 1px solid #3b4a70; border-radius: 3px; padding: 3px 8px; color: #8fd3e2; white-space: pre-wrap; max-height: 44px; overflow: auto; }
 #queue-board .qb-out.on { display: block; }
-#queue-board .qb-out b { color: #9a989e; font-weight: 400; }
+#queue-board .qb-out b { color: #a9b3c9; font-weight: 400; }
 #queue-board .qb-ctrl { display: flex; align-items: center; gap: 4px; }
-#queue-board .qb-ctrl button { min-width: 34px; min-height: 30px; background: #1c1c1f; color: #e8e6e3; border: 1px solid #4a4a4e; border-radius: 3px; font-size: 14px; cursor: pointer; }
-#queue-board .qb-ctrl button:hover:not(:disabled) { border-color: #f4f2ee; }
+#queue-board .qb-ctrl button { min-width: 34px; min-height: 30px; background: #16213d; color: #f1e8d2; border: 1px solid #3b4a70; border-radius: 3px; font-size: 14px; cursor: pointer; }
+#queue-board .qb-ctrl button:hover:not(:disabled), #queue-board .qb-ctrl button:focus-visible { border-color: #d8a84e; outline: none; }
 #queue-board .qb-ctrl button:disabled { opacity: 0.35; cursor: default; }
-#queue-board .qb-ctrl select { background: #1c1c1f; color: #e8e6e3; border: 1px solid #4a4a4e; min-height: 30px; font-family: inherit; }
-#queue-board .qb-count { font-size: 12px; color: #9a989e; min-width: 92px; text-align: right; }
+#queue-board .qb-ctrl select { background: #16213d; color: #f1e8d2; border: 1px solid #3b4a70; min-height: 30px; font-family: inherit; }
+#queue-board .qb-count { font-size: 12px; color: #a9b3c9; min-width: 92px; text-align: right; }
 @media (max-width: 900px) { #queue-board { display: none !important; } }
 `;
-export const FRONT_COLOR = "#f4f2ee", REAR_COLOR = "#ff5a48";
+export const FRONT_COLOR = "#f1e8d2", REAR_COLOR = "#d8a84e";   // the Atlas: FRONT ivory, REAR antique gold (red is kept for danger only)
 
 // ---------- the model, shared with the 3D pit: one frame = the state after a step
 // shape: "ring" (a circular queue, or the game's own queue), "row" (the linear queue), "pq" (a priority queue)
@@ -113,7 +116,7 @@ export class QueueBoard {
     const el = this.el = document.createElement("section");
     el.id = "queue-board"; el.setAttribute("aria-label", "The queue, step by step");
     el.innerHTML = `<div class="qb-head"><span class="qb-title">THE QUEUE</span><span class="qb-call"></span><span class="qb-say" role="status" aria-live="polite"></span></div>
-      <div class="qb-main"><div class="qb-stage"><svg class="qb-wrap"><defs><marker id="qb-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a888e"/></marker></defs></svg></div>
+      <div class="qb-main"><div class="qb-stage"><svg class="qb-wrap"><defs><marker id="qb-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d8a84e"/></marker></defs></svg></div>
         <div class="qb-side"><div class="k">FRONT → REAR</div><div class="line"></div><div class="k" style="margin-top:4px">SERVED, IN ORDER</div><div class="drank"></div></div></div>
       <div class="qb-out" aria-live="polite"></div>
       <div class="qb-foot"><div class="qb-vars"></div>
@@ -230,14 +233,14 @@ export class QueueBoard {
     if (f.shape === "ring") {
     const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
     p.setAttribute("class", "w"); p.setAttribute("d", `M${xa} ${yb} C ${xa} ${yb + 18}, ${xb} ${yb + 18}, ${xb} ${yb + 2}`);
-    p.setAttribute("fill", "none"); p.setAttribute("stroke", "#8a888e"); p.setAttribute("stroke-dasharray", "4 4"); p.setAttribute("marker-end", "url(#qb-ah)");
+    p.setAttribute("fill", "none"); p.setAttribute("stroke", "#d8a84e"); p.setAttribute("stroke-dasharray", "4 4"); p.setAttribute("marker-end", "url(#qb-ah)");
     svg.appendChild(p);
     const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    t.setAttribute("x", (xa + xb) / 2); t.setAttribute("y", yb + 18); t.setAttribute("text-anchor", "middle"); t.setAttribute("fill", "#8a888e"); t.setAttribute("font-size", "11");
+    t.setAttribute("x", (xa + xb) / 2); t.setAttribute("y", yb + 18); t.setAttribute("text-anchor", "middle"); t.setAttribute("fill", "#d8a84e"); t.setAttribute("font-size", "11");
     t.textContent = `after [${f.cap - 1}] comes [0]`; svg.appendChild(t);
     } else if (f.shape === "row") {
       const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      t.setAttribute("x", X(f.cap - 1) + W); t.setAttribute("y", yb + 14); t.setAttribute("text-anchor", "end"); t.setAttribute("fill", "#8a888e"); t.setAttribute("font-size", "11");
+      t.setAttribute("x", X(f.cap - 1) + W); t.setAttribute("y", yb + 14); t.setAttribute("text-anchor", "end"); t.setAttribute("fill", "#d8a84e"); t.setAttribute("font-size", "11");
       t.textContent = `a straight row: rear can only move right, up to [${f.cap - 1}]`; svg.appendChild(t);
     }
     // FRONT and REAR over their cells (both on one cell: side by side)

@@ -9,6 +9,7 @@ import { TRIAL_CSS } from "../../learn/trialPanelCss.js";
 import { QueueBoard, SHADES } from "../../learn/queueBoard.js";
 import { Codex } from "../../learn/codex.js";
 import { LESSONS, lessonCode, UNDERWORLD_CODEX, FULL, PROGRAMS } from "./underworldLessons.js";
+import { icon } from "../../ui/icons.js";
 
 const STORE = "odyssey.underworld.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -95,12 +96,12 @@ function startSteps(ls) {
 const shapeOf = l => (l.lesson ? PROGRAMS[l.lesson.prog].shape : "ring");
 
 const css = `
-#trial-card { position: fixed; inset: 0; z-index: 33; background: #050403; display: none; flex-direction: column; justify-content: center; padding-left: 9vw;
-  font-family: Anton, Impact, sans-serif; color: #f2c230; pointer-events: none; }
+#trial-card { position: fixed; inset: 0; z-index: 33; background: #101a31; display: none; flex-direction: column; justify-content: center; padding-left: 9vw;
+  font-family: Anton, Impact, sans-serif; color: #f1e8d2; pointer-events: none; }
 #trial-card.on { display: flex; }
-#trial-card .h { font-size: clamp(56px, 11vw, 150px); line-height: 0.9; letter-spacing: 2px; text-shadow: 5px 5px 0 #7e1a0f; }
-#trial-card .s { margin-top: 18px; font-family: 'Courier Prime', monospace; font-size: clamp(15px, 1.6vw, 22px); color: #efe1c2; letter-spacing: 1px; }
-#trial-panel .trial-hour { font-family: Anton, Impact, sans-serif; color: #e0644a; letter-spacing: 2px; font-size: 14px; margin-right: 8px; }
+#trial-card .h { font-size: clamp(56px, 11vw, 150px); line-height: 0.9; letter-spacing: 2px; text-shadow: 5px 5px 0 #24365e; padding-bottom: 14px; border-bottom: 3px solid #d8a84e; align-self: flex-start; }
+#trial-card .s { margin-top: 18px; font-family: 'Courier Prime', monospace; font-size: clamp(15px, 1.6vw, 22px); color: #d8a84e; letter-spacing: 1px; }
+#trial-panel .trial-hour { font-family: Anton, Impact, sans-serif; color: #d8a84e; letter-spacing: 2px; font-size: 14px; margin-right: 8px; }
 #trial-panel .lab { display: none; border: 1px solid #5a4422; border-radius: 4px; padding: 8px 10px; background: #1a130c; }
 #trial-panel .lab.on { display: block; }
 #trial-panel .lab label { display: block; font-size: 12.5px; color: #f2c230; letter-spacing: 1px; margin-bottom: 4px; }
@@ -115,21 +116,21 @@ const css = `
 #trial-panel .lab .stones { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: #9c8a6c; }
 #trial-panel .lab .stones select { min-height: 28px; }
 /* three doors, three colours: you always know where you are */
-#trial-panel { border-top: 8px solid var(--mode, #c8261e); }
-#trial-panel.m-trials { --mode: #c8261e; } #trial-panel.m-lab { --mode: #f2c230; } #trial-panel.m-lesson { --mode: #3b62ff; }
+#trial-panel { border-top: 8px solid var(--mode, #d8a84e); }
+#trial-panel.m-trials { --mode: #d8a84e; } #trial-panel.m-lab { --mode: #f1e8d2; } #trial-panel.m-lesson { --mode: #57b9d1; }
 #trial-panel .who { display: flex; align-items: center; gap: 10px; }
-#trial-panel .who .badge { font-size: 13px; letter-spacing: 2px; padding: 2px 8px; border-radius: 3px; background: var(--mode); color: #fff4cf; text-shadow: none; font-family: 'Courier Prime', monospace; font-weight: 700; }
+#trial-panel .who .badge { font-size: 13px; letter-spacing: 2px; padding: 2px 8px; border-radius: 3px; background: var(--mode); color: #111522; text-shadow: none; font-family: 'Courier Prime', monospace; font-weight: 700; }
 #trial-panel.m-lab .who .badge { color: #120c06; }
 #trial-panel .who .sub { font-family: 'Courier Prime', monospace; font-size: 12.5px; color: #9c8a6c; letter-spacing: 0; text-shadow: none; }
-#trial-panel.m-lesson .tab.on { background: #3b62ff; border-color: #3b62ff; color: #fff4cf; }
-#trial-panel .lesson-watch { display: none; border-left: 4px solid #3b62ff; background: #10162e; padding: 7px 10px; font-size: 13px; line-height: 1.4; color: #dfe6ff; }
+#trial-panel.m-lesson .tab.on { background: #57b9d1; border-color: #57b9d1; color: #111522; }
+#trial-panel .lesson-watch { display: none; border-left: 4px solid #57b9d1; background: #13213f; padding: 7px 10px; font-size: 13px; line-height: 1.4; color: #e6eef6; }
 #trial-panel.m-lesson .lesson-watch { display: block; }
-#trial-panel .lesson-watch b { color: #8fb4ff; }
-#trial-panel .lesson-watch.mis { border-left-color: #c8261e; background: #2a0f0c; color: #ffd9d0; } #trial-panel .lesson-watch.mis b { color: #ff7a5c; }
+#trial-panel .lesson-watch b { color: #8fd3e2; }
+#trial-panel .lesson-watch.mis { border-left-color: #c64a36; background: #2a120e; color: #ffd9d0; } #trial-panel .lesson-watch.mis b { color: #e8806c; }
 #trial-panel .lesson-btns { display: none; gap: 6px; flex-wrap: wrap; }
 #trial-panel.m-lesson .lesson-btns { display: flex; }
 #trial-panel .lesson-btns button { flex: 1; min-height: 34px; background: #1a130c; color: #efe1c2; border: 1px solid #5a4422; border-radius: 3px; font: 700 12.5px 'Courier Prime', monospace; cursor: pointer; }
-#trial-panel .lesson-btns button.mis { border-color: #c8261e; color: #ff9a85; }
+#trial-panel .lesson-btns button.mis { border-color: #c64a36; color: #e8806c; }
 #trial-panel .lesson-btns button:disabled { opacity: 0.35; cursor: default; }
 #trial-panel.m-lesson .tabs .tab { flex: 1 0 18% !important; }
 #trial-panel.m-lesson .lab select.examples, #trial-panel.m-lesson .meta { display: none; }
@@ -252,7 +253,9 @@ export class UnderworldTrials {
       b.className = "tab" + (l === this.level ? " on" : "");
       b.style.flex = "1 0 30%"; b.style.minHeight = "34px"; b.style.fontSize = "12px";
       const locked = this.locked(l);
-      b.textContent = (locked ? "🔒 " : "") + (CARDS[l.id] || [String(i + 1)])[0].replace(/\.$/, "") + (d.includes(l.id) ? " ✓" : "");
+      // line icons, as every chapter's tabs: lock and check (no emoji)
+      b.innerHTML = (locked ? icon("lock", { size: 13 }) + " " : "") + (CARDS[l.id] || [String(i + 1)])[0].replace(/\.$/, "") + (d.includes(l.id) ? " " + icon("check", { size: 13 }) : "");
+      b.style.display = "inline-flex"; b.style.alignItems = "center"; b.style.justifyContent = "center"; b.style.gap = "5px";
       b.title = l.title;
       b.setAttribute("aria-pressed", l === this.level);
       b.setAttribute("aria-label", l.title + (locked ? " (locked)" : "") + (d.includes(l.id) ? " (done)" : ""));
@@ -261,10 +264,10 @@ export class UnderworldTrials {
     });
   }
 
-  // the camera keeps the whole ring in view, from above and in front, like the board under it
+  // the camera keeps the whole queue in view, from above and in front, like the board under it
   view(snap = false) {
     const { pit, director } = this.ctx;
-    director.frame(() => pit.points(), { dir: [0, 1.9, 1], fov: 40, margin: 1.08, minDist: 6, lag: 2.6, snap });
+    director.frame(() => pit.points(), { dir: [0, 0.85, 1], fov: 40, margin: 1.16, minDist: 6, lag: 2.6, snap });   // a medium-high three-quarter view: every station, both ends, the travellers as figures
   }
 
   async trialCard(l) {

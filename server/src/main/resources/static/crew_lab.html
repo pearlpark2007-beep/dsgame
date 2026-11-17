@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crew lab (narrative Phase 1 test page)</title>
+<!-- A developer test page for the narrative redesign, Phase 1. Not linked from the game.
+     It shows Odysseus and six crewmen (copies of his marble figure), Elpenor's red cord, the optional-clip
+     fallbacks, the arm helper, and the new film sounds. Open http://localhost:8081/crew_lab.html and press
+     Shift+F for the frame-rate meter. -->
+<link rel="stylesheet" href="js/ui/tokens.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0c0a; color: #f4ead2; font-family: 'Courier Prime', monospace; }
+  #panel { position: fixed; left: 14px; top: 14px; z-index: 30; width: 330px; padding: 12px 14px; background: rgba(12,10,6,.88); border: 1px solid #3a2c18; border-radius: 6px; font-size: 13px; }
+  #panel h1 { margin: 0 0 6px; font: 400 20px Anton, Impact, sans-serif; letter-spacing: 2px; color: #f2c230; }
+  #panel button { all: unset; cursor: pointer; display: inline-block; margin: 3px 4px 3px 0; padding: 5px 9px; border: 1px solid #8a7a5a; border-radius: 4px; font-size: 12px; }
+  #panel button:hover, #panel button:focus-visible { border-color: #f2c230; color: #f2c230; }
+  #panel .row { margin-top: 8px; }
+  #clips { margin-top: 8px; color: #b3a47f; font-size: 12px; line-height: 1.5; }
+  #clips b { color: #f4ead2; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>CREW LAB</h1>
+  <div>Odysseus + six crewmen. Elpenor wears the red cord.</div>
+  <div class="row">Motion:
+    <button data-act="idle">all idle</button><button data-act="walk">walk a lap</button><button data-act="run">Eurylochus runs</button>
+    <button data-act="talk">talk</button><button data-act="sit">sit</button>
+  </div>
+  <div class="row">Arm helper:
+    <button data-act="point">Odysseus points</button><button data-act="drink">cup to mouth</button><button data-act="yell">arm up (shout)</button>
+  </div>
+  <div class="row">Sounds (click once first):
+    <button data-snd="sea1">sea heard 1</button><button data-snd="sea4">sea heard 4</button><button data-snd="song">crowd song</button><button data-snd="roar">crowd roar</button>
+    <button data-snd="horn">horn</button><button data-snd="creak">creak</button><button data-snd="hatch">hatch</button><button data-snd="fire">fire on/off</button><button data-snd="stop">stop loops</button>
+  </div>
+  <div class="row"><button data-act="dispose">remove crew</button><button data-act="respawn">add crew again</button></div>
+  <div id="clips">Optional clips: checking…</div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { World } from "./js/engine/world.js";
+import { Hero } from "./js/engine/hero.js";
+import { installUI } from "./js/ui/ui.js";
+import { sound } from "./js/engine/sound.js";
+import { Crew, OPTIONAL, addClips, clipFor, holdReach } from "./js/story/crew.js";
+
+const params = new URLSearchParams(location.search);
+const world = new World({ quality: params.get("q") || "auto" });
+world.grade.uniforms.letterbox.value = 0;
+installUI({ chapter: "title", world, ambience: null });   // only for Shift+F (the frame-rate meter) and the sound control
+const scene = world.scene;
+scene.background = new THREE.Color(0x1a1612);
+scene.add(new THREE.HemisphereLight(0xcfd8e6, 0x2a2018, 1.1));
+const sun = new THREE.DirectionalLight(0xffe2b8, 2.4); sun.position.set(6, 10, 5); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 }); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(14, 64), new THREE.MeshStandardMaterial({ color: 0x5c5040, roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const cam = world.camera; cam.fov = 42; cam.updateProjectionMatrix();
+cam.position.set(0, 3.2, 9.5); cam.lookAt(0, 1.1, 0);
+
+const hero = new Hero(world); await hero.load();
+hero.teleport(0, 1.6, 0);
+const MEN = [
+  { name: "Polites", tint: 0xd6cdbd, at: [-3.0, -0.4] },
+  { name: "Eurylochus", tint: 0xb8ae9c, at: [-1.8, -1.6] },
+  { name: "Elpenor", tint: 0xe3dccf, at: [-0.6, -2.4], cord: true },
+  { name: "Perimedes", tint: 0xc4b8a4, at: [0.6, -2.4] },
+  { name: "Lycus", tint: 0xa9a08f, at: [1.8, -1.6] },
+  { name: "Antiphus", tint: 0xcabfae, at: [3.0, -0.4] }
+];
+let crew = null;
+async function spawn() {
+  crew = await Crew.ready(world, hero);
+  addClips(hero, crew.optional);
+  for (const m of MEN) crew.add(m).place(m.at[0], 0, m.at[1]).face(0, 1.6);
+  const have = Object.keys(OPTIONAL).map(k => `${k}: <b>${crew.optional[k] ? "file found" : "fallback (" + clipFor(crew.men[0], k).join(" at ") + "×)"}</b>`).join("<br>");
+  document.getElementById("clips").innerHTML = "Optional clips<br>" + have;
+}
+await spawn();
+
+let reach = null;
+const stopReach = () => { if (reach) { reach.stop(); reach = null; } };
+const handTarget = (dx, dy, dz) => () => new THREE.Vector3(dx, dy, dz).applyAxisAngle(new THREE.Vector3(0, 1, 0), hero.group.rotation.y).add(hero.group.position);
+const acts = {
+  idle: () => { stopReach(); hero.play("idle"); crew.men.forEach(m => m.play("idle")); },
+  walk: async () => { const m = crew.men; await Promise.all(m.map((x, i) => x.walkTo(Math.sin(i) * 4, Math.cos(i) * 4 - 1, { speed: 1.3 }))); await Promise.all(MEN.map((d, i) => m[i] && m[i].walkTo(d.at[0], d.at[1]))); m.forEach(x => x.face(0, 1.6)); },
+  run: async () => { const e = crew.get("Eurylochus"); if (!e) return; await e.walkTo(-6, 4, { speed: 3.6, clip: "run" }); await e.walkTo(-1.8, -1.6, { speed: 3.6, clip: "run" }); e.face(0, 1.6); },
+  talk: () => crew.men.forEach(m => m.play("talk")),
+  sit: () => crew.men.forEach(m => m.play("sit")),
+  point: () => { stopReach(); if (hero.actions.point) hero.play("point", 0.2); else reach = holdReach(world, hero.bones, "r", handTarget(-0.32, 1.45, 0.62)); },
+  drink: () => { stopReach(); if (hero.actions.drink) hero.play("drink", 0.2); else reach = holdReach(world, hero.bones, "r", handTarget(-0.05, 1.5, 0.18)); },
+  yell: () => { stopReach(); if (hero.actions.yell) hero.play("yell", 0.2); else reach = holdReach(world, hero.bones, "r", handTarget(-0.3, 1.95, 0.25)); },
+  dispose: () => { crew.dispose(); },
+  respawn: async () => { crew.dispose(); await spawn(); }
+};
+let fireOn = false;
+const snds = {
+  sea1: () => sound.seaHeard({ level: 0.25 }), sea4: () => sound.seaHeard({ level: 0.7 }),
+  song: () => sound.crowd(true, { mood: "song" }), roar: () => sound.crowd(true, { mood: "roar", level: 0.09 }),
+  horn: () => sound.horn(), creak: () => sound.creak(), hatch: () => sound.hatch(),
+  fire: () => { fireOn = !fireOn; sound.fire(fireOn); }, stop: () => { sound.crowd(false); sound.fire(false); fireOn = false; }
+};
+document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => acts[b.dataset.act]());
+document.querySelectorAll("[data-snd]").forEach(b => b.onclick = () => snds[b.dataset.snd]());
+
+if (params.get("capture")) {
+  window.__advance = async s => { const n = Math.round(s / (1 / 30)); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  world.step(1 / 30);
+} else world.start();
+window.__lab = { world, hero, get crew() { return crew; }, acts, snds, sound };
+window.__ready = true;
+</script>
+</body>
+</html>

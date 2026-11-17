@@ -12,12 +12,14 @@ import { TRIAL_CSS as css } from "../../learn/trialPanelCss.js";
 import { StackBoard } from "../../learn/stackBoard.js";
 import { Codex } from "../../learn/codex.js";
 import { HARBOUR_CODEX } from "../../learn/codexContent.js";
+import { icon } from "../../ui/icons.js";
 
 const STORE = "odyssey.harbour.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
 const markDone = id => { try { const d = done(); if (!d.includes(id)) { d.push(id); localStorage.setItem(STORE, JSON.stringify(d)); } } catch { /* storage off */ } };
 
-const TIER = { PRACTICE: "PRACTICE", FINALE: "FINALE", LAB: "⚗ LAB" };
+const TIER = { PRACTICE: "PRACTICE", FINALE: "FINALE", LAB: "LAB" };
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // THE LAB: the player builds the quay (up to 3 stacks, up to 6 crates high) and writes anything.
 // Java runs it (POST /api/sandbox); nothing to win. The examples are classic stack algorithms on s and t.
@@ -88,7 +90,7 @@ export class TrialMode {
       <div class="meta"><span class="moves"></span><span class="hintArea"></span></div>
       <div class="editor"><div class="gutter">1</div><div class="wrap"><div class="hl"></div><label class="sr" style="position:absolute;left:-9999px" for="tcode">Your C code</label><textarea id="tcode" spellcheck="false" autocomplete="off"></textarea></div></div>
       <button class="run">GUIDE HIM</button>
-      <div class="row"><button class="reset">Reset trial</button><button class="lessonb">Athena's lesson</button></div>
+      <div class="row"><button class="reset">Reset trial</button><button class="lessonb">Athena's lesson</button><button class="closeb">Close</button></div>
       <div class="status" role="status" aria-live="polite"></div>
       <div class="words">Words Athena understands: <code>push(&amp;s, x);</code> <code>pop(&amp;s)</code> <code>peek(&amp;s)</code> <code>isEmpty(&amp;s)</code> <code>isFull(&amp;s)</code> <code>size(&amp;s)</code> <code>int x = ...;</code> <code>if</code> <code>while</code> <code>for</code></div>`;
     document.body.appendChild(el);
@@ -100,6 +102,7 @@ export class TrialMode {
     this.$(".run").onclick = () => this.run();
     this.$(".reset").onclick = () => { if (!this.busy && this.level) this.select(this.level); };
     this.$(".lessonb").onclick = () => { if (!this.busy && ctx.onLesson) ctx.onLesson(); };
+    this.$(".closeb").onclick = () => { if (!this.busy) this.close(true); };
     if (!document.getElementById("harbour-lab-css")) { const st = document.createElement("style"); st.id = "harbour-lab-css"; st.textContent = LAB_CSS; document.head.appendChild(st); }
     this.buildLab();
     this.codex = new Codex(el, HARBOUR_CODEX, part => this.runPart(part));
@@ -183,7 +186,11 @@ export class TrialMode {
     const d = done();
     this.select(this.levels.find(l => !d.includes(l.id)) || this.levels[0]);
   }
-  close() { this.el.classList.remove("on"); this.board.close(); }
+  // back = the player closed the panel (back to the chapter's doors); without it the page is switching to something else
+  close(back = false) {
+    this.el.classList.remove("on"); this.board.close();
+    if (back) { this.ctx.panelView(false); if (this.ctx.onClose) this.ctx.onClose(); }
+  }
   // the finale opens once every practice level on the island is done
   locked(l) { const d = done(); return l.tier === "FINALE" && this.levels.some(p => p.tier === "PRACTICE" && !d.includes(p.id)); }
 
@@ -202,7 +209,9 @@ export class TrialMode {
       const b = document.createElement("button");
       b.className = "tab" + (l === this.level ? " on" : "");
       const locked = this.locked(l);
-      b.textContent = l === LAB ? "⚗ THE LAB" : (locked ? "🔒 " : "") + TIER[l.tier] + " · " + l.title + (d.includes(l.id) ? " ✓" : "");
+      // the same line icons as every chapter's tabs (no emoji): lock, flask, check
+      b.innerHTML = l === LAB ? icon("flask", { size: 14 }) + " THE LAB"
+        : (locked ? icon("lock", { size: 14 }) + " " : "") + TIER[l.tier] + " · " + esc(l.title) + (d.includes(l.id) ? " " + icon("check", { size: 14 }) : "");
       if (l === LAB) b.classList.add("labtab");
       b.setAttribute("aria-pressed", l === this.level);
       b.onclick = () => { if (this.busy) return; if (locked) { this.status("Finish the practice first: the crew won't row out with an empty hold.", "bad"); return; } this.select(l); };
@@ -556,4 +565,5 @@ const LAB_CSS = `
 #trial-panel .lab .labmsg { font-size: 12.5px; margin-top: 5px; color: #9c8a6c; min-height: 16px; }
 #trial-panel .lab .labmsg.bad { color: #ff7a5c; }
 #trial-panel .tab.labtab { border-color: #3f7a52; color: #8fe3a0; }
+body[data-chapter="harbour"] #trial-panel .tab { flex: 1 1 auto; padding: 0 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; letter-spacing: 0.4px; }
 `;

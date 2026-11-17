@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troy lab (narrative Phase 6 rough prototype)</title>
+<!-- A developer test page for the narrative redesign, Phase 6: the rough Troy set for a look review, and the
+     two wooden horses side by side. Not linked from the game. Open http://localhost:8081/troy_lab.html,
+     press Shift+F for the frame-rate meter, and use the shot buttons. -->
+<link rel="stylesheet" href="js/ui/tokens.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #f4ead2; font-family: 'Courier Prime', monospace; }
+  #panel { position: fixed; left: 14px; top: 14px; z-index: 30; width: 300px; padding: 12px 14px; background: rgba(12,10,6,.86); border: 1px solid #3a2c18; border-radius: 6px; font-size: 12px; }
+  #panel.min > :not(h1) { display: none; }
+  #panel h1 { margin: 0 0 6px; font: 400 20px Anton, Impact, sans-serif; letter-spacing: 2px; color: #f2c230; cursor: pointer; }
+  #panel button { all: unset; cursor: pointer; display: inline-block; margin: 3px 4px 3px 0; padding: 4px 8px; border: 1px solid #8a7a5a; border-radius: 4px; font-size: 12px; }
+  #panel button:hover, #panel button:focus-visible, #panel button.on { border-color: #f2c230; color: #f2c230; }
+  #panel .row { margin-top: 8px; }
+  #stats { margin-top: 8px; color: #b3a47f; line-height: 1.5; white-space: pre-line; }
+  #shotname { position: fixed; right: 18px; bottom: 16px; z-index: 30; font-size: 13px; color: #d8c9a0; text-shadow: 0 1px 3px #000; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1 title="click to fold">TROY LAB</h1>
+  <div>Rough prototype: blocking, materials and light. Not the film.</div>
+  <div class="row">Shots:<br><span id="shots"></span></div>
+  <div class="row">Mood: <button data-mood="night">night, burning</button><button data-mood="dawn">dawn</button></div>
+  <div class="row">Set: <button id="gateb">open the gate</button><button id="hatchb">open the hatch</button><button id="fleetb">fleet to sea</button></div>
+  <div class="row">Horse in the set: <button data-horse="proc">built in code</button><button data-horse="ext">licensed model</button></div>
+  <div class="row">Letterbox: <button id="lbb">on/off</button></div>
+  <div id="stats">…</div>
+</div>
+<div id="shotname"></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { World } from "./js/engine/world.js";
+import { Hero } from "./js/engine/hero.js";
+import { installUI } from "./js/ui/ui.js";
+import { buildTroy, groundAt } from "./js/story/troy/troySet.js";
+import { buildHorse } from "./js/story/troy/troyHorse.js";
+import { stats } from "./js/story/troy/bake.js";
+
+const params = new URLSearchParams(location.search);
+const world = new World({ quality: params.get("q") || "auto" });
+installUI({ chapter: "title", world, ambience: null });     // only for Shift+F (the frame-rate meter) and the sound control
+world.renderer.info.autoReset = false; world.add({ update: () => world.renderer.info.reset() });   // count every pass of a frame (shadows, sea reflection, glow)
+const cam = world.camera; cam.fov = 38; cam.far = 6000; cam.updateProjectionMatrix();
+const $ = id => document.getElementById(id);
+document.querySelector("#panel h1").onclick = () => $("panel").classList.toggle("min");
+
+let t0 = performance.now();
+const troy = buildTroy(world);
+const setMs = performance.now() - t0;
+
+// ---- the horses: the licensed model (assets/troy/horse.glb, the chosen one) and the one built in code (the fallback)
+t0 = performance.now();
+const procHorse = buildHorse({ quality: world.quality });
+const procMs = performance.now() - t0;
+const HSPOT = new THREE.Vector3(4, troy.PLATEAU, troy.GATE.z - 24);
+const placeHorse = (h, at, yaw) => { h.position.set(at.x, groundAt(at.x, at.z), at.z); h.rotation.y = yaw; };
+placeHorse(procHorse, HSPOT, -Math.PI / 2);                     // faces the gate (+z)
+procHorse.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+troy.root.add(procHorse);
+
+let extHorse = null, extInfo = { status: "not found (assets/troy/horse.glb)" };
+async function loadExt() {
+  const url = "assets/troy/horse.glb";
+  try {
+    const t = performance.now();
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const buf = await res.arrayBuffer(), bytes = buf.byteLength;
+    const gltf = await new GLTFLoader().parseAsync(buf, "assets/troy/");
+    const ms = performance.now() - t;
+    const m = gltf.scene;
+    // turn it so its long axis runs along x, then scale it to the built horse's height, feet on the ground, centred
+    const turn = new THREE.Group(); turn.add(m);
+    let size = new THREE.Box3().setFromObject(turn).getSize(new THREE.Vector3());
+    if (size.z > size.x) turn.rotation.y = Math.PI / 2;
+    turn.updateMatrixWorld(true); size = new THREE.Box3().setFromObject(turn).getSize(new THREE.Vector3());
+    turn.scale.setScalar(procHorse.userData.height / size.y); turn.updateMatrixWorld(true);
+    const b2 = new THREE.Box3().setFromObject(turn), c = b2.getCenter(new THREE.Vector3());
+    turn.position.set(-c.x, -b2.min.y, -c.z);
+    const wrap = new THREE.Group(); wrap.add(turn); wrap.updateMatrixWorld(true);
+    m.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+    addHatch(wrap, m);
+    extHorse = wrap; extInfo = { status: "loaded", bytes, ms, ...stats(wrap) };
+  } catch (e) { extInfo = { status: "error: " + e.message }; }
+}
+// a belly hatch for the licensed model (it has none): a panel cut from the model's own wood, hinged on one side,
+// with a dark opening behind it. The belly is found by casting a ray down through the middle of the body.
+function addHatch(wrap, model) {
+  let mat = null; model.traverse(o => { if (o.isMesh && !mat) mat = o.material; });
+  const rc = new THREE.Raycaster(), H = procHorse.userData.height;
+  const bellyAt = x => { rc.set(new THREE.Vector3(x, H + 5, 0), new THREE.Vector3(0, -1, 0)); const ys = rc.intersectObject(model, true).map(i => i.point.y).filter(y => y > 0.35 * H); return ys.length ? Math.min(...ys) : null; };
+  const ys = [-0.8, 0, 0.8].map(bellyAt).filter(y => y != null);
+  if (!ys.length) return;
+  const y = Math.min(...ys);                                   // the lowest point of the belly under the hatch
+  const W = 2.0, D = 1.2;
+  const hole = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ color: 0x050302 }));
+  hole.rotation.x = Math.PI / 2; hole.position.set(0, y - 0.03, 0); wrap.add(hole);
+  const hinge = new THREE.Group(); hinge.position.set(-W / 2, y - 0.1, 0); hinge.name = "hatch"; wrap.add(hinge);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(W, 0.12, D + 0.06), mat); door.position.set(W / 2, 0, 0); door.castShadow = true; hinge.add(door);
+  const seamMat = new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: 1 });     // a dark frame round the opening
+  for (const [x, z, w, d] of [[0, D / 2 + 0.06, W + 0.24, 0.12], [0, -D / 2 - 0.06, W + 0.24, 0.12], [W / 2 + 0.06, 0, 0.12, D], [-W / 2 - 0.06, 0, 0.12, D]]) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), seamMat); s.position.set(x, y - 0.07, z); wrap.add(s);
+  }
+  const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.14), new THREE.MeshStandardMaterial({ color: 0x7c6034, metalness: 0.8, roughness: 0.45 }));
+  bolt.position.set(W - 0.15, -0.09, 0); hinge.add(bolt);
+  wrap.userData.hatch = hinge;
+}
+await loadExt();
+
+// ---- Odysseus, for scale (and for the wall shot)
+const hero = new Hero(world); await hero.load();
+hero.teleport(HSPOT.x - 6, HSPOT.z + 4, 0, troy.PLATEAU);
+
+// ---- the comparison: both horses side by side on the plain, outside the walls
+const CMP = { a: new THREE.Vector3(22, 0, 40), b: new THREE.Vector3(38, 0, 40) };
+let mode = "set", horseInSet = "proc";
+function showHorse(which) {
+  horseInSet = which;
+  const h = which === "ext" && extHorse ? extHorse : procHorse;
+  for (const x of [procHorse, extHorse]) if (x && x !== h && x.parent === troy.root && mode === "set") troy.root.remove(x);
+  if (mode === "set") { placeHorse(h, HSPOT, h === extHorse ? Math.PI / 2 : -Math.PI / 2); troy.root.add(h); }
+  document.querySelectorAll("[data-horse]").forEach(b => b.classList.toggle("on", b.dataset.horse === which));
+}
+function compareMode(on) {
+  mode = on ? "compare" : "set";
+  if (on) {
+    placeHorse(procHorse, CMP.a, Math.PI - 0.45); troy.root.add(procHorse);
+    if (extHorse) { placeHorse(extHorse, CMP.b, -0.45); /* this model faces the other way */ troy.root.add(extHorse); }
+  } else showHorse(horseInSet);
+}
+
+// ---- shots (camera set-ups from the screenplay's opening film)
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const st = troy.stairTop, tr = troy.trident.position;
+const inward = V(troy.C.x - tr.x, 0, troy.C.z - tr.z).normalize();
+// a point on the circle of the wall at the top of the stair: r from the centre, s metres along the wall, height y
+const phiE = Math.atan2(st.x - troy.C.x, st.z - troy.C.z);
+const onWall = (r, s, y) => V(troy.C.x + Math.sin(phiE) * r + Math.cos(phiE) * s, y, troy.C.z + Math.cos(phiE) * r - Math.sin(phiE) * s);
+const SHOTS = [
+  { k: "wide", name: "Overview", mood: "night", pos: V(200, 110, 170), at: V(0, 10, -110) },
+  { k: "3", name: "3 · The hatch: up the horse's flank to the wall", mood: "night", pos: V(HSPOT.x - 7, troy.PLATEAU + 1.2, HSPOT.z - 13), at: V(HSPOT.x + 1, troy.PLATEAU + 13, troy.GATE.z + 2) },
+  { k: "4a", name: "4a · The gate, from inside", mood: "night", pos: V(-3, troy.PLATEAU + 2.2, troy.GATE.z - 36), at: V(0, troy.PLATEAU + 6, troy.GATE.z) },
+  { k: "4c", name: "4c · Fire roof to roof, high angle", mood: "night", pos: V(-60, 95, -95), at: V(-10, 18, -160) },
+  { k: "4d", name: "4d · Over the wall: the whole city burning", mood: "night", pos: V(30, 48, -40), at: V(0, 18, -170) },
+  { k: "5", name: "5 · On the wall, the city behind him", mood: "night", pos: onWall(77.9, -1.8, troy.WALL_TOP + 2.0), at: onWall(40, 8, troy.PLATEAU + 9), hero: true },
+  { k: "6", name: "6 · The trident in the stone", mood: "night", pos: tr.clone().add(inward.clone().multiplyScalar(2.3)).add(V(0, 0.5, 0)), at: tr.clone() },
+  { k: "7", name: "7 · The beach at dawn, the city smoking", mood: "dawn", pos: V(-70, 4.2, troy.SHORE_Z + 8), at: V(-36, 12, 20) },
+  { k: "10", name: "10 · Twelve ships (fleet at sea)", mood: "dawn", pos: V(-120, 160, 560), at: V(0, 0, 330), fleet: true },
+  { k: "cmp", name: "Horse comparison: left built in code, right licensed model", mood: "dawn", pos: V(30, 8.5, 80), at: V(30, 7.5, 40), compare: true }
+];
+let fleetAtSea = false;
+function fleet(on) {
+  fleetAtSea = on;
+  troy.ships.forEach((s, i) => {
+    if (!s.userData.beach) s.userData.beach = { p: s.position.clone(), r: s.rotation.clone() };
+    if (on) { const row = i % 4, line = Math.floor(i / 4); s.position.set(-60 + row * 40 + line * 14, 0.2, troy.SHORE_Z + 160 + line * 70 + row * 9); s.rotation.set(0, -Math.PI / 2, 0); }
+    else { s.position.copy(s.userData.beach.p); s.rotation.copy(s.userData.beach.r); }
+  });
+  troy.syncFleet();
+}
+function go(shot) {
+  compareMode(!!shot.compare);
+  fleet(!!shot.fleet);
+  troy.setMood(shot.mood);
+  if (shot.hero) { const h = onWall(75.3, 0, 0); hero.teleport(h.x, h.z, Math.atan2(inward.x, inward.z), troy.WALL_TOP); }
+  else hero.teleport(HSPOT.x - 6, HSPOT.z + 4, 0, troy.PLATEAU);
+  cam.position.copy(shot.pos); cam.lookAt(shot.at);
+  $("shotname").textContent = shot.name;
+  document.querySelectorAll("[data-shot]").forEach(b => b.classList.toggle("on", b.dataset.shot === shot.k));
+  current = shot;
+}
+let current = null;
+$("shots").innerHTML = SHOTS.map(s => `<button data-shot="${s.k}">${s.k === "wide" ? "overview" : s.k === "cmp" ? "horse compare" : s.k}</button>`).join("");
+document.querySelectorAll("[data-shot]").forEach(b => b.onclick = () => go(SHOTS.find(s => s.k === b.dataset.shot)));
+document.querySelectorAll("[data-mood]").forEach(b => b.onclick = () => troy.setMood(b.dataset.mood));
+document.querySelectorAll("[data-horse]").forEach(b => b.onclick = () => showHorse(b.dataset.horse));
+let gateOpen = 0, hatchOpen = 0;
+$("gateb").onclick = () => { gateOpen = 1 - gateOpen; troy.openGate(gateOpen); };
+$("hatchb").onclick = () => { hatchOpen = 1 - hatchOpen; for (const x of [procHorse, extHorse]) { const h = x && x.userData.hatch; if (h) { h.rotation.x = 0; h.rotation.z = -hatchOpen * 1.9; } } };
+$("fleetb").onclick = () => fleet(!fleetAtSea);
+$("lbb").onclick = () => { const u = world.grade.uniforms.letterbox; u.value = u.value ? 0 : 1; };
+
+// ---- stats
+const ps = stats(procHorse), all = stats(world.scene);
+function showStats() {
+  const r = world.renderer.info.render;
+  const e = extInfo.status === "loaded" ? `${extInfo.tris.toLocaleString()} triangles · ${extInfo.meshes} meshes · ${(extInfo.bytes / 1048576).toFixed(2)} MB file · loaded in ${extInfo.ms.toFixed(0)} ms` : extInfo.status;
+  $("stats").textContent =
+    `Horse built in code: ${ps.tris.toLocaleString()} triangles · ${ps.meshes} meshes · no file · built in ${procMs.toFixed(0)} ms\n` +
+    `Licensed horse: ${e}\n` +
+    `Set built in ${setMs.toFixed(0)} ms\n` +
+    `This frame: ${r.calls} draw calls · ${r.triangles.toLocaleString()} triangles\n` +
+    `Frame rate: press Shift+F`;
+}
+showHorse(extHorse ? "ext" : "proc");          // the licensed model is the chosen horse; the built one stands in if its file is missing
+go(SHOTS[0]);
+showStats(); setInterval(showStats, 1000);
+
+if (params.get("capture")) {
+  window.__advance = async s => { const n = Math.max(1, Math.round(s / (1 / 30))); for (let i = 0; i < n; i++) { world.step(1 / 30, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  world.step(1 / 30);
+} else world.start();
+window.__troy = { world, troy, hero, procHorse, get extHorse() { return extHorse; }, extInfo: () => extInfo, SHOTS, go, fleet, showHorse, compareMode, stats: () => ({ proc: ps, all, frame: { ...world.renderer.info.render } }) };
+window.__ready = true;
+</script>
+</body>
+</html>

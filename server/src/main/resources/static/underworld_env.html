@@ -11,57 +11,31 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 <title>The Underworld</title>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { --sun: #f2f1ee; --ink: #0b0b0c; --blood: #d7261e; --cobalt: #1d3fd1; --paper: #ecebe8; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: var(--paper); font-family: 'Courier Prime', monospace; }
+  /* THE ATLAS OF LAST VOYAGES: night indigo, ivory, antique gold, route cyan; ember red for danger only */
+  :root { --sun: #f1e8d2; --ink: #111522; --blood: #c64a36; --cobalt: #57b9d1; --paper: #f1e8d2; --night: #101a31; --brass: #d8a84e; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night); color: var(--paper); font-family: 'Courier Prime', monospace; }
   canvas { display: block; }
-  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #0b0b0c; z-index: 40; transition: opacity 1s; }
-  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 34px; color: var(--blood); }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--night); z-index: 40; transition: opacity 1s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 34px; color: var(--brass); }
   #loading p { margin: 0; color: var(--paper); font-size: 15px; }
 
-  /* the chapter mark: Kill Bill black bands on a bright picture */
-  #title { position: fixed; left: 0; top: 7%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: opacity 0.6s; }
-  #title span { background: var(--ink); padding: 4px 18px 4px max(18px, 4vw); }
-  #title .k { font-size: 15px; letter-spacing: 4px; color: var(--paper); }
-  #title .t { font-family: Anton, Impact, sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: 1.05; color: var(--paper); letter-spacing: 1px; }
-  #title .t em { font-style: normal; color: var(--blood); }
-
-  /* three doors: three colours, three jobs */
-  #doors { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 0 max(16px, 3vw) 18px; display: flex; flex-direction: column; gap: 10px; transition: opacity 0.6s; }
-  #doors .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .door { position: relative; text-align: left; border: 0; border-top: 10px solid var(--c); background: rgba(14, 10, 7, 0.92); color: var(--paper); padding: 14px 16px 16px; cursor: pointer;
-          font: inherit; display: flex; flex-direction: column; gap: 6px; min-height: 150px; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 6px 6px 0 var(--ink); }
-  .door:hover, .door:focus-visible { transform: translate(-2px, -3px); box-shadow: 9px 10px 0 var(--ink); outline: none; }
-  .door:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
-  .door .kick { font-size: 12px; letter-spacing: 3px; color: var(--c); font-weight: 700; }
-  .door .name { font-family: Anton, Impact, sans-serif; font-size: clamp(26px, 2.8vw, 38px); line-height: 1; letter-spacing: 1px; }
-  .door .what { font-size: 14px; line-height: 1.4; color: #d8ccb2; }
-  .door .prog { margin-top: auto; font-size: 12.5px; color: var(--c); font-weight: 700; letter-spacing: 1px; }
-  .door.lesson { --c: #3b62ff; } .door.trials { --c: var(--blood); } .door.lab { --c: #f2c230; }
-  #doors .extra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  #doors .extra button, #doors .extra a { min-height: 36px; padding: 0 14px; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); font: inherit; font-size: 13px;
-          letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }
-  #doors .extra button:hover, #doors .extra a:hover, #doors .extra :focus-visible { border-color: var(--sun); color: var(--sun); outline: none; }
-  #doors .extra .lbl { font-size: 11px; letter-spacing: 2px; color: var(--ink); background: var(--paper); padding: 2px 8px; font-weight: 700; }
-  @media (max-width: 760px) { #doors .row { grid-template-columns: minmax(0, 1fr); } .door { min-height: 0; } .door .what { display: none; } }
-
-  body.busy #doors, body.busy #title { opacity: 0; pointer-events: none; }
-  body.cinematic #doors, body.cinematic #title { display: none; }
+  /* the chapter mark and the three doors: the shared menu in js/ui/tokens.css (.odx-title, .odx-doors), dressed there for this island */
 
   /* the prologue: typed title cards on black */
-  #lore { position: fixed; inset: 0; z-index: 33; background: #050403; display: none; flex-direction: column; justify-content: center; padding: 0 12vw; pointer-events: none; }
+  #lore { position: fixed; inset: 0; z-index: 33; background: var(--night); display: none; flex-direction: column; justify-content: center; padding: 0 12vw; pointer-events: none; }
   #lore.on { display: flex; }
   #lore p { margin: 0; max-width: 46ch; font-family: 'Courier Prime', monospace; font-weight: 700; font-size: clamp(22px, 2.7vw, 38px); line-height: 1.35; color: var(--paper); min-height: 2.7em; }
   #lore p.red { font-family: Anton, Impact, sans-serif; font-weight: 400; font-size: clamp(44px, 7vw, 96px); letter-spacing: 2px; color: var(--blood); line-height: 1; }
-  #lore p::after { content: "▌"; color: var(--sun); animation: blink 0.8s steps(1) infinite; }
+  #lore p::after { content: "▌"; color: var(--brass); animation: blink 0.8s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { #lore p::after { animation: none; } .door { transition: none; } }
 
-  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.8); color: var(--paper);
-          border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(16, 26, 49, 0.88); color: var(--paper);
+          border: 1px solid #8b7448; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
   #skip.on { display: block; }
   @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
-  #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
-          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: var(--sun); }
+  #fast { position: fixed; inset: 0; z-index: 34; background: var(--night); display: none; align-items: center; justify-content: center;
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: var(--brass); }
   #fast.on { display: flex; }
 </style>
 <script type="importmap">
@@ -70,20 +44,21 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 </head>
 <body>
 <div id="loading"><h1>THE OFFICE OF HADES</h1><p>please take a number…</p></div>
-<div id="title"><span class="k">CHAPTER FOUR</span><span class="t">THE DEAD <em>TAKE A NUMBER</em></span></div>
+<div id="title" class="odx-title"><span class="k">CHAPTER FOUR</span><span class="t">THE DEAD <em>TAKE A NUMBER</em></span></div>
 <div id="lore" aria-live="polite"><p></p></div>
 <button id="skip">SKIP SCENE ▸▸ (Esc)</button>
 <div id="fast">▸▸</div>
-<nav id="doors" aria-label="Chapter four">
+<nav id="doors" class="odx-doors" aria-label="Chapter four">
+  <button class="continue" id="continue-btn"></button>
   <div class="row">
-    <button class="door lesson" id="door-lesson"><span class="kick">LEARN</span><span class="name">ATHENA'S LESSON</span>
+    <button class="door lesson" id="door-lesson"><span class="kick" data-ic="book">LEARN</span><span class="name">ATHENA'S LESSON</span>
       <span class="what">The linear queue and its fake FULL, the circular queue that fixes it, a deque and a priority queue. C, line by line. Nothing is graded.</span><span class="prog" id="prog-lesson">11 lessons</span></button>
-    <button class="door trials" id="door-trials"><span class="kick">BE JUDGED</span><span class="name">THE OFFICE</span>
+    <button class="door trials" id="door-trials"><span class="kick" data-ic="check">BE JUDGED</span><span class="name">THE OFFICE</span>
       <span class="what">Four trials and closing time. Serve the wrong soul first and the whole line knows it.</span><span class="prog" id="prog-trials"></span></button>
-    <button class="door lab" id="door-lab"><span class="kick">PLAY</span><span class="name">THE LAB</span>
+    <button class="door lab" id="door-lab"><span class="kick" data-ic="flask">PLAY</span><span class="name">THE LAB</span>
       <span class="what">No judge, no story. Your queue, your code, or the whole queue program.</span><span class="prog">3 to 8 places</span></button>
   </div>
-  <div class="extra"><button id="open-btn">▶ PROLOGUE</button></div>
+  <div class="extra"><span class="lbl">STORY</span><button id="open-btn" data-ic="film">Prologue</button><button id="crawl-btn" data-ic="scroll">The story so far</button></div>
 </nav>
 
 <script type="module">
@@ -93,19 +68,20 @@ import { panelW } from "./js/learn/panelWidth.js";
 import { Director } from "./js/engine/director.js";
 import { sound } from "./js/engine/sound.js";
 import { installUI } from "./js/ui/ui.js";
+import { icon } from "./js/ui/icons.js";
 import { Comic } from "./js/engine/comic.js";
 import { Hero } from "./js/engine/hero.js";
 import { nameCard } from "./js/story/tags.js";
-import { buildHall, Hall } from "./js/islands/underworld/hall.js";
+import { buildHall, Hall } from "./js/islands/underworld/atlas.js";   // the Atlas of Last Voyages (hall.js: the old office, unused)
 import { UnderworldTrials } from "./js/islands/underworld/underworldTrials.js";
+import { Crew, reachArm } from "./js/story/crew.js";
 
 const params = new URLSearchParams(location.search);
 const world = new World({ quality: params.get("q") || "auto" });
 world.grade.uniforms.letterbox.value = 0;
-world.grade.uniforms.mono.value = 1;            // black and white: only red survives (the neon, the ropes)
-world.grade.uniforms.halo.value = 0.6;
-if (world.grade.uniforms.burn) world.grade.uniforms.burn.value = 0.7;
-world.renderer.toneMappingExposure = 1.05;
+// clarity first (the Atlas redesign): no bloom; the chapter grade (grades.js) is switched off for gameplay
+world.noBloom = true; world.applyQuality();
+world.renderer.toneMappingExposure = 1.15;
 
 try { await Promise.race([Promise.all([document.fonts.load("40px Anton"), document.fonts.load("bold 40px 'Courier Prime'")]), new Promise(r => setTimeout(r, 2500))]); } catch { /* fonts blocked: fallbacks */ }
 
@@ -116,8 +92,8 @@ const ui = installUI({ chapter: "underworld", world });  // tokens, loading, VOY
 const comic = new Comic(world, director);
 const hero = await new Hero(world, { groundY: 0 }).load();
 hero.teleport(7.2, 6.4, -2.3);                    // Odysseus just inside the door, by the ticket machine
-// the title shot: down the hall from the door, the carousel, the counter and the red sign at the back
-const POSTCARD = [[0, 6.0, 17], [0, 3.2, -10], 52];
+// the title shot: a wide three-quarter view of the chamber, the astrolabe over the console, the Orbit Gallery in front
+const POSTCARD = [[9.5, 6.4, 14.5], [-0.5, 3.6, -3.5], 52];
 
 // ---------- skipping
 let skipping = false, filming = false, trialRun = false, trialFast = false;
@@ -157,20 +133,130 @@ async function typeCard(text, cls = "") {
   p.textContent = text;
   await pit.wait(cls ? 1.4 : Math.max(1.3, 0.022 * n));
 }
+// ---- the screenplay's U1–U3 ("Nobody noticed"). U1 replaces cards 1–4; U2–U3 play after the queue caption.
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const STAIR_FOOT = V3(9.5, 0, 7.5), STAIR_DIR = V3(9.5, 0, 7.5).normalize(), STAIR_SIDE = V3(-STAIR_DIR.z, 0, STAIR_DIR.x);
+const stairY = d => Math.min(1, Math.max(0, (d - 2.75) / 7.2)) * 2.56;          // height on the Descent, d metres out from its foot
+const uncaption = () => comic.el.querySelectorAll(".narr").forEach(n => n.remove());   // a cut cancels a caption's own timer
+// drive the camera every frame (fn sets o.pos, o.look, o.fov)
+function track(fn) {
+  let t = 0; const o = { pos: V3(0, 0, 0), look: V3(0, 0, 0), fov: 45 };
+  const u = { update: (dt, time, raw) => { t += director.skipping ? dt : raw; fn(t, o); director.mode = null; director.cam.position.copy(o.pos); director.look.copy(o.look); director.setFov(o.fov); director.cam.lookAt(o.look); } };
+  world.add(u); return { stop() { const i = world.updaters.indexOf(u); if (i >= 0) world.updaters.splice(i, 1); } };
+}
+// U1 · the Descent: from the top of the stair, looking down into the Atlas. He comes past us and goes down; his crew
+// stay at the top, and one raises a hand.
+async function descent() {
+  const crew = await Crew.ready(world, hero);
+  const top = d => STAIR_FOOT.clone().addScaledVector(STAIR_DIR, d).setY(stairY(d));
+  const men = [["Polites", 0xd6cdbd, 2.2], ["Eurylochus", 0xb8ae9c, -2.3], ["Perimedes", 0xc4b8a4, -2.6]].map(([name, tint, sd], i) => {
+    const m = crew.add({ name, tint }); const p = top(i === 2 ? 12.2 : 11.3).addScaledVector(STAIR_SIDE, sd);      // at the edges of the frame
+    m.place(p.x, p.y, p.z); m.face(0, -4); return m;
+  });
+  let wave = 0;
+  const waving = { update: () => { const m = men[0]; if (wave > 0) { m.group.updateMatrixWorld(); reachArm(m.bones, "r", V3(-0.2, 2.2, 0.3).applyMatrix4(m.group.matrixWorld), wave); } } };
+  world.add(waving);
+  const cam = track((t, o) => { const k = Math.min(1, t / 8); o.pos.copy(top(12.9)).add(V3(0, 2.5 - 0.3 * k, 0)); o.look.set(0, 1.6 + 0.4 * k, -6); o.fov = 52 - 4 * k; });
+  try {
+    hero.group.position.copy(top(13.3)); hero.group.rotation.y = Math.atan2(-STAIR_DIR.x, -STAIR_DIR.z); hero.play("walk", 0.1);
+    const walk = pit._tween(6.4, k => { const d = 13.3 - 11.3 * k; hero.group.position.copy(top(d)); });
+    await pit.wait(0.8);
+    comic.caption("Not home. Down.", { x: 6, y: 16, seconds: 2.4 });
+    await pit.wait(1.8);
+    await pit._tween(0.5, k => wave = k * k * (3 - 2 * k));
+    comic.caption("The blind prophet Tiresias knows the way back to Ithaca. Tiresias is dead.", { x: 6, y: 16, seconds: 3.6 });
+    await walk; hero.play("idle", 0.3);
+    await pit._tween(0.5, k => wave = 1 - k);
+    await pit.wait(0.9);
+  } finally {
+    cam.stop(); uncaption();
+    const i = world.updaters.indexOf(waving); if (i >= 0) world.updaters.splice(i, 1);
+    crew.dispose();
+  }
+}
+// the soul at the front of the line wearing ticket 7, and the red cord on his wrist (made once, kept on him)
+function front7() { for (const s of Object.values(pit.souls)) if (s.v === 7) return s; return null; }
+function cordOn(fig) {
+  if (fig.userData.cord) return fig.userData.cord;
+  const cord = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.017, 6, 16), new THREE.MeshStandardMaterial({ color: 0xb3121a, roughness: 0.6 }));
+  cord.position.set(0.31, 0.97, 0.36); cord.rotation.set(-0.75 + Math.PI / 2, 0, -0.25); fig.add(cord); fig.userData.cord = cord; return cord;
+}
+// U2 · past the line, and U3 · the front of the line
+async function frontOfTheLine() {
+  const s7 = front7(); if (!s7) return;                                  // (the line always starts 7, 12, 30: guard anyway)
+  const F = s7.fig.position.clone().setY(0), out = F.clone().normalize();
+  const meet = F.clone().addScaledVector(out, 1.25);                      // facing him, just outside the ring
+  cordOn(s7.fig);
+  // the brass arm: a post by the station and an arm that swings across his path and stops at his chest
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb08a3e, metalness: 0.8, roughness: 0.35 });
+  const side = V3(-out.z, 0, out.x);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 1.5, 10), brass); post.position.copy(meet).addScaledVector(side, 0.95).addScaledVector(out, -0.35).setY(0.75);
+  const hinge = new THREE.Group(); hinge.position.copy(post.position).setY(1.32);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 1.35), brass); bar.position.z = 0.67; hinge.add(bar);
+  const yawAcross = Math.atan2(-side.x, -side.z), yawUp = yawAcross;        // swung back along the post, then across
+  hinge.rotation.set(-Math.PI / 2 + 0.05, yawUp, 0, "YXZ"); world.scene.add(post, hinge);
+  const heads = Object.values(pit.souls).map(s => ({ fig: s.fig, y: s.fig.rotation.y }));
+  const turning = { update: () => { const H = hero.group.position; for (const h of heads) { if (h.fig === s7.fig) continue; const d = h.fig.position.distanceTo(H); if (d < 3.2) h.fig.lookAt(H.x, h.fig.position.y, H.z); } } };
+  world.add(turning);
+  let cam = null;
+  try {
+    // ---- U2 · shoulder height behind him as he walks the line to the front (not to its rear); the shades turn
+    const start = hero.group.position.clone();
+    cam = track((t, o) => { const P = hero.group.position, yaw = hero.group.rotation.y, f = V3(Math.sin(yaw), 0, Math.cos(yaw)), sd = V3(-f.z, 0, f.x);
+      o.pos.copy(P).addScaledVector(f, -2.3).addScaledVector(sd, 0.55).add(V3(0, 1.72, 0)); o.look.copy(P).addScaledVector(f, 3).add(V3(0, 1.35, 0)); o.fov = 50; });
+    await hero.walkTo(meet.x + side.x * 0.0, meet.z + side.z * 0.0);
+    hero.group.rotation.y = Math.atan2(F.x - meet.x, F.z - meet.z);
+    // the Keeper does not look up: the arm swings down across his path and stops at his chest
+    sound.op("bell");
+    await pit._tween(0.55, k => hinge.rotation.x = (-Math.PI / 2 + 0.05) * (1 - k * k * (3 - 2 * k)));
+    await pit.wait(0.6);
+    cam.stop();
+    // ---- U3 · two-shot; then down the arm of the soul at the front, ticket 7, to the red cord; only then his face
+    const mid = meet.clone().lerp(F, 0.5), across = side.clone();
+    director.cut([mid.x - across.x * 3.4, 1.7, mid.z - across.z * 3.4], [mid.x, 1.5, mid.z], 40);   // from the side away from the brass post
+    await comic.subtitle("Elpenor? You were alive when we sailed.", { speaker: "ODYSSEUS", seconds: 2.6 });
+    const cordW = () => s7.fig.userData.cord.getWorldPosition(V3(0, 0, 0)), headW = () => s7.fig.localToWorld(V3(0, 1.8, 0.05));
+    // from his side (between the two of them and away from the post), close on the wrist, then up to the face
+    const c0 = cordW().addScaledVector(side, -1.25).addScaledVector(out, 0.35).add(V3(0, 0.15, 0));
+    cam = track((t, o) => { const k = Math.min(1, t / 3.6), e = k * k * (3 - 2 * k), up = Math.max(0, Math.min(1, (t - 2.2) / 1.6));
+      o.pos.copy(c0).addScaledVector(side, 0.4 * e).add(V3(0, 0.75 * up, 0)); o.look.copy(cordW()).lerp(headW(), up * up * (3 - 2 * up)); o.fov = 34 - 6 * e; });
+    await pit.wait(3.9);
+    await comic.subtitle("I fell off Circe's roof, Captain. The morning you left. Nobody noticed.", { speaker: "ELPENOR", seconds: 3.6 });
+    cam.stop(); cam = null;
+    // he steps back from the arm, and walks the whole length of the line to the rear: the plinth at the foot of the
+    // Descent. The medallion he is given is blank: he is not dead, so it has no number.
+    await pit._tween(0.4, k => hinge.rotation.x = (-Math.PI / 2 + 0.05) * (k * k * (3 - 2 * k)));
+    const plinth = STAIR_FOOT.clone().addScaledVector(STAIR_SIDE, 2.6), stand = plinth.clone().addScaledVector(STAIR_SIDE, -0.9).addScaledVector(STAIR_DIR, -0.6);
+    director.cut([2.5, 3.6, 13.5], [6.5, 1.2, 4.5], 46);
+    await hero.walkTo(stand.x, stand.z);
+    hero.group.rotation.y = Math.atan2(plinth.x - stand.x, plinth.z - stand.z);
+    hero.play("pickup", 0.25);
+    await pit.wait(1.0);
+    hero.stand && hero.stand(0.4);
+  } finally {
+    if (cam) cam.stop();
+    const i = world.updaters.indexOf(turning); if (i >= 0) world.updaters.splice(i, 1);
+    for (const h of heads) h.fig.rotation.y = h.y;
+    world.scene.remove(post, hinge); post.geometry.dispose(); bar.geometry.dispose(); brass.dispose();
+  }
+}
 async function opening() {
   await film(async () => {
     office.clearServing();
+    await descent();                                                         // cards 1–4, shown, not said
     lore.classList.add("on");
-    for (const [text, cls] of LORE) await typeCard(text, cls);
+    for (const [text, cls] of LORE.slice(4)) await typeCard(text, cls);      // cards 5–9: the rules of the place
     lore.classList.remove("on");
     director.cut([0, 3.2, 18], [0, 4.2, -10], 50);
     await comic.chapter("CHAPTER FOUR", "THE DEAD TAKE A NUMBER", 2.6);
-    await director.glide([0, 6.2, -2.5], [0, 6.6, -12], 44, 2.6);
+    await director.glide([3.0, 3.1, 3.0], [0, 5.0, -10], 48, 2.6);        // a controlled push to the route console: the Keeper, his console, the plate over him
     office.setServing(7);
     await director.freeze("THE CLERK", "Has served the dead for three thousand years.<br>Has never once hurried.", 3.0);
     await director.glide([0, 13.5, 9.5], [0, 0, -0.6], 46, 2.6);
     comic.caption("A queue. You join at the REAR. You're served from the FRONT. Nobody cuts in.", { seconds: 3.6 });
     await pit.wait(3.6);
+    uncaption();
+    await frontOfTheLine();                                                  // U2–U3
     await director.glide([4.6, 2.4, 11.5], [7.6, 1.4, 6.0], 42, 2.0);
     const c = nameCard("underworld");
     await director.freeze(c.name, c.sub, 2.6);
@@ -180,6 +266,8 @@ async function opening() {
   try { localStorage.setItem("odyssey.underworld.prologue", "1"); } catch { /* storage off */ }
 }
 document.getElementById("open-btn").onclick = () => opening();
+// all nine cards as they used to open the chapter, kept whole as a read
+document.getElementById("crawl-btn").onclick = () => film(async () => { lore.classList.add("on"); for (const [text, cls] of LORE) await typeCard(text, cls); lore.classList.remove("on"); });
 
 // ---------- the finale film (after closing time): Tiresias walks out of the ferry door
 async function finale() {
@@ -188,6 +276,12 @@ async function finale() {
     await director.glide([1.5, 2.6, 4.0], [0, 2.4, -3.6], 40, 2.2);
     comic.caption("\"You'll get home. Late, alone, on a stranger's ship, to a house full of strangers.\"", { seconds: 4.0 });
     await pit.wait(4.0);
+    uncaption();
+    // [new] he doesn't accept it. Tiresias does not answer: he turns his blind face to the station where ticket 7
+    // stood (the front, now empty), and walks back out through the gate
+    await comic.subtitle("Alone? I have a crew.", { speaker: "ODYSSEUS", seconds: 2.2 });
+    director.cut([5.5, 3.2, 6.5], [1.5, 2.0, -6.5], 44);
+    await pit.prophetLeaves(pit.seat(0));
     await director.freeze("TIRESIAS", "The blind prophet of Thebes.<br>Dead, and still the only one who can see.", 3.0);
     const c = nameCard("underworld", { done: true });
     await director.glide([4.6, 2.4, 11.5], [7.6, 1.4, 6.0], 42, 1.6);
@@ -216,10 +310,17 @@ const trials = new UnderworldTrials({
 document.getElementById("door-lesson").onclick = () => trials.openLesson();
 document.getElementById("door-trials").onclick = () => trials.open();
 document.getElementById("door-lab").onclick = () => trials.openLab();
+// the trials in order, as the black cards name them (Java holds the trials; these are only for the gold button)
+const ORDER = [["underworld-1", "ONE", "Now Serving"], ["underworld-2", "TWO", "Who Stands at the Front"], ["underworld-3", "THREE", "The Prophet Goes First"], ["underworld-4", "FOUR", "Five Seats"], ["underworld-finale", "CLOSING TIME", "Closing Time"]];
+document.querySelectorAll("#doors [data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", icon(el.dataset.ic) + " "));
 function progress() {
   let d = []; try { d = JSON.parse(localStorage.getItem("odyssey.underworld.done")) || []; } catch { /* storage off */ }
   const n = d.filter(id => id.startsWith("underworld-")).length;
   document.getElementById("prog-trials").textContent = n ? `${n} / 5 done${d.includes("underworld-finale") ? " · Tiresias has spoken" : ""}` : "5 trials · start with ONE";
+  // the gold button (shared with every chapter): back into the trials once they are started, otherwise the prologue
+  const next = ORDER.find(([id]) => !d.includes(id)), cont = document.getElementById("continue-btn");
+  if (n && next) { cont.innerHTML = `CONTINUE ${icon("arrow")} <small>${next[1]} · ${next[2]}</small>`; cont.onclick = () => { if (!filming) trials.open(); }; }
+  else { cont.innerHTML = `${icon("play")} PLAY SCENE <small>the prologue</small>`; cont.onclick = () => { if (!filming) opening(); }; }
 }
 progress();
 

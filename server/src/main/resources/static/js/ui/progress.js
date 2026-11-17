@@ -11,7 +11,7 @@ export const CHAPTERS = [
   { id: "circe", tag: "circe", n: 3, word: "THREE", title: "Circe's Island", ds: "Linked list", page: "circe_env.html",
     key: "odyssey.circe.done", total: 6, finale: "circe-banquet", accent: "#1d3fd1", status: "Helios is rising…" },
   { id: "underworld", tag: "underworld", n: 4, word: "FOUR", title: "The Underworld", ds: "Queue", page: "underworld_env.html",
-    key: "odyssey.underworld.done", total: 5, finale: "underworld-finale", accent: "#d7261e", status: "please take a number…" }
+    key: "odyssey.underworld.done", total: 5, finale: "underworld-finale", accent: "#d8a84e", status: "please take a number…" }
 ];
 // what lies past the four islands: shown on the map, never playable
 export const BEYOND = ["Scheria", "The voyage", "Ithaca"];

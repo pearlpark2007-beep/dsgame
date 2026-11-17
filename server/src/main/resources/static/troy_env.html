@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troy — The Sacker of Cities</title>
+<!-- The opening film. "Begin voyage" on the title screen opens this page as troy_env.html?voyage=1: the film plays
+     at once and goes straight on into the Harbour (whose opening then plays by itself). Opened on its own (no
+     ?voyage), it is a test page: PLAY, and an end panel with PLAY AGAIN. -->
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="js/ui/tokens.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050403; color: #e9e4da; font-family: 'Courier Prime', monospace; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #050403; z-index: 40; transition: opacity 1s; }
+  #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 30px; color: #f2c230; }
+  #loading p { margin: 0; color: #8a979b; font-size: 15px; }
+  #loading.gone { opacity: 0; pointer-events: none; }
+  #start, #end { position: fixed; inset: 0; z-index: 38; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #050403; }
+  #start.on, #end.on { display: flex; }
+  #start button, #end button, #end a { all: unset; cursor: pointer; padding: 12px 22px; border: 1px solid #8a7a5a; border-radius: 4px; font: 700 15px 'Courier Prime', monospace; letter-spacing: 3px; color: #f4ead2; }
+  #start button:hover, #end button:hover, #end a:hover, #start button:focus-visible, #end button:focus-visible, #end a:focus-visible { border-color: #f2c230; color: #f2c230; }
+  #start p, #end p { margin: 0; color: #8a979b; font-size: 14px; max-width: 520px; text-align: center; line-height: 1.5; }
+  #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 6, 4, 0.75); color: #efe1c2;
+          border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
+  #skip.on { display: block; }
+  #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
+          font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
+  #fast.on { display: flex; }
+  /* the game's title, in the title screen's own type style */
+  #gtitle { position: fixed; left: 7%; top: 30%; z-index: 33; pointer-events: none; opacity: 0; transform: translateY(10px); transition: opacity 1.6s var(--ease, ease), transform 1.6s var(--ease, ease); }
+  #gtitle.on { opacity: 1; transform: none; }
+  #gtitle h1 { margin: 0; font: 400 clamp(54px, 8.6vw, 132px)/0.9 var(--display, Anton, Impact, sans-serif); letter-spacing: 4px; color: var(--paper, #f4ead2); text-transform: uppercase; text-shadow: 0 6px 40px rgba(0,0,0,.45); }
+  #gtitle h1 span { display: block; }
+  #gtitle .rule { width: min(420px, 60vw); height: 2px; background: var(--gold, #f2c230); margin: 22px 0 0; transform-origin: left; transform: scaleX(0); transition: transform 1.2s var(--ease, ease) .5s; }
+  #gtitle.on .rule { transform: scaleX(1); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="loading"><h1>TROY</h1><p>raising the walls…</p></div>
+<div id="start"><button id="play">▸ PLAY THE OPENING</button><p>About a minute and three quarters. Esc fast-forwards.</p></div>
+<div id="end"><p>The opening has ended. (Test page: from "Begin voyage" the Harbour follows at once.)</p><button id="again">▸ PLAY AGAIN</button><a id="tohar" href="harbour_env.html">GO ON TO THE HARBOUR ▸</a></div>
+<div id="gtitle"><h1><span>The Odyssey</span><span>of Data</span></h1><div class="rule"></div></div>
+<button id="skip">SKIP SCENE ▸▸ (Esc)</button>
+<div id="fast">▸▸</div>
+<script type="module">
+import { World } from "./js/engine/world.js";
+import { Hero } from "./js/engine/hero.js";
+import { Director } from "./js/engine/director.js";
+import { Comic } from "./js/engine/comic.js";
+import { installUI } from "./js/ui/ui.js";
+import { sound } from "./js/engine/sound.js";
+import { Crew } from "./js/story/crew.js";
+import { buildTroy } from "./js/story/troy/troySet.js";
+import { loadHorse } from "./js/story/troy/troyHorseModel.js";
+import { playTroyOpening } from "./js/story/troy/troyFilm.js";
+
+const params = new URLSearchParams(location.search);
+const voyage = !!params.get("voyage") && !params.get("capture");   // opened by "Begin voyage": no panels, on into the Harbour
+const $ = id => document.getElementById(id);
+const world = new World({ quality: params.get("q") || "auto" });
+installUI({ chapter: "title", world, ambience: null });   // tokens, the title grade, sound volume and mute, Shift+F; no save key is written
+world.grade.uniforms.letterbox.value = 0;
+const director = new Director(world);
+const comic = new Comic(world, director);
+const troy = buildTroy(world);
+const { horse, info: horseInfo } = await loadHorse({ quality: world.quality });
+const hero = new Hero(world); await hero.load();
+hero.group.visible = false;
+
+// a calm frame behind the PLAY button
+director.cut([200, 110, 170], [0, 10, -110], 38);
+troy.setMood("night", { burn: 0 });
+
+// ---- playing, and skipping (Esc fast-forwards behind a black card, as in every film)
+let filming = false, skipping = false;
+function skip() { if (!filming || skipping) return; skipping = true; director.skipping = true; world.timeScale = 40; $("fast").classList.add("on"); }
+$("skip").onclick = skip;
+addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
+async function play() {
+  if (filming) return;
+  $("start").classList.remove("on"); $("end").classList.remove("on");
+  filming = true; $("skip").classList.add("on"); document.body.classList.add("busy");
+  const crew = await Crew.ready(world, hero);
+  let ok = false;
+  try { await playTroyOpening({ world, director, comic, troy, hero, crew, horse, titleEl: $("gtitle"), quality: world.quality }); ok = true; }
+  catch (e) { console.error(e); window.__filmError = String(e && e.stack || e); }
+  finally {
+    if (voyage && ok) {
+      // on into the Harbour behind the black, the rain still falling; its loading screen is the chapter card
+      // (the same hand-over a voyage between islands uses), and its opening plays by itself
+      try { sessionStorage.setItem("odyssey.arrive", "harbour"); } catch { /* storage off */ }
+      location.href = "harbour_env.html";
+      return;
+    }
+    filming = false; skipping = false; director.skipping = false; world.timeScale = 1;
+    $("fast").classList.remove("on"); $("skip").classList.remove("on"); document.body.classList.remove("busy");
+    $("gtitle").classList.remove("on");
+    // the film ends on black with rain starting (Phase 8 carries that straight into the Harbour). Until then, lift the black
+    // so the end panel can be seen, and let the rain fade: otherwise the page is a black screen with only the rain playing
+    comic.black(false, 0.01); comic.letterbox(false); world.grade.uniforms.letterbox.value = 0;
+    sound.ambience(null);
+    $("end").classList.add("on");
+  }
+}
+$("play").onclick = () => play();
+$("again").onclick = () => location.reload();
+
+if (params.get("capture")) {
+  window.__advance = async (s, step = 1 / 30) => { const n = Math.max(1, Math.round(s / step)); for (let i = 0; i < n; i++) { world.step(step, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
+  world.step(1 / 30);
+} else world.start();
+$("loading").classList.add("gone");
+if (voyage) {
+  // the click on "Begin voyage" usually lets this page play sound at once; if the browser still holds it back,
+  // one click starts the film (rather than a silent opening)
+  const ctx = sound.ctx;
+  await new Promise(r => setTimeout(r, 250));
+  if (ctx && ctx.state === "running") play();
+  else { $("play").textContent = "▸ BEGIN THE VOYAGE"; $("start").querySelector("p").textContent = "Your browser needs one click before it plays sound."; $("start").classList.add("on"); }
+} else $("start").classList.add("on");
+window.__world = world; window.__troy = troy; window.__hero = hero; window.__director = director; window.__horseInfo = horseInfo;
+window.__play = play; window.__skip = skip;
+window.__ready = true;
+</script>
+</body>
+</html>

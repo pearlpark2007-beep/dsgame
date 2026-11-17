@@ -19,7 +19,7 @@
 body[data-chapter="harbour"] { --chapter: #b98a3e; }
 body[data-chapter="cave"] { --chapter: #e0782a; }
 body[data-chapter="circe"] { --chapter: #1d3fd1; }
-body[data-chapter="underworld"] { --chapter: #d7261e; }
+body[data-chapter="underworld"] { --chapter: #d8a84e; }
 
 /* ---------- result stamps: one family for the whole game (director.stamp) */
 body.odx .stamp { top: 40%; transform: translate(-50%, -50%) scale(1.04); width: max-content; min-width: 300px; max-width: min(80vw, 900px); padding: 16px 28px 18px; border-radius: 4px;
@@ -52,7 +52,8 @@ body.odx #loading p { font: 15px var(--mono) !important; color: var(--dim) !impo
 
 /* ---------- the voyage bar: VOYAGE (the map) and the sound control, top-right of the stage */
 #odx-bar { position: fixed; z-index: 40; top: 12px; right: 16px; display: flex; align-items: center; gap: 6px; transition: opacity var(--t-mid); }
-@media (min-width: 901px) { body.side-panel #odx-bar { right: calc(var(--pw, 520px) + 12px); } }
+@media (min-width: 901px) { body.side-panel #odx-bar, body:has(#athena-learn.on) #odx-bar, body:has(#parsons.on) #odx-bar { right: calc(var(--pw, 520px) + 12px); } }
+/* (Athena's lesson and the Arrange puzzles are side panels too: the bar used to sit on top of their headers) */
 body[data-chapter="circe"].side-panel #odx-bar { top: 60px; }
 body.cinematic #odx-bar, body.filming #odx-bar { opacity: 0; pointer-events: none; }
 #odx-bar button { height: 34px; min-width: 34px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--rule); background: rgba(20, 16, 8, .88); color: var(--paper);
@@ -108,25 +109,27 @@ body.odx #chapter b { font: 400 clamp(32px, 4vw, 54px)/1.05 var(--display) !impo
    then the small grouped buttons. */
 .odx-title { position: fixed; left: 0; top: 7%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: opacity 0.6s; }
 .odx-title span { background: var(--ink); padding: 4px 18px 4px max(18px, 4vw); }
-.odx-title .k { font: 700 15px var(--mono); letter-spacing: 4px; color: var(--chapter); }
-.odx-title .t { font-family: var(--display); font-size: clamp(34px, 5vw, 60px); line-height: 1.05; color: var(--paper); letter-spacing: 1px; text-transform: uppercase; }
+.odx-title .k { font: 700 15px var(--mono); letter-spacing: 4px; color: var(--title-k, var(--chapter)); }
+.odx-title .t { font-family: var(--display); font-size: clamp(34px, 5vw, 60px); line-height: 1.05; color: var(--title-t, var(--paper)); letter-spacing: 1px; text-transform: uppercase; }
+.odx-title .t em { font-style: normal; color: var(--blood); }
 .odx-doors { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 0 max(16px, 3vw) 18px; display: flex; flex-direction: column; gap: 10px; transition: opacity 0.6s; font-family: var(--mono); }
 .odx-doors .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .odx-doors .door { position: relative; text-align: left; border: 0; border-top: 10px solid var(--c); background: var(--door-bg, rgba(14, 10, 7, 0.92)); color: var(--paper); padding: 14px 16px 16px; cursor: pointer;
   font: inherit; display: flex; flex-direction: column; gap: 6px; min-height: 150px; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 6px 6px 0 var(--ink); }
 .odx-doors .door:hover, .odx-doors .door:focus-visible { transform: translate(-2px, -3px); box-shadow: 9px 10px 0 var(--ink); outline: none; }
-.odx-doors .door:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.odx-doors .door:focus-visible { outline: 3px solid var(--door-focus, var(--gold)); outline-offset: 2px; }
 .odx-doors .door .kick { font-size: 12px; letter-spacing: 3px; color: var(--c); font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .odx-doors .door .name { font-family: var(--display); font-size: clamp(26px, 2.8vw, 38px); line-height: 1; letter-spacing: 1px; }
 .odx-doors .door .what { font-size: 14px; line-height: 1.4; color: #d8ccb2; }
 .odx-doors .door .prog { margin-top: auto; font-size: 12.5px; color: var(--c); font-weight: 700; letter-spacing: 1px; }
 .odx-doors .door .prog.done { color: #9fd08a; }
 .odx-doors .extra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.odx-doors .extra button { min-height: 36px; padding: 0 14px; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); font: inherit; font-size: 13px;
-  letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; box-sizing: border-box; }
-.odx-doors .extra button:hover, .odx-doors .extra button:focus-visible { border-color: var(--gold); color: var(--gold); outline: none; }
+.odx-doors .extra button, .odx-doors .extra a { min-height: 36px; padding: 0 14px; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); font: inherit; font-size: 13px;
+  letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; box-sizing: border-box; text-decoration: none; }
+.odx-doors .extra button:hover, .odx-doors .extra button:focus-visible, .odx-doors .extra a:hover, .odx-doors .extra a:focus-visible { border-color: var(--door-accent, var(--gold)); color: var(--door-accent, var(--gold)); outline: none; }
 .odx-doors .extra button.seen { color: #9fd08a; }
-.odx-doors .extra .lbl { font-size: 11px; letter-spacing: 2px; color: var(--ink); background: var(--gold); padding: 2px 8px; font-weight: 700; margin-left: 6px; }
+.odx-doors .extra [hidden] { display: none; }
+.odx-doors .extra .lbl { font-size: 11px; letter-spacing: 2px; color: var(--ink); background: var(--door-lbl, var(--gold)); padding: 2px 8px; font-weight: 700; margin-left: 6px; }
 .odx-doors .extra .lbl:first-child { margin-left: 0; }
 .odx-doors .continue { align-self: flex-start; min-height: 46px; padding: 0 20px; background: var(--gold); color: var(--ink); border: 0; font: 700 15px var(--mono); letter-spacing: 1.5px;
   cursor: pointer; display: inline-flex; align-items: center; gap: 10px; box-shadow: 6px 6px 0 var(--ink); transition: transform 0.15s, box-shadow 0.15s; }
@@ -149,3 +152,43 @@ body[data-chapter="cave"] .odx-doors .door::before { left: 8px; } body[data-chap
 body[data-chapter="cave"] .odx-doors .door.lesson { --c: #9fb4d0; } body[data-chapter="cave"] .odx-doors .door.trials { --c: #e0782a; } body[data-chapter="cave"] .odx-doors .door.lab { --c: #f2c230; }
 body[data-chapter="cave"] .odx-title span { background: linear-gradient(90deg, #120d09, #1e1610); border-bottom: 1px solid rgba(185, 138, 62, 0.4); }
 @media (prefers-reduced-motion: reduce) { .odx-doors .door, .odx-doors .continue { transition: none; } }
+
+/* Circe's dressing (moved here from circe_env.html, unchanged): noon sun on black bands; lesson = cobalt, trials = blood, lab = sun */
+body[data-chapter="circe"] { --title-k: var(--paper); --title-t: var(--sun); --door-accent: var(--sun); --door-lbl: var(--sun); --door-focus: var(--paper); }
+body[data-chapter="circe"] .odx-title .k { font-weight: 400; }
+body[data-chapter="circe"] .odx-doors .door.lesson { --c: #3b62ff; } body[data-chapter="circe"] .odx-doors .door.trials { --c: var(--blood); } body[data-chapter="circe"] .odx-doors .door.lab { --c: var(--sun); }
+
+/* the Underworld's dressing: THE ATLAS OF LAST VOYAGES. Night indigo faces, a brass edge and rivets, ivory type;
+   lesson = route cyan, trials = antique gold, lab = ivory. (Red is danger only, everywhere.) */
+body[data-chapter="underworld"] { --title-k: #f1e8d2; --title-t: #f1e8d2; --door-accent: #d8a84e; --door-lbl: #d8a84e; --door-focus: #f1e8d2; }
+body[data-chapter="underworld"] .odx-title .k { font-weight: 400; }
+body[data-chapter="underworld"] .odx-title .t em { color: #d8a84e; }
+body[data-chapter="underworld"] .odx-title span { background: linear-gradient(90deg, #0b1224, #182645); border-bottom: 1px solid rgba(216, 168, 78, 0.5); }
+body[data-chapter="underworld"] .odx-doors { --door-bg: linear-gradient(180deg, rgba(27, 40, 72, 0.96), rgba(13, 21, 41, 0.96)); }
+body[data-chapter="underworld"] .odx-doors .door { box-shadow: 6px 6px 0 #070b16, inset 0 0 0 1px rgba(216, 168, 78, 0.45); }
+body[data-chapter="underworld"] .odx-doors .door:hover, body[data-chapter="underworld"] .odx-doors .door:focus-visible { box-shadow: 9px 10px 0 #070b16, inset 0 0 0 1px rgba(216, 168, 78, 0.8); }
+body[data-chapter="underworld"] .odx-doors .door::before, body[data-chapter="underworld"] .odx-doors .door::after { content: ""; position: absolute; top: 8px; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f0d08a, #a77b34 60%, #3d2a10); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+body[data-chapter="underworld"] .odx-doors .door::before { left: 8px; } body[data-chapter="underworld"] .odx-doors .door::after { right: 8px; }
+body[data-chapter="underworld"] .odx-doors .door.lesson { --c: #57b9d1; } body[data-chapter="underworld"] .odx-doors .door.trials { --c: #d8a84e; } body[data-chapter="underworld"] .odx-doors .door.lab { --c: #f1e8d2; }
+body[data-chapter="underworld"] .odx-doors .extra button { background: #0d1529; border-color: #0d1529; }
+
+/* the Harbour's dressing: storm, wet steel and bronze. Slate door faces with a bronze edge and rivets;
+   lesson = storm key, trials = bronze, lab = action gold */
+body[data-chapter="harbour"] .odx-doors { --door-bg: linear-gradient(180deg, rgba(22, 30, 36, 0.95), rgba(8, 12, 15, 0.95)); }
+body[data-chapter="harbour"] .odx-doors .door { box-shadow: 6px 6px 0 #05080a, inset 0 0 0 1px rgba(185, 138, 62, 0.4); }
+body[data-chapter="harbour"] .odx-doors .door:hover, body[data-chapter="harbour"] .odx-doors .door:focus-visible { box-shadow: 9px 10px 0 #05080a, inset 0 0 0 1px rgba(185, 138, 62, 0.7); }
+body[data-chapter="harbour"] .odx-doors .door::before, body[data-chapter="harbour"] .odx-doors .door::after { content: ""; position: absolute; top: 8px; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e6c27a, #9a6f2e 60%, #3d2a10); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+body[data-chapter="harbour"] .odx-doors .door::before { left: 8px; } body[data-chapter="harbour"] .odx-doors .door::after { right: 8px; }
+body[data-chapter="harbour"] .odx-doors .door.lesson { --c: #b9c8d6; } body[data-chapter="harbour"] .odx-doors .door.trials { --c: #b98a3e; } body[data-chapter="harbour"] .odx-doors .door.lab { --c: #f2c230; }
+body[data-chapter="harbour"] .odx-doors .extra button, body[data-chapter="harbour"] .odx-doors .extra .lbl { box-shadow: none; }
+body[data-chapter="harbour"] .odx-doors .extra button { background: #0b1014; border-color: #0b1014; }
+body[data-chapter="harbour"] .odx-title span { background: linear-gradient(90deg, #070a0d, #121a20); border-bottom: 1px solid rgba(185, 138, 62, 0.45); }
+/* his pace (walking speed) only matters while he works: not over the chapter title */
+body[data-chapter="harbour"]:not(.busy) #pace, body[data-chapter="harbour"]:not(.busy) #pace-quip { display: none; }
+
+
+/* ---------- freeze-frame name cards (director.freeze): the line under the name sits on a dark plate, readable over any frame */
+body.odx .name-card .nc-sub { display: inline-block; margin-top: 12px; padding: 6px 12px; max-width: min(70vw, 760px); font: 700 clamp(15px, 1.45vw, 20px)/1.4 var(--mono); letter-spacing: 0.5px;
+  color: var(--paper); background: rgba(10, 8, 6, 0.74); border-left: 3px solid var(--gold); text-shadow: none; }

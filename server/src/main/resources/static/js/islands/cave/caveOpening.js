@@ -2,10 +2,10 @@
 // the cave introduced as a PLACE before anything happens in it. Sound and shadow come before the giant;
 // the comic lettering is kept to two moments (his roar, and his counting); shakes are reserved for real
 // impacts. The story and the crawl are unchanged.
-//  0. the crawl (the existing text)
-//  1. ARRIVAL: outside at dusk. The sea, the cliff, the cave mouth; Odysseus climbs up to it
-//  2. the threshold from inside: a black figure in the bright doorway, light round him (we see the exit)
-//  3. ESTABLISH: a wide, held shot of the whole cave: pens in the middle, hearth, his corner far off
+//  0–3. THE ARRIVAL (the screenplay's C1–C3, 22 s, which replace the crawl and the old shots 1–3; those are kept
+//       below, behind c.oldArrival, and the crawl plays on its own from the Story door as "The story so far"):
+//       C1 Plenty: his men filling sacks · C2 The refusal: "Not yet. I want him to see who took it." ·
+//       C3 They stay: the sacks go down one by one; "He stayed."
 //  4. in the dark he strikes a torch; it lights his face. Freeze on his name
 //  5. he walks to the pens and looks along them. Far off: footsteps. Grit falls. He listens, turns
 //  6. THE SHADOW: something fills the doorway (never seen); its shadow slides in; the flock shies
@@ -22,6 +22,7 @@ import { Fire } from "../../engine/weather.js";
 import { GodRays } from "../../engine/godrays.js";
 import { sound } from "../../engine/sound.js";
 import { buildOutside } from "./caveOutside.js";
+import { Crew, reachArm } from "../../story/crew.js";
 
 export const ease = k => k * k * (3 - 2 * k);
 
@@ -63,7 +64,7 @@ export function dustFall(world, at, n = 120) {
     vel.push(-(1 + Math.random() * 3));
   }
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({ color: 0xbfae96, size: 0.06, transparent: true, opacity: 0.9, depthWrite: false });
+  const mat = new THREE.PointsMaterial({ color: 0xbfae96, size: 0.06, map: dotTexture(), transparent: true, opacity: 0.9, depthWrite: false });   // round grit, not squares
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; world.scene.add(pts);
   let t = 0;
   const u = { update: dt => {
@@ -78,6 +79,16 @@ export function dustFall(world, at, n = 120) {
 
 
 // sparks from a flint, at a point
+let _dot = null;
+function dotTexture() {
+  if (_dot) return _dot;
+  const c = document.createElement("canvas"); c.width = c.height = 32;
+  const g = c.getContext("2d"), r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.35, "rgba(255,255,255,0.6)"); r.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+  return (_dot = new THREE.CanvasTexture(c));
+}
+
 export function sparks(world, at, n = 40) {
   const geo = new THREE.BufferGeometry(), pos = new Float32Array(n * 3), vel = [];
   for (let i = 0; i < n; i++) {
@@ -86,7 +97,8 @@ export function sparks(world, at, n = 40) {
     vel.push(new THREE.Vector3(Math.cos(a) * Math.sqrt(1 - u * u) * sp, Math.abs(u) * sp * 0.6 + 1, Math.sin(a) * Math.sqrt(1 - u * u) * sp));
   }
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({ color: 0xffd28a, size: 0.05, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  // soft round dots (a plain PointsMaterial draws squares, which near the camera became big white tiles)
+  const mat = new THREE.PointsMaterial({ color: 0xffc070, size: 0.035, map: dotTexture(), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; world.scene.add(pts);
   let t = 0;
   const u = { update: dt => {
@@ -142,6 +154,98 @@ function torchFor(world, hero) {
   };
 }
 
+// the crawl on its own, from the chapter's Story door: the full text, as it used to open the film
+export async function playCaveCrawl({ comic }) {
+  document.body.classList.add("cinematic");
+  try { await comic.crawl({ ...CRAWL, seconds: 44 }); } finally { comic.clear(); document.body.classList.remove("cinematic"); }
+}
+
+// ---- C1–C3: the men in the cave at dusk, and the choice that keeps them there.
+// Crew figures are made for this scene only and removed before the giant comes (they are never on screen with him).
+async function arrivalScene({ world, hero, director, comic }) {
+  const wait = s => hero.wait(s);
+  const crew = await Crew.ready(world, hero);
+  const sackMat = new THREE.MeshStandardMaterial({ color: 0x7a6040, roughness: 1 });
+  const sackGeo = new THREE.SphereGeometry(0.3, 10, 8).scale(1, 1.25, 0.85);
+  // a giant's stool by the hearth, the size of a cart
+  const wood = new THREE.MeshStandardMaterial({ color: 0x5a4028, roughness: 1 });
+  const stool = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.32, 1.9), wood); seat.position.y = 1.75; seat.castShadow = seat.receiveShadow = true; stool.add(seat);
+  for (const [x, z] of [[-1.1, -0.75], [1.1, -0.75], [-1.1, 0.75], [1.1, 0.75]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.28, 1.6, 0.28), wood); l.position.set(x, 0.8, z); l.castShadow = true; stool.add(l); }
+  stool.position.set(-7.4, 0, 2.2); stool.rotation.y = 0.12; world.scene.add(stool);
+  // the men: name, tint, where they work, and the sack each one is filling
+  const MEN = [["Eurylochus", 0xb8ae9c, -4.8, 3.6], ["Polites", 0xd6cdbd, 1.6, 2.6], ["Lycus", 0xa9a08f, 4.2, 3.0], ["Perimedes", 0xc4b8a4, 6.6, 2.4],
+               ["Antiphus", 0xcabfae, -0.8, 3.8], ["Elpenor", 0xe3dccf, 2.8, 4.6, true]];
+  const men = {}, sacks = [];
+  for (const [name, tint, x, z, cord] of MEN) {
+    const m = crew.add({ name, tint, cord: !!cord, shadow: false });
+    m.place(x, 0, z); m.face(x + 0.3, 0); men[name] = m;
+    const sack = new THREE.Mesh(sackGeo, sackMat); sack.castShadow = true; world.scene.add(sack);
+    sacks.push({ m, sack, held: true });
+  }
+  const carry = { update: () => { for (const s of sacks) if (s.held) { s.m.bones.rHand.updateWorldMatrix(true, false); s.sack.position.setFromMatrixPosition(s.m.bones.rHand.matrixWorld).add(new THREE.Vector3(0, -0.32, 0)); } } };
+  world.add(carry);
+  // the work: bending to the sacks in turn (pickup / putdown), so the room is busy without anyone in step
+  let working = true;
+  const work = { update: (dt, t) => { if (!working) return; MEN.slice(1).forEach(([n], i) => { const m = men[n], want = Math.floor(t / 2.2 + i * 0.7) % 2 ? "pickup" : "putdown"; if (m.base !== m.actions[want]) m.play(want, 0.35); }); } };
+  world.add(work);
+  const E = men.Eurylochus; E.play("idle", 0.01); E.face(-2.6, 1.7);
+  hero.teleport(-2.6, 1.7, Math.PI, 0); hero.play("idle", 0.01);
+  let s = null, touch = 0, along = 0;
+  const hand = { update: () => { if (touch > 0) { const p = stool.localToWorld(new THREE.Vector3(-0.6 + 1.0 * along, 1.95, 0.95)); reachArm(hero.bones, "r", p, touch); } } };
+  world.add(hand);
+  try {
+    // ---- C1 · 0:00–0:07 · Plenty. Low and wide in the dusk light: the pens down the middle, men filling sacks.
+    //      A slow push toward Odysseus standing at the pens.
+    s = shot(world, director, (t, o) => { const k = ease(Math.min(1, t / 7)); o.pos.set(-12.5 + 5 * k, 0.9 + 0.3 * k, 10.5 - 3.5 * k); o.look.set(-1.5 + 0.5 * k, 1.5, 0.8); o.fov = 54 - 10 * k; });
+    await wait(1.4);
+    comic.caption("The cave was empty. The pens were full. The racks were heavy with cheese.", { x: 6, y: 16, seconds: 4.6 });
+    await wait(5.6);
+    s.stop();
+
+    // ---- C2 · 0:07–0:15 · The refusal. Eurylochus in the foreground with a full sack; Odysseus behind him,
+    //      at a stool the size of a cart. He runs a hand along it.
+    hero.teleport(-7.0, 3.55, Math.PI + 0.1, 0); hero.play("idle", 0.01);
+    E.place(-10.3, 0, 6.0); E.face(-7.0, 3.55);                         // in the foreground, to one side of the line to him
+    s = shot(world, director, (t, o) => { o.pos.set(-9.9 + t * 0.04, 1.6, 8.3); o.look.set(-8.1, 1.5, 4.3); o.fov = 46; });
+    await hero.over(0.6, k => touch = ease(k));
+    await Promise.all([hero.over(2.6, k => along = k), comic.subtitle("We have enough, Captain. To the ship. Now.", { speaker: "EURYLOCHUS", seconds: 2.6 })]);
+    await comic.subtitle("Not yet. I want him to see who took it.", { speaker: "ODYSSEUS", seconds: 2.8 });
+    await hero.over(0.5, k => touch = 1 - ease(k));
+    await wait(0.6);
+    s.stop();
+
+    // ---- C3 · 0:15–0:22 · They stay. A slow move across the men's faces; they look at each other, and put
+    //      their sacks down one by one.
+    working = false;
+    const line = [["Antiphus", -5.6], ["Polites", -4.1], ["Elpenor", -2.6], ["Lycus", -1.1], ["Perimedes", 0.4], ["Eurylochus", 1.9]];
+    line.forEach(([n, x], i) => { const m = men[n]; m.place(x, 0, 5.6 + (i % 2) * 0.5); m.face(x, 12); m.play("idle", 0.01, { offset: i * 0.4 }); });
+    s = shot(world, director, (t, o) => { const k = Math.min(1, t / 7); o.pos.set(-6.4 + 9 * k, 1.6, 10.2); o.look.set(-5.4 + 9 * k, 1.45, 5.8); o.fov = 38; });
+    comic.caption("His men begged him to take what they could carry and run.", { x: 6, y: 16, seconds: 3.8 });
+    for (let i = 0; i < line.length; i++) {
+      const m = men[line[i][0]], nb = men[line[Math.min(line.length - 1, i + 1)][0]];
+      m.face(nb.group.position.x, nb.group.position.z + 3);                 // a glance at the man beside him
+      await wait(0.45);
+      m.play("putdown", 0.25);
+      const sk = sacks.find(x => x.m === m);
+      await wait(0.5);
+      sk.held = false; sk.sack.position.y = 0.32; m.face(m.group.position.x, 12);
+      await wait(0.1);
+    }
+    await wait(0.4);
+    s.stop(); s = null;
+    await comic.black(true, 0.5);
+    await comic.caption("He stayed.", { x: 44, y: 46, seconds: 2.0 });
+  } finally {
+    if (s) s.stop();
+    for (const u of [carry, work, hand]) { const i = world.updaters.indexOf(u); if (i >= 0) world.updaters.splice(i, 1); }
+    sacks.forEach(x => world.scene.remove(x.sack)); sackGeo.dispose(); sackMat.dispose();
+    world.scene.remove(stool); stool.traverse(o => { if (o.geometry) o.geometry.dispose(); }); wood.dispose();
+    crew.dispose();                                  // the men fall back into the dark: never on screen with the giant
+  }
+  comic.black(false, 0.5);                           // shot 4 cuts in under the lifting black
+}
+
 export async function playCaveOpening(c) {
   const { world, hero, director, comic, giant, cave, pens, card, noCrawl = false } = c;
   const { door, lights } = cave;
@@ -171,6 +275,10 @@ export async function playCaveOpening(c) {
   let s = null, outside = null;
 
   try {
+    if (!c.oldArrival) {
+      // ---- 0–3. the arrival scene (C1–C3)
+      await arrivalScene(c);
+    } else {
     // ---- 0. the crawl
     if (!noCrawl) await comic.crawl({ ...CRAWL, seconds: 44 });
 
@@ -233,6 +341,7 @@ export async function playCaveOpening(c) {
     });
     await wait(5.5);
     s.stop();
+    }                                                // (end of the old arrival, shots 0–3)
 
     // ---- 4. inside, in the dark: an extreme close-up. Sparks; the torch takes, and lights his face.
     hero.teleport(-11, -2.2, Math.PI / 2 + 0.35);

@@ -44,7 +44,7 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
       <span class="what">No giant, no clock. Your flock, your code, any array algorithm, step by step.</span><span class="prog">up to 10 sheep</span></button>
   </div>
   <div class="extra">
-    <span class="lbl">STORY</span><button id="open-btn" data-ic="film">Opening</button><button id="climax-btn" data-ic="film">Climax</button>
+    <span class="lbl">STORY</span><button id="open-btn" data-ic="film">Opening</button><button id="crawl-btn" data-ic="scroll">The story so far</button><button id="climax-btn" data-ic="film">Climax</button>
     <span class="lbl">LESSON</span><button data-part="1">1 Pens</button><button data-part="2">2 Walking</button><button data-part="3">3 Room &amp; gaps</button><button data-part="4">4 Turning around</button>
     <span class="lbl">ARRANGE</span><button data-arrange="traverse">Sum</button><button data-arrange="insert">Insert</button><button data-arrange="delete">Delete</button><button data-arrange="reverse">Reverse</button>
     <button id="codex-btn" data-ic="scroll">Codex</button>
@@ -67,7 +67,7 @@ import { addCaveDetails } from "./js/islands/cave/caveDetails.js";
 import { Cyclops } from "./js/islands/cave/cyclops.js";
 import { Hero } from "./js/engine/hero.js";
 import { Comic } from "./js/engine/comic.js";
-import { playCaveOpening } from "./js/islands/cave/caveOpening.js";
+import { playCaveOpening, playCaveCrawl } from "./js/islands/cave/caveOpening.js";
 import { playCaveClimax } from "./js/islands/cave/caveClimax.js";
 import { nameCard } from "./js/story/tags.js";
 import { FIRE_AT } from "./js/islands/cave/caveScene.js";
@@ -81,7 +81,7 @@ world.grade.uniforms.letterbox.value = 0;   // no cinema bars while learning
 // ---------- the cave itself (caveScene.js), and Polyphemus dozing at the back by his cheeses
 const scene = world.scene;
 const cave = await buildCave(world);
-addCaveDetails(world, cave);                          // the lived-in details: threshold, pen wall, his corner, the deep cave, moonlight
+cave.details = addCaveDetails(world, cave);                          // the lived-in details: threshold, pen wall, his corner, the deep cave, moonlight
 const giant = new Cyclops(world, { height: 11 });
 await giant.load();
 giant.place(GIANT_AT.x, 0, GIANT_AT.z, 8, 4); giant.play("idle", 0); giant.open(0.25);   // dozing: one eye, barely open
@@ -132,6 +132,13 @@ async function opening() {
   }
 }
 document.getElementById("open-btn").onclick = () => opening();
+// the crawl that used to open the chapter, kept whole as a read: the arrival scene now carries the story
+document.getElementById("crawl-btn").onclick = async () => {
+  if (filming) return;
+  filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy", "filming");
+  try { await playCaveCrawl({ comic }); }
+  finally { filming = false; skipping = false; director.skipping = false; world.timeScale = 1; fastEl.classList.remove("on"); skipBtn.classList.remove("on"); document.body.classList.remove("busy", "filming"); }
+};
 async function climax() {
   if (filming) return;
   filming = true; skipBtn.classList.add("on"); document.body.classList.add("busy");

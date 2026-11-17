@@ -19,28 +19,18 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
   #loading .bar { width: 260px; height: 2px; background: #1c2429; }
   #loading .bar div { height: 100%; width: 0; background: #c9a227; transition: width 0.3s; }
   #loading p { margin: 0; font-family: 'Courier Prime', monospace; color: #8a979b; font-size: 15px; }
-  #hud { position: fixed; left: 16px; bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; z-index: 10; }
-  #hud button { min-height: 40px; padding: 0 14px; background: rgba(8, 12, 15, 0.75); color: #efe1c2; border: 1px solid #4a3a28; border-radius: 4px;
-                font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
-  #hud button.on, #hud button.play { border-color: #f2c230; color: #f2c230; }
-  #chapter { position: fixed; left: 6%; top: 15%; pointer-events: none; z-index: 10; font-family: 'Courier Prime', 'Courier 10 Pitch', monospace;
-             font-size: 17px; letter-spacing: 3px; color: #efe1c2; text-shadow: 2px 2px 0 #000; transition: opacity 1.2s; }
-  #chapter b { display: block; margin-top: 2px; font-family: Anton, 'Inter Display Black', Impact, sans-serif; font-weight: 400; font-size: 46px;
-               letter-spacing: 1px; color: #f2c230; text-shadow: 3px 3px 0 #7e1a0f, 0 0 24px rgba(0,0,0,0.6); }
   #line { position: fixed; right: 5%; top: 14%; z-index: 10; pointer-events: none; font-family: 'Courier Prime', monospace; font-size: 20px; color: #efe1c2;
           background: rgba(10, 8, 6, 0.72); border-left: 4px solid #f2c230; padding: 10px 16px; opacity: 0; transition: opacity 0.3s; }
   #line.on { opacity: 1; }
   #skip { position: fixed; right: 18px; bottom: 16px; z-index: 35; min-height: 40px; padding: 0 16px; background: rgba(8, 12, 15, 0.75); color: #efe1c2;
           border: 1px solid #4a3a28; border-radius: 4px; font-family: 'Courier Prime', monospace; font-size: 13px; letter-spacing: 1px; cursor: pointer; display: none; }
   #skip.on { display: block; }
-  body.board-on #hud { visibility: hidden; }
-  body.side-panel #hud { right: calc(var(--pw, 520px) + 20px); }
   @media (min-width: 901px) { body.board-on #skip { right: calc(var(--pw, 520px) + 20px); bottom: calc(var(--board-h, 210px) + 22px); } }
   #fast { position: fixed; inset: 0; z-index: 34; background: #050403; display: none; align-items: center; justify-content: center;
           font-family: Anton, Impact, sans-serif; font-size: 34px; letter-spacing: 6px; color: #f2c230; }
   #fast.on { display: flex; }
   @media (min-width: 901px) { body.side-panel #line { right: calc(var(--pw, 520px) + 3%); } body.side-panel #skip { right: calc(var(--pw, 520px) + 20px); } }
-  body.cinematic #hud, body.cinematic #pace, body.cinematic #line, body.cinematic #skip { visibility: hidden; }
+  body.cinematic #pace, body.cinematic #line, body.cinematic #skip { visibility: hidden; }
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
@@ -48,9 +38,24 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 </head>
 <body>
 <div id="loading"><h1>THE LAESTRYGONIAN HARBOUR</h1><div class="bar"><div id="bar"></div></div><p>loading the harbour…</p></div>
-<div id="chapter">CHAPTER ONE<b>THE LAESTRYGONIAN HARBOUR</b></div>
+<div id="title" class="odx-title"><span class="k">CHAPTER ONE</span><span class="t">The Laestrygonian Harbour</span></div>
 <div id="line"></div>
-<div id="hud"></div>
+<!-- the chapter's doors: the shared menu (js/ui/tokens.css .odx-doors), in the Harbour's storm-and-bronze dressing -->
+<nav id="doors" class="odx-doors" aria-label="Chapter one">
+  <button class="continue" id="continue-btn"></button>
+  <div class="row">
+    <button class="door lesson" id="door-lesson"><span class="kick" data-ic="book">LEARN</span><span class="name">ATHENA'S LESSON</span>
+      <span class="what">The textbook stack in real C, one line at a time on the quay: push, pop, overflow and underflow. Nothing is graded.</span><span class="prog" id="prog-lesson">22 steps · 2 questions</span></button>
+    <button class="door trials" id="door-trials"><span class="kick" data-ic="check">BE JUDGED</span><span class="name">THE TRIALS</span>
+      <span class="what">Load the Ship, then The Chain: the bronze AXE is buried in your tallest cargo tower.</span><span class="prog" id="prog-trials"></span></button>
+    <button class="door lab" id="door-lab"><span class="kick" data-ic="flask">PLAY</span><span class="name">THE LAB</span>
+      <span class="what">No giants. No chain. Your quay, your code: Athena only watches.</span><span class="prog">up to 3 stacks</span></button>
+  </div>
+  <div class="extra">
+    <span class="lbl">STORY</span><button id="open-btn" data-ic="film">Opening</button><button id="crawl-btn" data-ic="scroll">The story so far</button><button id="climax-btn" data-ic="film" hidden>Climax</button>
+    <button id="codex-btn" data-ic="scroll">Codex</button>
+  </div>
+</nav>
 <button id="skip">SKIP SCENE ▸▸ (Esc)</button>
 <div id="fast">▸▸</div>
 
@@ -72,7 +77,7 @@ import { Comic } from "./js/engine/comic.js";
 import { Giant, CLIFF_GIANTS } from "./js/islands/harbour/giant.js";
 import { ChainTower } from "./js/islands/harbour/chainTower.js";
 import { playClimax } from "./js/islands/harbour/climax.js";
-import { playOpening } from "./js/islands/harbour/opening.js";
+import { playOpening, playCrawl } from "./js/islands/harbour/opening.js";
 import { Mood } from "./js/islands/harbour/mood.js";
 import { sound } from "./js/engine/sound.js";
 import { nameCard } from "./js/story/tags.js";
@@ -80,12 +85,14 @@ import { stackLesson } from "./js/islands/harbour/stackLesson.js";
 import { ReturnBench } from "./js/islands/harbour/returnBench.js";
 import { Pace } from "./js/engine/pace.js";
 import { installUI } from "./js/ui/ui.js";
+import { icon } from "./js/ui/icons.js";
 
 const params = new URLSearchParams(location.search);
 manager.onProgress = (url, done, total) => { document.getElementById("bar").style.width = (done / total * 100) + "%"; };
 
 const world = new World({ quality: params.get("q") || "auto" });
 world.renderer.localClippingEnabled = true;
+world.grade.uniforms.letterbox.value = 0;   // no cinema bars while learning: the films switch them on and off themselves
 await loadFonts();
 const harbour = await buildHarbour(world);
 buildTechProps(world, harbour);
@@ -150,6 +157,7 @@ controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.495; control
 const free = on => { controls.enabled = on; director.mode = null; director.paused = on; if (on) controls.target.copy(director.look); };
 const SHOTS = {
   trial:   { pos: [1.2, 3.0, 7.6], look: [0.2, 2.0, -1.6], fov: 40 },
+  rest:    { pos: [4.2, 7.0, 14.0], look: [-1.2, 0.4, -9], fov: 44 },
   manifest: { pos: [4.4, 2.85, 2.3], look: [6.2, 2.9, -0.4], fov: 40 },
   arrival: { pos: [-9, 9, -42], look: [3, 2, 0], fov: 46 },
   giants:  { pos: [-3, 2.3, 4], look: [6, 40, -200], fov: 52 },
@@ -176,7 +184,6 @@ const piles = {
 // ---------- the Harbour's opening: the film that sets up the whole chapter (opening.js)
 async function play() {
   free(false);
-  document.getElementById("chapter").style.opacity = 0;
   [prize].forEach(c => c.parent && c.parent.remove(c));
   await giantReady;
   await playOpening({ world, hero, director, comic, giant, chain, trial, harbour, card: nameCard("harbour"), piles, crowd });
@@ -197,19 +204,46 @@ addEventListener("pointerdown", () => sound.ctx, { once: true });
 addEventListener("keydown", () => sound.ctx, { once: true });
 addEventListener("keydown", e => { if (e.key === "Escape") skip(); });
 
-// ---------- HUD
-const hud = document.getElementById("hud");
-const pb = document.createElement("button"); pb.textContent = "▶ play scene"; pb.className = "play"; pb.onclick = () => { if (!busy) location.search = ""; }; hud.appendChild(pb);
-const lb = document.createElement("button"); lb.textContent = "Athena's lesson"; lb.onclick = () => { if (!busy) { trials.close(); lesson(); } }; hud.appendChild(lb);
-const cb = document.createElement("button"); cb.textContent = "climax (preview)"; cb.onclick = () => climaxPreview(); if (params.get("dev")) hud.appendChild(cb);
-const tb = document.createElement("button"); tb.textContent = "the trials"; tb.onclick = () => { if (!busy && !inLesson) trialsOpen(); }; hud.appendChild(tb);
-if (params.get("dev")) for (const [t, href] of [["2 · the cave ▸", "cave_env.html"], ["3 · circe ▸", "circe_env.html"], ["4 · underworld ▸", "underworld_env.html"]]) { const b = document.createElement("button"); b.textContent = t; b.onclick = () => (location.href = href); hud.appendChild(b); }
-const labBtn = document.createElement("button"); labBtn.textContent = "⚗ the lab"; labBtn.onclick = () => { if (!busy && !inLesson) trialsOpen(true); }; hud.appendChild(labBtn);
-if (params.get("dev")) Object.keys(SHOTS).forEach(name => { const b = document.createElement("button"); b.textContent = name; b.onclick = () => shot(name); hud.appendChild(b); });
+// ---------- the doors (and, behind ?dev=1, the developer's extras)
+const extra = document.querySelector("#doors .extra");
+const devBtn = (label, fn) => { const b = document.createElement("button"); b.textContent = label; b.onclick = fn; extra.appendChild(b); return b; };
 const qb = document.createElement("button");
 const showQ = () => qb.textContent = "quality: " + world.quality;
 qb.onclick = () => { world.autoQuality = false; world.quality = world.quality === "high" ? "low" : "high"; world.applyQuality(); showQ(); };
-if (params.get("dev")) hud.appendChild(qb);
+if (params.get("dev")) {
+  extra.insertAdjacentHTML("beforeend", `<span class="lbl">DEV</span>`);
+  devBtn("climax (preview)", () => climaxPreview());
+  for (const [t, href] of [["2 · the cave ▸", "cave_env.html"], ["3 · circe ▸", "circe_env.html"], ["4 · underworld ▸", "underworld_env.html"]]) devBtn(t, () => (location.href = href));
+  Object.keys(SHOTS).forEach(name => devBtn(name, () => shot(name)));
+  extra.appendChild(qb);
+}
+document.querySelectorAll("#doors [data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", icon(el.dataset.ic) + " "));
+// the menu shows only at rest: films, the lesson and the trials hide it (body.busy, shared with every chapter)
+const setBusy = on => { document.body.classList.toggle("busy", on); if (!on) refreshMenu(); };
+const TRIAL_DONE = () => { try { return (JSON.parse(localStorage.getItem("odyssey.harbour.done")) || []).filter(id => id.startsWith("harbour-")); } catch { return []; } };
+function refreshMenu() {
+  const d = TRIAL_DONE(), practice = d.includes("harbour-practice"), finished = d.includes("harbour-finale");
+  const pt = document.getElementById("prog-trials");
+  pt.textContent = finished ? "2 / 2 done" : practice ? "1 / 2 done · next: FINALE · The Chain" : "2 trials · start with Load the Ship";
+  pt.classList.toggle("done", finished);
+  // the gold button: back into the trials once they are started, otherwise the film
+  const cont = document.getElementById("continue-btn");
+  cont.innerHTML = practice && !finished ? `CONTINUE ${icon("arrow")} <small>FINALE · The Chain</small>` : `${icon("play")} PLAY SCENE <small>the opening, then Athena's lesson</small>`;
+  cont.onclick = () => { if (busy || inLesson) return; if (practice && !finished) trialsOpen(); else run(); };
+  document.getElementById("climax-btn").hidden = !finished;
+}
+document.getElementById("door-lesson").onclick = () => { if (!busy && !inLesson) lesson(); };
+document.getElementById("door-trials").onclick = () => { if (!busy && !inLesson) trialsOpen(); };
+document.getElementById("door-lab").onclick = () => { if (!busy && !inLesson) trialsOpen(true); };
+document.getElementById("open-btn").onclick = () => { if (!busy && !inLesson) run(); };
+// the crawl that used to open the chapter, kept whole as a read: the arrival scene now carries the story
+document.getElementById("crawl-btn").onclick = async () => {
+  if (busy || inLesson) return;
+  setBusy(true); skipper.begin();
+  try { await playCrawl({ comic }); } finally { skipper.end(); setBusy(false); }
+};
+document.getElementById("climax-btn").onclick = () => climaxPreview();
+document.getElementById("codex-btn").onclick = async () => { if (busy || inLesson) return; await trialsOpen(); trials.codex.show(true); };
 let busy = false;
 const skipper = {
   begin() { busy = true; skipBtn.classList.add("on"); },
@@ -222,11 +256,11 @@ const skipper = {
   end() {
     busy = false; skipping = false; director.skipping = false; world.timeScale = 1;
     fastEl.classList.remove("on"); skipBtn.classList.remove("on");
-    document.getElementById("chapter").style.opacity = 0;
-    director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
+      director.card.classList.remove("on"); world.grade.uniforms.freeze.value = 0;
   }
 };
 async function run() {
+  setBusy(true);
   skipper.begin();
   try { await play(); }
   finally { skipper.end(); }
@@ -238,6 +272,7 @@ let inLesson = false;
 async function lesson() {
   if (inLesson) return;
   inLesson = true;
+  setBusy(true);
   free(false);
   // cut to black, reset the trial area, stand him up by the pile
   fastEl.textContent = ""; fastEl.classList.add("on");
@@ -250,7 +285,6 @@ async function lesson() {
   const shift = () => { const w = innerWidth, h = innerHeight; document.body.classList.add("side-panel"); if (w > 900) world.camera.setViewOffset(w, h, panelW() / 2, 0, w, h); else world.camera.clearViewOffset(); };
   shift(); addEventListener("resize", shift);
   stackFrame(director, trial, hero, () => [s], { snap: true });
-  document.getElementById("chapter").style.opacity = 0;
   fastEl.classList.remove("on"); fastEl.textContent = "▸▸";
   bench.clear();
   const player = stackLesson({ hero, trial, director, HEAP, bench, newCrate: v => trial.newCrate(v) });
@@ -272,7 +306,9 @@ const trials = new TrialMode({
   skipping: () => skipping,
   climax: () => climax(),
   panelView: on => { if (on) shiftForPanel(); else { document.body.classList.remove("side-panel"); world.camera.clearViewOffset(); } },
-  onLesson: () => { trials.close(); removeEventListener("resize", shiftForPanel); lesson(); }
+  onLesson: () => { trials.close(); removeEventListener("resize", shiftForPanel); lesson(); },
+  // Close: back to the chapter's doors, the quay at rest
+  onClose: () => { removeEventListener("resize", shiftForPanel); setBusy(false); shot("rest"); }
 });
 // the finale's ending: the comic climax (with the panel out of the way)
 async function climax() {
@@ -287,8 +323,8 @@ async function climax() {
 // preview: put the finale's end state on the quay and play the climax straight away
 async function climaxPreview() {
   if (busy) return;
+  setBusy(true);
   trials.close(); document.body.classList.remove("side-panel"); world.camera.clearViewOffset();
-  document.getElementById("chapter").style.opacity = 0;
   trial.clearAll();
   trial.rebuild([{ name: "tower", capacity: 6, initial: [12, 31, 45, 50, 63, 77] }, { name: "spare", capacity: 4, initial: [] }]);
   setPileObstacles(nav, trial);
@@ -300,8 +336,8 @@ async function climaxPreview() {
 }
 
 async function trialsOpen(lab = false) {
+  setBusy(true);
   free(false);
-  document.getElementById("chapter").style.opacity = 0;
   [prize].forEach(c => c.parent && c.parent.remove(c));
   shiftForPanel(); addEventListener("resize", shiftForPanel);
   await (lab ? trials.openLab() : trials.open());
@@ -310,7 +346,7 @@ async function trialsOpen(lab = false) {
 world.onFrame = () => { if (controls.enabled) controls.update(); showQ(); };
 const origUpdate = director.update.bind(director);
 director.update = (dt, time, raw) => { if (!director.paused) origUpdate(dt, time, raw); };
-window.__shot = shot; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__climax = () => climaxPreview(); window.__trials = lab => trialsOpen(lab); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
+window.__shot = shot; window.__free = free; window.__play = run; window.__skip = skip; window.__lesson = lesson; window.__climax = () => climaxPreview(); window.__trials = lab => trialsOpen(lab); window.__tm = () => trials; window.__world = world; window.__hero = hero; window.__director = director;
 window.__strike = (x = -60, z = -380) => { harbour.lightning.strike(new THREE.Vector3(x, 0, z)); harbour.lightning.pulseClock = 0.01; };
 
 // ---------- warm-up: the stutter at the start was the giants still unpacking (three 12 MB files) and their
@@ -352,12 +388,12 @@ if (params.get("capture")) {
   // test mode: frames are stepped on request so the scene can be checked frame by frame
   window.__advance = async (seconds, dt = 1 / 30) => { const n = Math.round(seconds / dt); for (let i = 0; i < n; i++) { world.step(dt, i === n - 1); await new Promise(r => setTimeout(r, 0)); } };
   loading.remove();
-  shot("trial");
+  shot("rest"); refreshMenu();
 } else {
   world.start(world.onFrame);
   loading.style.opacity = 0;
   setTimeout(() => loading.remove(), 1300);
-  if (params.get("free")) shot("trial"); else run();
+  if (params.get("free")) { shot("rest"); refreshMenu(); } else run();
 }
 window.__ready = true;
 </script>

@@ -16,7 +16,7 @@ export class Sound {
   setVolume(v) { this.volume = Math.max(0, Math.min(1, v)); if (this._out && this._ctx) this._out.gain.setTargetAtTime(this.volume, this._ctx.currentTime, 0.05); }
   setMuted(m) {
     this.muted = !!m;
-    if (this.muted) { this.sea(false); this._stopAmb(); }
+    if (this.muted) { this.sea(false); this._stopAmb(); this.crowd(false); this.fire(false); }
     else if (this._ambKind) this.ambience(this._ambKind);
   }
   // ---------- the film's own cues, the same in every chapter: a freeze-frame card lands with one low hit,
@@ -34,8 +34,8 @@ export class Sound {
   }
   // ---------- one small sound for one data-structure operation (never more than one every 120 ms, so a
   // fast-forwarded run doesn't turn into noise). kind: thump (a crate set down, a value written),
-  // creak (a crate lifted), tick (a value read, a pointer moved), ticket (a ticket printed: enqueue),
-  // bell (the counter bell: dequeue), buzz (full / empty: refused)
+  // creak (a crate lifted), tick (a value read, a pointer moved), ticket (a brass token set down: enqueue),
+  // bell (the gate's chime: dequeue), buzz (full / empty: refused, a low two-note warning)
   op(kind) {
     const A = this.ctx; if (!A || this.muted) return;
     const now = performance.now(); if (now - (this._opAt || 0) < 120) return; this._opAt = now;
@@ -45,13 +45,13 @@ export class Sound {
     if (kind === "thump") { tone("sine", 120, 60, 0.28, 0.18); hiss("lowpass", 700, 0.7, 0.08, 0.08); }
     else if (kind === "creak") { hiss("bandpass", 650, 8, 0.12, 0.22); }
     else if (kind === "tick") { tone("sine", 1300, 700, 0.09, 0.05); }
-    else if (kind === "ticket") { tone("square", 1800, 1600, 0.035, 0.03); tone("square", 1800, 1600, 0.035, 0.03, 0.06); }
-    else if (kind === "bell") { tone("triangle", 1568, 1560, 0.12, 0.9); tone("sine", 3136, 3120, 0.04, 0.5); }
-    else if (kind === "buzz") { tone("sawtooth", 110, 104, 0.08, 0.35); }
+    else if (kind === "ticket") { tone("triangle", 2400, 1800, 0.05, 0.04); tone("sine", 900, 700, 0.07, 0.09); }   // a brass token set on the track (enqueue)
+    else if (kind === "bell") { tone("sine", 1046, 1044, 0.08, 1.1); tone("sine", 1568, 1566, 0.03, 0.8, 0.05); }    // the gate's soft chime (dequeue)
+    else if (kind === "buzz") { tone("triangle", 196, 190, 0.08, 0.3); tone("triangle", 165, 160, 0.07, 0.32, 0.18); }   // a low, clear warning (full / empty)
   }
   // ---------- each place's ambience: quiet, looping, made from filtered noise and tones; one at a time.
   // kind: "title" (sea and wind) | "harbour" (rain and gusts) | "cave" (fire, drips, a low rumble) |
-  //       "underworld" (the fluorescent hum, the odd ticket click) | null (stop)
+  //       "underworld" (the Atlas: a low resonance, air from the aperture, turning rings, a far chime) | null (stop)
   ambience(kind) {
     this._ambKind = kind || null;
     this._stopAmb();
@@ -90,9 +90,11 @@ export class Sound {
       const low = A.createOscillator(), lg = A.createGain(); low.frequency.value = 38; lg.gain.value = 0.025; low.connect(lg).connect(bus); low.start(); nodes.push(low);   // the rock itself
     }
     if (kind === "underworld") {
-      [[50, 0.02], [100, 0.012], [150, 0.006], [300, 0.003]].forEach(([fq, lv]) => { const o = A.createOscillator(), g = A.createGain(); o.type = "sawtooth"; o.frequency.value = fq; g.gain.value = lv; o.connect(g).connect(bus); o.start(); nodes.push(o); });   // the tubes' hum
-      loopNoise("lowpass", 900, 0, 0.008);                                                                            // the room
-      every(7000, 9000, () => blip(1800, 1400, 0.03, 0.04, "square"));                                                // somewhere, a ticket machine
+      // the Atlas of Last Voyages: a quiet, resonant instrument room (no fluorescent buzz)
+      [[55, 0.014], [82.5, 0.008], [110, 0.005]].forEach(([fq, lv]) => { const o = A.createOscillator(), g = A.createGain(); o.type = "sine"; o.frequency.value = fq; g.gain.value = lv; o.connect(g).connect(bus); o.start(); nodes.push(o); swell(g.gain, lv * 0.35, 0.05 + fq / 4000); });   // the chamber's low resonance
+      const air = loopNoise("bandpass", 2600, 0.7, 0.004); swell(air.g.gain, 0.002, 0.07);                         // air falling from the aperture
+      every(4500, 2500, () => blip(220, 205, 0.012, 0.35, "triangle"));                                               // the astrolabe's rings, turning
+      every(10000, 6000, () => { blip(1318, 1314, 0.018, 1.8); blip(1975, 1970, 0.006, 1.2); });                      // far off, a chime
     }
     this._amb = { bus, nodes, timers };
     if (!this._ambHooked) { this._ambHooked = true; addEventListener("pagehide", () => this._stopAmb(0)); }
@@ -297,6 +299,96 @@ export class Sound {
     else if (kind === "breath") { noise(2.4, "bandpass", 260, 140, 0.05, 1.0); }
     else if (kind === "scrape") { noise(2.6, "bandpass", 420, 180, 0.12, 0.3); this.boom({ freq: 40, to: 30, seconds: 2.4, level: 0.12 * level }); }
     else if (kind === "slam") { this.boom({ freq: 58, to: 24, seconds: 1.6, level: 0.6 * level }); noise(0.8, "lowpass", 1400, 160, 0.16, 0.004); }
+  }
+
+  // ---------- the narrative films (Troy and the chapter scenes). Added for the redesign; nothing above changed
+  // except setMuted, which now also stops crowd() and fire().
+  // "The sea heard him": one deep swell, the only recurring sound in the story. Low enough to feel, with a
+  // quiet upper partial so laptop speakers still carry it. level rises each time it is used (0.25 .. 0.7).
+  seaHeard({ level = 0.4, seconds = 4.5 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime;
+    for (const [f0, f1, l] of [[49, 41, 1], [49.6, 41.3, 0.8], [98, 82, 0.28]]) {
+      const o = A.createOscillator(), g = A.createGain(), f = A.createBiquadFilter();
+      o.type = "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + seconds);
+      f.type = "lowpass"; f.frequency.value = 260;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(level * l, t + seconds * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+      o.connect(f).connect(g).connect(this._out); o.start(t); o.stop(t + seconds + 0.1);
+    }
+    const n = this._noise(seconds), fn = A.createBiquadFilter(), gn = A.createGain();
+    fn.type = "lowpass"; fn.frequency.value = 180;
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(level * 0.25, t + seconds * 0.4); gn.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+    n.connect(fn).connect(gn).connect(this._out); n.start(t);
+  }
+  // a crowd far off: "song" (a city celebrating, voices in a slow swell) or "roar" (a city waking to fire).
+  // crowd(false) fades it out.
+  crowd(on, { mood = "song", level = 0.06 } = {}) {
+    const A = this.ctx; if (!A) return;
+    if (this._crowd) { const c = this._crowd, e = A.currentTime; c.g.gain.cancelScheduledValues(e); c.g.gain.setValueAtTime(Math.max(c.g.gain.value, 0.0001), e); c.g.gain.exponentialRampToValueAtTime(0.0001, e + 1.2); c.srcs.forEach(s => s.stop(e + 1.3)); this._crowd = null; }
+    if (!on || this.muted) return;
+    const t = A.currentTime, g = A.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(level, t + 1.5); g.connect(this._out);
+    const srcs = [];
+    // voices: noise through a few vowel-like bands, each swelling at its own slow rate
+    for (const [fr, q, rate] of mood === "roar" ? [[380, 1.2, 0.7], [900, 1.5, 1.1], [1700, 2, 1.6]] : [[520, 6, 0.21], [780, 7, 0.17], [1150, 8, 0.29]]) {
+      const n = this._noise(3); n.loop = true;
+      const f = A.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = fr; f.Q.value = q;
+      const vg = A.createGain(); vg.gain.value = 0.5;
+      const lfo = A.createOscillator(), lg = A.createGain(); lfo.frequency.value = rate; lg.gain.value = 0.45; lfo.connect(lg).connect(vg.gain);
+      n.connect(f).connect(vg).connect(g); n.start(t); lfo.start(t); srcs.push(n, lfo);
+    }
+    this._crowd = { g, srcs };
+  }
+  // a war horn: one long, rough low note
+  horn({ level = 0.22, seconds = 2.2 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime;
+    for (const [fr, l] of [[110, 1], [110.8, 0.7], [220.5, 0.3]]) {
+      const o = A.createOscillator(), g = A.createGain(), f = A.createBiquadFilter(), vib = A.createOscillator(), vg = A.createGain();
+      o.type = "sawtooth"; o.frequency.setValueAtTime(fr * 0.94, t); o.frequency.linearRampToValueAtTime(fr, t + 0.35);
+      vib.frequency.value = 4.6; vg.gain.value = fr * 0.004; vib.connect(vg).connect(o.frequency);
+      f.type = "lowpass"; f.frequency.value = 700;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(level * l, t + 0.3); g.gain.setValueAtTime(level * l, t + seconds - 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+      o.connect(f).connect(g).connect(this._out); o.start(t); vib.start(t); o.stop(t + seconds + 0.1); vib.stop(t + seconds + 0.1);
+    }
+  }
+  // a long wooden creak (a gate, a hull, the horse): many tiny catches through a falling resonance
+  creak({ level = 0.16, seconds = 1.4, from = 700, to = 300 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    const t = A.currentTime, f = A.createBiquadFilter(), g = A.createGain();
+    f.type = "bandpass"; f.Q.value = 12; f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + seconds);
+    g.gain.value = level; f.connect(g).connect(this._out);
+    const step = 1 / 38;
+    for (let k = 0; k * step < seconds; k++) {
+      const n = this._noise(0.012), eg = A.createGain(), at = t + k * step + Math.random() * step * 0.4;
+      this._env(eg, at, 0.6 + Math.random() * 0.4, 0.001, 0.01); n.connect(eg).connect(f); n.start(at);
+    }
+  }
+  // a heavy wooden hatch or door falling open: a knock, then a dull slam
+  hatch({ level = 0.5 } = {}) {
+    const A = this.ctx; if (!A || this.muted) return;
+    this.boom({ freq: 140, to: 70, seconds: 0.18, level: level * 0.5 });
+    this.boom({ freq: 85, to: 40, seconds: 0.5, level: level, at: 0.12 });
+    this.crash({ seconds: 0.35, level: level * 0.3 });
+  }
+  // a fire burning nearby: a low roar and random crackles. fire(false) fades it out.
+  fire(on, { level = 0.08 } = {}) {
+    const A = this.ctx; if (!A) return;
+    clearInterval(this._fireTick); this._fireTick = null;
+    if (this._fire) { const e = A.currentTime, g = this._fire.g; g.gain.cancelScheduledValues(e); g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), e); g.gain.exponentialRampToValueAtTime(0.0001, e + 1); this._fire.n.stop(e + 1.1); this._fire = null; }
+    if (!on || this.muted) return;
+    const n = this._noise(3); n.loop = true;
+    const f = A.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 420;
+    const g = A.createGain(); g.gain.setValueAtTime(0.0001, A.currentTime); g.gain.exponentialRampToValueAtTime(level, A.currentTime + 1);
+    n.connect(f).connect(g).connect(this._out); n.start(); this._fire = { n, g };
+    this._fireTick = setInterval(() => {
+      if (this.muted || !this._fire) return;
+      const t = A.currentTime;
+      for (let k = 0; k < 1 + Math.floor(Math.random() * 3); k++) {
+        const c = this._noise(0.02), cf = A.createBiquadFilter(), cg = A.createGain(), at = t + Math.random() * 0.12;
+        cf.type = "highpass"; cf.frequency.value = 1800 + Math.random() * 2500;
+        this._env(cg, at, level * (1.5 + Math.random() * 2), 0.001, 0.015); c.connect(cf).connect(cg).connect(this._out); c.start(at);
+      }
+    }, 140);
   }
 }
 export const sound = new Sound();

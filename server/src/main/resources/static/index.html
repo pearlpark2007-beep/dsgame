@@ -41,15 +41,31 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
   .sheet h2 { margin: 0; font: 400 clamp(32px, 4vw, 52px) var(--display); letter-spacing: 3px; text-transform: uppercase; }
   .sheet .close { all: unset; cursor: pointer; font: 700 13px var(--mono); letter-spacing: 2px; color: var(--paper); border: 1px solid var(--paper); padding: 8px 14px; border-radius: 4px; }
   .sheet .close:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
-  /* the chart */
-  #chart { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 26px; align-items: start; }
-  #chart svg { width: 100%; height: auto; background: #efe3c6; border-radius: 4px; box-shadow: inset 0 0 80px rgba(110, 80, 40, .35); }
-  #chart svg .isle { cursor: pointer; }
-  #chart svg .isle:focus { outline: none; }
-  #chart svg .isle:focus .ring, #chart svg .isle:hover .ring { stroke: #c8261e; stroke-width: 3; }
+  /* the chart: a 3D sea fills the sheet; the header and the list float over it */
+  #map.sheet { background: #061015; overflow: hidden; }
+  #map .stage { position: absolute; inset: 0; }
+  #map .stage canvas { display: block; width: 100%; height: 100%; }
+  #map .stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 42% 50%, transparent 55%, rgba(3,8,10,.75) 100%); }
+  #map .inner { position: relative; z-index: 2; max-width: none; height: 100%; display: flex; flex-direction: column; padding: 26px clamp(18px, 3vw, 44px) 24px; pointer-events: none; }
+  #map header { pointer-events: auto; border-bottom-color: rgba(242,194,48,.55); }
+  #map h2 { text-shadow: 0 2px 18px rgba(0,0,0,.7); }
+  #map .close { background: rgba(6,16,21,.6); }
+  #chart { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(270px, 24vw, 380px); gap: 26px; align-items: start; }
+  #chart .side { pointer-events: auto; max-height: 100%; overflow: auto; padding: 14px; border: 1px solid rgba(216,178,90,.22); border-radius: 6px; background: rgba(5,13,17,.78); backdrop-filter: blur(6px); }
+  .chart-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .chart-labels .cl { position: absolute; left: 0; top: 0; white-space: nowrap; text-align: center; will-change: transform; }
+  .chart-labels .isle { pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 10px 6px; border-radius: 4px; background: rgba(4,10,13,.72); border: 1px solid rgba(216,178,90,.25); border-top: 2px solid var(--c); transition: border-color var(--t-fast), background var(--t-fast), transform 0s; }
+  .chart-labels .isle .k { font: 700 10px var(--mono); letter-spacing: 2.5px; color: var(--c); }
+  .chart-labels .isle b { font: 400 clamp(13px, 0.95vw, 17px)/1.1 var(--display); letter-spacing: 1.5px; color: var(--paper); font-weight: 400; }
+  .chart-labels .isle .m { font: 700 11px var(--mono); letter-spacing: 2px; color: #b3a47f; }
+  .chart-labels .isle.done .m { color: var(--gold); }
+  .chart-labels .isle.hot { border-color: var(--gold); background: rgba(24,18,4,.94); box-shadow: 0 0 0 1px var(--gold), 0 0 22px rgba(242,194,48,.35); }
+  .chart-labels .isle.hot b { color: var(--gold); }
+  .chart-labels .place { font: 700 11px var(--mono); letter-spacing: 4px; color: #b8a77e; text-shadow: 0 1px 6px #000; opacity: .85; }
+  .chart-labels .place.sea { color: #6fa3a6; }
   #isles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-  #isles li button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: block; padding: 12px 14px; background: var(--ink); border: 1px solid var(--rule); border-left: 4px solid var(--c); border-radius: 4px; }
-  #isles li button:hover, #isles li button:focus-visible { border-color: var(--gold); border-left-color: var(--c); outline: none; }
+  #isles li button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: block; padding: 12px 14px; background: rgba(10,18,20,.85); border: 1px solid var(--rule); border-left: 4px solid var(--c); border-radius: 4px; }
+  #isles li button:hover, #isles li button:focus-visible, #isles li button.hot { border-color: var(--gold); border-left-color: var(--c); outline: none; }
   #isles .k { font: 700 11px var(--mono); letter-spacing: 3px; color: var(--c); }
   #isles .t { font: 400 22px/1.1 var(--display); letter-spacing: 2px; text-transform: uppercase; margin: 3px 0 4px; color: var(--paper); }
   #isles .m { font: 13px var(--mono); color: var(--dim); }
@@ -67,7 +83,7 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
   #info td:first-child { white-space: nowrap; color: var(--gold); font-weight: 700; padding-right: 16px; }
   #info p { font: 14px/1.55 var(--mono); margin: 0 0 10px; color: var(--paper); }
   #info a { color: var(--gold); }
-  @media (max-width: 860px) { #chart { grid-template-columns: 1fr; } #title { top: 8%; } }
+  @media (max-width: 860px) { #chart { grid-template-columns: 1fr; } #chart > .spacer { min-height: 46vh; } #map.sheet { overflow: auto; } #title { top: 8%; } }
   @media (prefers-reduced-motion: reduce) { #title, #title .rule, #menu { transition: none; } }
 </style>
 <script type="importmap">
@@ -85,11 +101,12 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 <div id="hint">↑ ↓ · Enter</div>
 
 <section class="sheet" id="map" role="dialog" aria-modal="true" aria-labelledby="map-h">
+  <div class="stage"></div>
   <div class="inner">
     <header><h2 id="map-h">The Voyage</h2><button class="close" data-close>CLOSE · Esc</button></header>
     <div id="chart">
-      <svg viewBox="0 0 1000 620" role="img" aria-label="A sea chart: Troy, then the four islands of the voyage, and the sea beyond"></svg>
-      <div><ul id="isles"></ul><div id="namecard"><div class="n">ODYSSEUS</div><div class="s"></div></div></div>
+      <div class="spacer"></div>
+      <div class="side"><ul id="isles"></ul><div id="namecard"><div class="n">ODYSSEUS</div><div class="s"></div></div></div>
     </div>
   </div>
 </section>
@@ -137,6 +154,7 @@ import { installUI } from "./js/ui/ui.js";
 import { CHAPTERS, BEYOND, status, anyProgress, continueTo, deeds } from "./js/ui/progress.js";
 import { voyageTo, arriving } from "./js/ui/voyage.js";
 import { DEEDS, TITLES } from "./js/story/tags.js";
+import { SeaChart } from "./js/ui/seaChart.js";
 
 const params = new URLSearchParams(location.search);
 // ---------- the shot: dusk at sea, a ship heading for a dark island with one light on it
@@ -187,7 +205,8 @@ world.add({ update(dt, t) {
 const $ = s => document.querySelector(s);
 const cont = $("#m-continue");
 if (anyProgress()) { const c = continueTo(); cont.hidden = false; cont.querySelector("small").textContent = `CHAPTER ${c.word} · ${c.title.toUpperCase()}`; cont.onclick = () => voyageTo(c); }
-$("#m-begin").onclick = () => voyageTo(CHAPTERS[0]);
+// a new voyage starts at Troy: the opening film, then straight on into the Harbour (troy_env.html?voyage=1)
+$("#m-begin").onclick = () => voyageTo({ id: "troy", page: "troy_env.html?voyage=1" });
 $("#m-map").onclick = () => openSheet("map");
 $("#m-info").onclick = () => openSheet("info");
 const items = () => [...document.querySelectorAll("#menu button:not([hidden])")];
@@ -205,53 +224,23 @@ let lastFocus = null;
 function openSheet(id) {
   lastFocus = document.activeElement;
   document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on"));
-  if (id === "map") drawMap();
+  if (id === "map") { drawMap(); pauseTitle(true); chart.start(); }
   const el = document.getElementById(id); el.classList.add("on");
   (el.querySelector("#isles button") || el.querySelector(".close")).focus();
 }
-function closeSheet() { document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on")); if (location.hash) history.replaceState(null, "", location.pathname + location.search); (lastFocus || items()[0]).focus(); }
+function closeSheet() { if (chart && chart.running) { chart.stop(); pauseTitle(false); } document.querySelectorAll(".sheet").forEach(s => s.classList.remove("on")); if (location.hash) history.replaceState(null, "", location.pathname + location.search); (lastFocus || items()[0]).focus(); }
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheet);
 
-// ---------- the voyage map: a navigator's chart, each island in its own colours
-const SPOTS = { troy: [905, 92], harbour: [720, 190], cave: [560, 372], circe: [355, 205], underworld: [235, 425] };
+// ---------- the voyage map: the wine-dark sea in 3D (js/ui/seaChart.js), with the islands as a list beside it
+let chart = null;
+const capture = !!params.get("capture");
+function pauseTitle(on) { if (capture) return; if (on) world.renderer.setAnimationLoop(null); else world.start(); }
 function drawMap() {
-  const svg = $("#chart svg"), ink = "#2a2016";
-  const isle = (c, [x, y]) => {
-    const st = status(c), pct = st.done / c.total;
-    const art = {
-      harbour: `<path d="M-46 18 Q-50 -36 0 -40 Q50 -36 46 18" fill="#6e7378" stroke="${ink}" stroke-width="2"/><path d="M-30 14 h60" stroke="#b98a3e" stroke-width="4" stroke-dasharray="6 3"/>`,
-      cave: `<path d="M-50 26 L-8 -40 L14 -12 L26 -28 L54 26 Z" fill="#3a2a22" stroke="${ink}" stroke-width="2"/><circle cx="2" cy="4" r="7" fill="#e0782a"/><circle cx="2" cy="4" r="2.4" fill="#141008"/>`,
-      circe: `<circle r="34" fill="#f2c230" stroke="${ink}" stroke-width="2"/><circle r="22" fill="none" stroke="#1d3fd1" stroke-width="5"/><circle r="6" fill="#1d3fd1"/>`,
-      underworld: `<circle r="34" fill="#141008" stroke="${ink}" stroke-width="2"/><text y="9" text-anchor="middle" font-family="Anton, Impact" font-size="28" fill="#d7261e">7</text>`
-    }[c.id];
-    return `<g class="isle" tabindex="0" role="link" aria-label="Chapter ${c.n}: ${c.title}, ${st.done} of ${c.total} trials${st.finished ? ", finished" : ""}" data-id="${c.id}" transform="translate(${x} ${y})">
-      <circle class="ring" r="52" fill="none" stroke="${ink}" stroke-width="1.5" stroke-dasharray="${(2 * Math.PI * 52 * pct).toFixed(1)} 999" transform="rotate(-90)"/>
-      ${art}
-      <text y="76" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="13" letter-spacing="2" fill="${ink}">${c.word} · ${c.ds.toUpperCase()}</text>
-      <text y="96" text-anchor="middle" font-family="Anton, Impact" font-size="19" letter-spacing="1" fill="${ink}">${c.title.toUpperCase()}</text>
-      ${st.finished ? `<text y="-62" text-anchor="middle" font-family="Anton, Impact" font-size="15" fill="#c8261e" letter-spacing="2">✓ DONE</text>` : ""}
-    </g>`;
-  };
-  const p = [SPOTS.troy, SPOTS.harbour, SPOTS.cave, SPOTS.circe, SPOTS.underworld];
-  const route = "M" + p.map(([x, y]) => `${x} ${y}`).join(" L");
-  svg.innerHTML = `
-    <defs><filter id="paper"><feTurbulence baseFrequency="0.9" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 0.45  0 0 0 0 0.33  0 0 0 0 0.2  0 0 0 0.09 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
-      <linearGradient id="fog" x1="1" x2="0"><stop offset="0" stop-color="#efe3c6" stop-opacity="0"/><stop offset="1" stop-color="#efe3c6" stop-opacity="0.95"/></linearGradient></defs>
-    <rect width="1000" height="620" fill="#efe3c6"/><rect width="1000" height="620" filter="url(#paper)"/>
-    <g stroke="#b9a782" stroke-width="1" fill="none" opacity=".7">${Array.from({ length: 9 }, (_, i) => `<path d="M0 ${70 * i + 20} Q 500 ${70 * i + (i % 2 ? 40 : 0)} 1000 ${70 * i + 20}"/>`).join("")}</g>
-    <path d="M1000 0 L1000 170 Q 960 150 930 120 Q 900 60 940 0 Z" fill="#d9c9a4" stroke="#2a2016" stroke-width="1.5"/>
-    <text x="905" y="58" text-anchor="middle" font-family="Courier Prime, monospace" font-weight="700" font-size="13" letter-spacing="3" fill="#2a2016">TROY</text>
-    <path d="${route}" fill="none" stroke="#2a2016" stroke-width="2" stroke-dasharray="7 7"/>
-    <path d="M${SPOTS.underworld[0]} ${SPOTS.underworld[1]} Q 150 520 70 560" fill="none" stroke="#2a2016" stroke-width="2" stroke-dasharray="7 7" opacity=".4"/>
-    <rect x="0" y="440" width="240" height="180" fill="url(#fog)"/>
-    ${BEYOND.map((name, i) => `<g opacity=".55" transform="translate(${130 - i * 45} ${505 + i * 30})"><circle r="9" fill="none" stroke="#2a2016" stroke-dasharray="3 3"/></g>`).join("")}
-    <text x="40" y="604" font-family="Courier Prime, monospace" font-weight="700" font-size="12" letter-spacing="3" fill="#2a2016" opacity=".7">BEYOND THE VOYAGE</text>
-    ${CHAPTERS.map(c => isle(c, SPOTS[c.id])).join("")}
-    <g transform="translate(940 560)" stroke="#2a2016" fill="none"><circle r="26"/><path d="M0 -34 L6 0 L0 34 L-6 0 Z" fill="#2a2016"/><text y="-40" text-anchor="middle" font-family="Courier Prime" font-size="12" fill="#2a2016" stroke="none">N</text></g>`;
-  svg.querySelectorAll(".isle").forEach(g => {
-    const go = () => voyageTo(g.dataset.id);
-    g.onclick = go; g.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
-  });
+  if (!chart) {
+    chart = new SeaChart(document.querySelector("#map .stage"), { onPick: id => voyageTo(id), avail: () => { const side = document.querySelector("#chart .side"); if (!side) return { w: innerWidth, h: innerHeight }; const r = side.getBoundingClientRect(); return innerWidth > 860 ? { w: r.left - 16, h: innerHeight } : { w: innerWidth, h: r.top + (document.getElementById("map").scrollTop || 0) }; } });
+    chart.onHover = id => document.querySelectorAll("#isles li button[data-id]").forEach(b => b.classList.toggle("hot", b.dataset.id === id));
+    window.__chart = chart;
+  }
   // the same islands as a list (readable, keyboard-first), each in its own colour
   const ul = $("#isles"); ul.innerHTML = "";
   for (const c of CHAPTERS) {
@@ -260,7 +249,10 @@ function drawMap() {
     b.innerHTML = `<div class="k">CHAPTER ${c.word} · ${c.ds.toUpperCase()}</div><div class="t"></div><div class="m"><b>${st.done} / ${c.total}</b> trials${st.finished ? " · <b>finished</b>" : st.started ? "" : " · not yet visited"}</div>` + (st.finished ? `<div class="deed"></div>` : "");
     b.querySelector(".t").textContent = c.title;
     if (st.finished) b.querySelector(".deed").textContent = DEEDS[c.tag];
+    b.dataset.id = c.id;
     b.onclick = () => voyageTo(c);
+    b.onpointerenter = b.onfocus = () => chart.highlight(c.id);
+    b.onpointerleave = b.onblur = () => chart.highlight(null);
     li.appendChild(b); ul.appendChild(li);
   }
   const li = document.createElement("li"); li.innerHTML = `<div class="beyond">Beyond the Underworld: ${BEYOND.join(" · ")}. Not on this voyage.</div>`; ul.appendChild(li);

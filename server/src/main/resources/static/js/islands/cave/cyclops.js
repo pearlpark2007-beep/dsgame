@@ -27,6 +27,8 @@ export const POSES = {
   drunk:  { spine: [0.15, 0, 0.12], neck: [0.25, 0, -0.1], head: [0.35, 0, 0.2], armL: [0.2, 0, 0], armR: [0.2, 0, 0] },
   sleep:  { ...SIT, spine: [0.15, 0, 0], neck: [0.35, 0, 0.1], head: [0.55, 0, 0.15], armL: [0.35, 0, 0], armR: [0.35, 0, 0] },
   clutch: { armR: [2.4, 0, 0.3], foreR: [1.3, 0, 0], armL: [2.4, 0, -0.3], foreL: [1.3, 0, 0], head: [-0.25, 0, 0], spine: [-0.1, 0, 0] },
+  // sunk down toward the sea, head bowed: the prayer to his father (the Cave's ending)
+  kneel:  { ...SIT, spine: [0.5, 0, 0], neck: [0.35, 0, 0], head: [0.55, 0, 0], armL: [0.4, 0, 0], armR: [0.4, 0, 0] },
   reach:  { ...SIT, armR: [0.85, 0, 0], foreR: [0.35, 0, 0], head: [0.3, 0, 0], neck: [0.15, 0, 0] },
   windup: { armR: [3.0, 0, 0.4], foreR: [0.6, 0, 0], spine: [-0.25, 0, 0], head: [-0.1, 0, 0] },
   hurl:   { armR: [0.9, 0, 0.2], foreR: [0.1, 0, 0], spine: [0.35, 0, 0], head: [0.2, 0, 0] },
@@ -122,6 +124,9 @@ export class Cyclops {
   // after the idle animation has posed the bones, add our own turns on top
   update(dt) {
     if (!this.mixer) return;
+    // no time passed (a freeze frame, a pause): leave him exactly as he is. With dt = 0 the mixer does not
+    // re-pose the bones, so the turns added below piled up frame after frame and twisted his body round
+    if (!(dt > 0)) return;
     this.mixer.update(dt);
     for (const [b, q] of this.rest) b.quaternion.copy(q);
     const B = this.bones;

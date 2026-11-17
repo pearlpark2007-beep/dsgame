@@ -12,7 +12,8 @@ import * as THREE from "three";
 import { QUAY_TOP } from "./harbourScene.js";
 import { makeBoulder, makeAxe } from "./chainTower.js";
 import { THROW_RELEASE, CLIFF_GIANTS } from "./giant.js";
-import { shot, cineLights, bolt, physics, splashAt, sparks, ease, ANTIPHATES_AT } from "./cine.js";
+import { sound } from "../../engine/sound.js";
+import { shot, cineLights, bolt, physics, splashAt, sparks, ease, ANTIPHATES_AT, reseed, rand, REDUCED, clearSpot } from "./cine.js";
 
 export async function playClimax(c) {
   const { world, hero, director, comic, giant, chain, trial, harbour, mood, crowd, cardAfter } = c;
@@ -26,8 +27,15 @@ export async function playClimax(c) {
   const hand = new THREE.Vector3(), wp = new THREE.Vector3();
   const slow = k => { if (!director.skipping) world.timeScale = k; };
   const unhook = u => { const i = world.updaters.indexOf(u); if (i >= 0) world.updaters.splice(i, 1); };
+  reseed(202);
+  // everything this film puts in the world, so a skip or an error can never leave any of it behind
+  const made = [], hooks = [];
+  const newBoulder = r => { const b = makeBoulder(r); made.push(b); return b; };
+  const addU = u => { world.add(u); hooks.push(u); return u; };
   document.body.classList.add("cinematic");
   comic.letterbox(true);
+  world.grade.uniforms.letterbox.value = 1;        // cinema bars only while the film runs
+  try {
   giant.place(ANTIPHATES_AT.x, ANTIPHATES_AT.y, ANTIPHATES_AT.z, tower.x, tower.z);
   giant.play("idle", 0);
   L.aim(ANTIPHATES_AT);
@@ -53,7 +61,7 @@ export async function playClimax(c) {
   axe.scale.setScalar(100);
   axe.rotation.set(Math.PI, 0, -Math.PI / 2); axe.position.set(0, 8, 3);
   hero.bones.rHand.add(axe);
-  comic.sfx("SHHNK!", { x: 62, y: 38, r: 10, size: 6, seconds: 1.0 });
+  comic.sfx("SHHNK!", { x: 72, y: 24, r: 8, size: 5, seconds: 1.0 }); sound.clang({ level: 0.25 });
   await hero.wait(1.6);
   hero.play("idle", 0.4);
   await hero.wait(0.6);
@@ -94,8 +102,8 @@ export async function playClimax(c) {
 
   // ---- 2. the standoff: each held a little too long, each shorter than the last
   const R = 2.6;
-  const boulder = makeBoulder(R); world.scene.add(boulder);
-  const ride = { update: () => boulder.position.copy(giant.handPos(hand)) }; world.add(ride);
+  const boulder = newBoulder(R); world.scene.add(boulder);
+  const ride = { update: () => boulder.position.copy(giant.handPos(hand)) }; addU(ride);
   // low on the stones in front of him, looking up. The ruins are full of columns, so try spots in an arc
   // and keep the first one with a clear line to his legs, chest and head.
   const lowAt = (() => {
@@ -123,16 +131,26 @@ export async function playClimax(c) {
     }
     return G.clone().addScaledVector(gdir, 19).setY(QUAY_TOP + 2.5);
   })();
-  const giantLow = (t, o) => { o.pos.copy(lowAt); o.look.set(G.x, G.y + 22, G.z); o.fov = 60 - t * 1.5; };
+  // aim at where his body really is this frame (between chest and head), eased so the frame never jerks
+  const gHead = new THREE.Vector3(), gAim = new THREE.Vector3(), aimed = { v: null };
+  const giantAim = (lift = 0.55) => { giant.headPos(gHead); const want = G.clone().add(up(12)).lerp(gHead, lift); if (!aimed.v) aimed.v = want.clone(); aimed.v.lerp(want, 0.12); return gAim.copy(aimed.v); };
+  const giantLow = (t, o) => { o.pos.copy(lowAt); o.look.copy(giantAim()); o.fov = 62 - t * 1.5; };
   const heroLow = (t, o) => { o.pos.copy(H).addScaledVector(toG, 3.4).addScaledVector(side, -1.0).add(up(-2.2)); o.look.copy(H).add(up(1.2)); o.fov = 40 - t * 2; };
   for (const [fn, hold] of [[giantLow, 2.2], [heroLow, 1.8], [giantLow, 1.1], [heroLow, 0.8]]) { s = shot(world, director, fn); await hero.wait(hold); s.stop(); }
 
   // ---- 3. the throw, in profile from out on the water: all of him, winding up
-  s = shot(world, director, (t, o) => { const body = G.clone().add(up(17)); o.pos.copy(body).addScaledVector(gside, -48).addScaledVector(gdir, 16).setY(6); o.look.copy(body).addScaledVector(gdir, 8); o.fov = 50; });
+  aimed.v = null;
+  // in profile, from a spot that really sees him (head, chest and throwing hand), not from behind a cliff
+  const body17 = G.clone().add(up(17));
+  giant.headPos(gHead); giant.handPos(hand);
+  const profCands = [];
+  for (const sd of [-56, 56, -46, 46, -64, 64]) for (const fw of [14, 24, 4]) for (const y of [6, 12]) profCands.push(body17.clone().addScaledVector(gside, sd).addScaledVector(gdir, fw).setY(y));
+  const profAt = clearSpot(world, profCands, [gHead.clone(), body17.clone(), hand.clone()], [giant.group, hero.group, boulder]);
+  s = shot(world, director, (t, o) => { o.pos.copy(profAt); giant.handPos(hand); o.look.copy(giantAim(0.4)).lerp(hand, 0.25); o.fov = 54; });
   const thr = giant.play("throw", 0.15);
   while (thr.time < THROW_RELEASE) await hero.wait(0.02);
   unhook(ride);
-  comic.sfx("HHRRNNGH!", { x: 40, y: 30, r: -6, size: 8, seconds: 1.2 });
+  sound.giant("breath", { level: 0.8 });
   s.stop();
   // the boulder's path: from his hand to the foot of the cargo tower, turning over as it comes
   const from = boulder.position.clone(), towerHit = new THREE.Vector3(tower.x, QUAY_TOP + 1.2, tower.z + 0.2);
@@ -144,7 +162,11 @@ export async function playClimax(c) {
   meet.y = surface(boulder, meet.x, meet.z, meet.y + R);
   pose(0);
   // he sees it coming: a low shot past him at the rock in the air
-  s = shot(world, director, (t, o) => { o.pos.copy(H).addScaledVector(toG, -3).addScaledVector(side, 1.6).add(up(0.4)); o.look.copy(boulder.position); o.fov = 46; });
+  s = shot(world, director, (t, o) => {
+    o.pos.copy(H).addScaledVector(toG, -8).addScaledVector(side, 3.5).add(up(2.2)); o.look.copy(boulder.position).lerp(H, 0.35); o.fov = 50;
+    const away = o.pos.clone().sub(boulder.position), d = away.length();
+    if (d < R * 2.5) o.pos.copy(boulder.position).addScaledVector(away.normalize(), R * 2.5);
+  });
   let jumped = false, j0 = null;
   await hero.over(1.7 * MEET, k => {
     const kk = k * MEET;
@@ -160,7 +182,7 @@ export async function playClimax(c) {
   // bullet time: his feet on the rock, the rock in the air, and the camera goes round him
   hero.play("land", 0.08, { timeScale: 0.5 });
   slow(0.04);
-  comic.sfx("TAK!", { x: 54, y: 62, r: 6, size: 5, seconds: 1.6 });
+  sound.boom({ freq: 160, to: 80, seconds: 0.15, level: 0.5 });
   s = shot(world, director, (t, o) => { const th = 0.6 + t * 1.1; o.pos.set(H.x + Math.sin(th) * 6.5, H.y + 1.0, H.z + Math.cos(th) * 6.5); o.look.copy(H).add(up(0.5)); o.fov = 46; });
   await comic.hold(2.6);
   s.stop();
@@ -170,7 +192,7 @@ export async function playClimax(c) {
   const flyYaw = Math.atan2(P1.x - P0.x, P1.z - P0.z);
   hero.group.rotation.y = flyYaw;
   hero.play("jump", 0.05, { timeScale: 1.6 });
-  comic.sfx("BOINNG!", { x: 46, y: 56, r: -12, size: 7, seconds: 1.4 });
+  sound.whoosh({ seconds: 0.9, level: 0.35 });
   slow(0.35);
   // the boulder carries on without him, down into the tower he was standing on
   const bFrom = boulder.position.clone();
@@ -178,12 +200,12 @@ export async function playClimax(c) {
     this.t += dt; const k = Math.min(1, this.t / 0.7);
     boulder.position.lerpVectors(bFrom, towerHit, k); boulder.rotation.x += dt * 3;
     if (k < 1) return;
-    tower.crates.forEach((cr, i) => fling(cr, new THREE.Vector3((Math.random() - 0.5) * 8, 3 + i * 1.2, 2 + Math.random() * 5), new THREE.Vector3(Math.random() * 5, 0, Math.random() * 5)));
+    tower.crates.forEach((cr, i) => fling(cr, new THREE.Vector3((rand() - 0.5) * 8, 3 + i * 1.2, 2 + rand() * 5), new THREE.Vector3(rand() * 5, 0, rand() * 5)));
     tower.crates = [];
     fling(boulder, new THREE.Vector3(1, 2, 5), new THREE.Vector3(1, 0, 1));
     unhook(carryOn);
   } };
-  world.add(carryOn);
+  addU(carryOn);
   const fdir = new THREE.Vector3(P1.x - P0.x, 0, P1.z - P0.z).normalize(), fside = new THREE.Vector3(-fdir.z, 0, fdir.x);
   // tracking alongside him in the air, the harbour far below
   s = shot(world, director, (t, o) => { o.pos.copy(H).addScaledVector(fside, 8).addScaledVector(fdir, -3).add(up(0.5)); o.look.copy(H).add(up(0.8)); o.fov = 50; });
@@ -199,9 +221,10 @@ export async function playClimax(c) {
     // the giant: he can't believe what he just saw
     if (!cutG && k > 0.3) {
       cutG = true; s.stop(); giant.play("roar", 0.2);
-      comic.sfx("WHA—?!", { x: 58, y: 34, r: 8, size: 8, seconds: 1.3 });
-      comic.sfx("KRAKA-THOOM!", { x: 28, y: 72, r: -10, size: 6, seconds: 1.3 });
-      s = shot(world, director, (t, o) => { o.pos.copy(lowAt); o.look.set(G.x, G.y + 25, G.z); o.fov = 52 - t * 4; });
+      sound.roar({ seconds: 1.4, level: 0.4 });
+      sound.crash({ seconds: 1.4, level: 0.7 });
+      aimed.v = null;
+      s = shot(world, director, (t, o) => { o.pos.copy(lowAt); o.look.copy(giantAim(0.7)); o.fov = 54 - t * 4; });
     }
     // the landing, from the open side of the tower top (the winch behind him, not in front)
     if (!cutL && k > 0.62) { cutL = true; s.stop(); s = shot(world, director, (t, o) => { o.pos.copy(P1).add(new THREE.Vector3(2.5, 1.0, 6.5)); o.look.copy(H).add(up(0.8)); o.fov = 50; }); }
@@ -211,7 +234,7 @@ export async function playClimax(c) {
   hero.group.rotation.y = strikeYaw;
   world.timeScale = 1;
   s.o.shake = 0.6;
-  comic.sfx("THUNK!", { x: 50, y: 70, r: 4, size: 6, seconds: 1.0 });
+  sound.boom({ freq: 120, to: 50, seconds: 0.3, level: 0.6 });
   await hero.wait(1.1);
   s.stop();
 
@@ -231,7 +254,7 @@ export async function playClimax(c) {
   const bite = edgeMesh.getWorldPosition(new THREE.Vector3());
   sparks(world, bite, 140);
   s.o.shake = 1.4;
-  comic.sfx("KRANNNGG!!", { x: 34, y: 20, r: -7, size: 10, seconds: 1.6 });
+  comic.sfx("KRANNNGG!!", { x: 34, y: 20, r: -7, size: 10, seconds: 1.6 }); sound.clang({ level: 0.9 }); sound.boom({ freq: 70, to: 30, seconds: 1.0, level: 0.9 });
   if (!director.skipping) { world.grade.uniforms.freeze.value = 1; world.timeScale = 0.0001; await comic.hold(0.45); world.grade.uniforms.freeze.value = 0; }
   chain.snap(bite);
   bolt(harbour, -60, -160);
@@ -241,15 +264,15 @@ export async function playClimax(c) {
   // from the winch, down along the chain as it falls, slow, into the harbour
   const cs = cutAt.clone();
   s = shot(world, director, (t, o) => { o.pos.copy(cs).add(new THREE.Vector3(-3, 4, 7)); o.look.copy(chain.point(0.35)); o.fov = 56; });
-  comic.sfx("clank", { x: 40, y: 40, r: -4, size: 3.5, seconds: 1.0 });
+  sound.clang({ level: 0.2 });
   await hero.wait(0.4);
-  comic.sfx("clank", { x: 55, y: 52, r: 6, size: 3.5, seconds: 1.0 });
+  sound.clang({ level: 0.2 });
   await hero.wait(0.4);
-  comic.sfx("CLANK", { x: 68, y: 64, r: -3, size: 4.5, seconds: 1.0 });
+  sound.rattle({ seconds: 1.4, level: 0.35 });
   await hero.wait(0.3);
   splashAt(world, chain.point(0.3).setY(0), 3);
   splashAt(world, chain.point(0.55).setY(0), 2.4);
-  comic.sfx("SPLOOSH!", { x: 60, y: 70, r: 5, size: 7, seconds: 1.2 });
+  sound.splash({ level: 0.7 });
   await hero.wait(0.9);
   world.timeScale = 1;
   s.stop();
@@ -258,16 +281,17 @@ export async function playClimax(c) {
   giant.group.rotation.y = Math.atan2(chain.group.position.x - G.x, chain.group.position.z - G.z);
   const g2 = new THREE.Vector3(Math.sin(giant.group.rotation.y), 0, Math.cos(giant.group.rotation.y)), g2s = new THREE.Vector3(-g2.z, 0, g2.x);
   giant.play("roar", 0.2);
-  comic.sfx("RRAAAAGH!", { x: 46, y: 30, r: -8, size: 10, seconds: 1.4 });
-  s = shot(world, director, (t, o) => { o.pos.copy(G).addScaledVector(g2, 30).addScaledVector(g2s, -12).setY(QUAY_TOP + 0.6); o.look.set(G.x, G.y + 24, G.z); o.fov = 60 - t * 3; });
+  sound.roar({ seconds: 2.0, level: 0.55 });
+  aimed.v = null;
+  s = shot(world, director, (t, o) => { o.pos.copy(G).addScaledVector(g2, 32).addScaledVector(g2s, -12).setY(QUAY_TOP + 0.6); o.look.copy(giantAim(0.6)); o.fov = 62 - t * 3; });
   await hero.wait(1.6);
   s.stop();
   const top = new THREE.Vector3(chain.group.position.x, strikePos.y, chain.group.position.z);
   const toShip = new THREE.Vector3(ship.position.x - top.x, 0, ship.position.z - top.z).normalize();
   const edge = top.clone().addScaledVector(toShip, 2.4);
-  const boulder2 = makeBoulder(3.0); world.scene.add(boulder2);
+  const boulder2 = newBoulder(3.0); world.scene.add(boulder2);
   const thr2 = giant.play("throw", 0.2); thr2.reset().play();
-  const ride2 = { update: () => boulder2.position.copy(giant.handPos(hand)) }; world.add(ride2);
+  const ride2 = { update: () => boulder2.position.copy(giant.handPos(hand)) }; addU(ride2);
   s = shot(world, director, (t, o) => { o.pos.copy(top).addScaledVector(toShip, 9).add(new THREE.Vector3(-6, 3, 0)); o.look.copy(top).add(up(1.2)); o.fov = 50; });
   hero.play("walk", 0.15, { timeScale: 1.6 });
   hero.group.rotation.y = Math.atan2(toShip.x, toShip.z);
@@ -279,7 +303,7 @@ export async function playClimax(c) {
   await hero.over(1.2, k => { boulder2.position.lerpVectors(b2from, winchAt, k); boulder2.position.y += Math.sin(Math.PI * k) * 8; boulder2.rotation.x += 0.1; });
   s.o.shake = 1.6;
   chain.smash();
-  comic.sfx("KRUNCH!", { x: 44, y: 40, r: 9, size: 9, seconds: 1.2 });
+  sound.crash({ seconds: 1.4, level: 0.8 });
   fling(boulder2, new THREE.Vector3(-4, 2, -6), new THREE.Vector3(2, 0, 3));
   bolt(harbour, 30, -200);
   await hero.wait(0.5);
@@ -298,14 +322,21 @@ export async function playClimax(c) {
   });
   world.timeScale = 1;
   splashAt(world, new THREE.Vector3(D1.x, 0, D1.z), 1.6);
-  comic.sfx("SPLOOSH!", { x: 50, y: 62, r: -6, size: 8, seconds: 1.2 });
+  sound.splash({ level: 0.7 });
   hero.group.visible = false;
   await hero.wait(1.0);
   s.stop();
 
   // ---- 6. he comes up by the hull and hauls himself up the side. Cut as he goes over the rail.
   // (the seaward side, away from the pier)
-  const hullX = ship.position.x + 4.2, hullZ = ship.position.z + 2;
+  const hullZ = ship.position.z + 2;
+  let hullX = ship.position.x + 4.2;
+  {
+    const rc = new THREE.Raycaster(new THREE.Vector3(ship.position.x + 30, 0.6, hullZ), new THREE.Vector3(-1, 0, 0));
+    ship.updateMatrixWorld(true);
+    const hit = rc.intersectObject(ship, true).find(h => h.object.isMesh && h.object.visible && !h.object.isSkinnedMesh && !hero.group.getObjectById(h.object.id));
+    if (hit) hullX = hit.point.x + 0.38;          // his chest a hand's width off the planks
+  }
   hero.group.visible = true;
   hero.group.position.set(hullX, -0.75, hullZ);
   hero.group.rotation.y = -Math.PI / 2;
@@ -325,15 +356,15 @@ export async function playClimax(c) {
   const rocks = [];
   let throwers = [];
   const launch = (from, to, size, onLand, flight = 1.6) => {
-    const b = makeBoulder(size); b.position.copy(from); world.scene.add(b);
+    const b = newBoulder(size); b.position.copy(from); world.scene.add(b);
     rocks.push({ b, from: from.clone(), to: to.clone(), t: 0, flight, onLand, arc: 6 + size * 2 });
   };
-  const nearMiss = () => { const sd2 = Math.random() < 0.5 ? -1 : 1; return new THREE.Vector3(ship.position.x + sd2 * (5 + Math.random() * 5), 0, ship.position.z - speed * 1.4 - Math.random() * 8); };
-  const landSplash = at => { splashAt(world, new THREE.Vector3(at.x, 0, at.z), 1.6); rock += 0.04; if (Math.random() < 0.4) comic.sfx("SPLASH!", { x: 20 + Math.random() * 60, y: 50 + Math.random() * 20, r: (Math.random() - 0.5) * 20, size: 4.5, seconds: 0.9 }); };
-  const planks = (at, n, power) => { for (let k = 0; k < n; k++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.08, 1.4), new THREE.MeshStandardMaterial({ color: 0x5a3b22 })); pl.position.copy(at); world.scene.add(pl); fling(pl, new THREE.Vector3((Math.random() - 0.5) * 10 * power, (6 + Math.random() * 6) * power, (Math.random() - 0.3) * 8 * power), new THREE.Vector3(6, 0, 4)); } };
+  const nearMiss = () => { const sd2 = rand() < 0.5 ? -1 : 1; return new THREE.Vector3(ship.position.x + sd2 * (5 + rand() * 5), 0, ship.position.z - speed * 1.4 - rand() * 8); };
+  const landSplash = at => { splashAt(world, new THREE.Vector3(at.x, 0, at.z), 1.6); rock += 0.04; if (rand() < 0.5) sound.splash({ level: 0.35 }); };
+  const planks = (at, n, power) => { for (let k = 0; k < n; k++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.08, 1.4), new THREE.MeshStandardMaterial({ color: 0x5a3b22 })); pl.position.copy(at); world.scene.add(pl); fling(pl, new THREE.Vector3((rand() - 0.5) * 10 * power, (6 + rand() * 6) * power, (rand() - 0.3) * 8 * power), new THREE.Vector3(6, 0, 4)); } };
   const chase = { update: dt => {
     t += dt;
-    if (phase === "row" && (nextBolt -= dt) <= 0) { nextBolt = 2.2 + Math.random() * 1.5; bolt(harbour, Math.random() < 0.5 ? -60 : 60, ship.position.z - 60); }
+    if (phase === "row" && (nextBolt -= dt) <= 0) { nextBolt = 2.2 + rand() * 1.5; bolt(harbour, rand() < 0.5 ? -60 : 60, ship.position.z - 60); }
     if (phase === "row") {
       // rowing hard: up to about 14 m/s; not rowing, she drifts at 3
       const rate = window.__rowFail && attempt === 0 ? 0 : row.rate();
@@ -345,17 +376,17 @@ export async function playClimax(c) {
     rock *= Math.pow(0.2, dt);
     if (phase !== "sinking") ship.rotation.x = shipRot.x + Math.sin(t * 9) * rock;
     if (phase === "row") for (const th of throwers) {
-      if (!th.act) { th.wait -= dt; if (th.wait <= 0) { th.g.current = null; th.act = th.g.play("throw", 0.15); th.act.reset().play(); th.rock = makeBoulder(2.0); world.scene.add(th.rock); } continue; }
+      if (!th.act) { th.wait -= dt; if (th.wait <= 0) { th.g.current = null; th.act = th.g.play("throw", 0.15); th.act.reset().play(); th.rock = newBoulder(2.0); world.scene.add(th.rock); } continue; }
       if (th.rock) th.rock.position.copy(th.g.handPos(wp));
       if (th.rock && th.act.time >= THROW_RELEASE) {
         const src = th.rock.position.clone(); world.scene.remove(th.rock); th.rock = null;
         const progress = (zStart - ship.position.z) / (zStart - zMouth);
         if (!hitDone && progress > 0.42) {
           hitDone = true;
-          launch(src, stern().clone(), 1.4, at => { rock += 0.14; if (s) s.o.shake = 1.2; planks(at, 6, 1); comic.sfx("WHAM!", { x: 62, y: 46, r: 10, size: 8, seconds: 1.0 }); }, 1.4);
+          launch(src, stern().clone(), 1.4, at => { rock += 0.14; if (s) s.o.shake = 1.2; planks(at, 6, 1); sound.crash({ seconds: 0.8, level: 0.6 }); }, 1.4);
         } else launch(src, nearMiss(), 2.0, at => landSplash(at));
       }
-      if (th.act.time >= th.act.getClip().duration - 0.05) { th.act = null; th.g.current = null; th.g.play("idle", 0.3); th.wait = 1.4 + Math.random() * 1.2; }
+      if (th.act.time >= th.act.getClip().duration - 0.05) { th.act = null; th.g.current = null; th.g.play("idle", 0.3); th.wait = 1.4 + rand() * 1.2; }
     }
     for (let k = rocks.length - 1; k >= 0; k--) {
       const r = rocks[k]; r.t += dt; const e = Math.min(1, r.t / r.flight);
@@ -363,7 +394,7 @@ export async function playClimax(c) {
       if (e >= 1) { rocks.splice(k, 1); world.scene.remove(r.b); r.onLand(r.to); }
     }
   } };
-  world.add(chase);
+  addU(chase);
   const angles = [
     // low behind the stern
     o => { o.pos.set(ship.position.x + 6, 3.2, ship.position.z + 20); o.look.set(ship.position.x, 4, ship.position.z - 30); o.fov = 52; },
@@ -402,7 +433,7 @@ export async function playClimax(c) {
     launch(thrower.handPos(wp).clone(), mid, 3.2, at => {
       hit = true; s.o.shake = 2.0;
       planks(at, 16, 1.4); splashAt(world, at, 3.5);
-      comic.sfx("KRAKOOM!", { x: 50, y: 40, r: -9, size: 11, seconds: 1.6 });
+      comic.sfx("KRAKOOM!", { x: 50, y: 40, r: -9, size: 11, seconds: 1.6 }); sound.crash({ seconds: 1.6, level: 0.9 });
     }, 1.5);
     slow(0.4);
     while (!hit) await hero.wait(0.05);
@@ -420,23 +451,23 @@ export async function playClimax(c) {
   // ---- the last boulder. Antiphates puts everything into it; it comes down just behind the stern
   phase = "out";
   speed = Math.max(speed, 8);
-  const last = makeBoulder(3.8); world.scene.add(last);
+  const last = newBoulder(3.8); world.scene.add(last);
   giant.group.rotation.y = Math.atan2(ship.position.x - G.x, ship.position.z - G.z);
   giant.current = null;
   const lastThrow = giant.play("throw", 0.2); lastThrow.reset().play();
-  const rideL = { update: () => last.position.copy(giant.handPos(wp)) }; world.add(rideL);
+  const rideL = { update: () => last.position.copy(giant.handPos(wp)) }; addU(rideL);
   s = shot(world, director, (tt, o) => { const st = stern(); o.pos.set(st.x + 9, 2.2, st.z - 10); o.look.set(G.x, G.y + 21, G.z); o.fov = 56; });
   while (lastThrow.time < THROW_RELEASE) await hero.wait(0.02);
   unhook(rideL);
   const lf = last.position.clone(), lt = new THREE.Vector3(ship.position.x + 1, 0, ship.position.z + 24);
   s.stop();
   // wide, from out beyond the mouth: the ship coming at us between the cliffs, the boulder falling behind it
-  s = shot(world, director, (tt, o) => { o.pos.set(ship.position.x + 10, 5, zOut - 26); o.look.set(ship.position.x, 4, ship.position.z + 8); o.fov = 46; });
+  s = shot(world, director, (tt, o) => { o.pos.set(ship.position.x - 6, 5, zOut - 26); o.look.set(ship.position.x, 4, ship.position.z + 8); o.fov = 46; });   // (clear of the cargo tower standing off the mouth)
   slow(0.3);
   await hero.over(2.6, k => { lt.z = ship.position.z + 22; last.position.lerpVectors(lf, lt, k); last.position.y += Math.sin(Math.PI * k) * 30; last.rotation.x += 0.05; });
   world.timeScale = 1;
   splashAt(world, lt, 4.5);
-  comic.sfx("KA-BLOOSH!", { x: 50, y: 44, r: 7, size: 11, seconds: 1.6 });
+  comic.sfx("KA-BLOOSH!", { x: 50, y: 44, r: 7, size: 11, seconds: 1.6 }); sound.splash({ level: 0.9 }); sound.boom({ freq: 55, to: 30, seconds: 1.2, level: 0.7 });
   world.scene.remove(last);
   s.o.shake = 1.6;
   // the wave behind it throws the ship out through the mouth
@@ -451,21 +482,36 @@ export async function playClimax(c) {
   // at the bow, facing home
   hero.group.rotation.set(0, Math.PI / 2, 0); hero.group.position.set(11.5, 2.45, 0);
   hero.play("idle", 0.3);
-  crowd.forEach(g => g.hide());
-  const S0 = ship.position.clone(), S1z = S0.z - 24;
+  crowd.forEach(g => g.hide()); giant.hide();
+  // out through the mouth to one fixed place in clear water (z = -170), so the last frame is always the same:
+  // aimed between the giants' two cargo towers standing off the mouth, with neither in the picture
+  const S0 = ship.position.clone(), S1z = Math.min(-170, S0.z - 4);
   s = shot(world, director, (tt, o) => { const k = Math.min(1, tt / 9); o.pos.set(ship.position.x - 12 + k * 4, 4 + k * 14, ship.position.z - 26 - k * 6); o.look.set(ship.position.x, 3, ship.position.z + 12); o.fov = 52; });
   mood.to(1, 8);
-  await hero.over(9, k => { ship.position.z = S0.z + (S1z - S0.z) * ease(k); });
+  // the one line over the dawn (the screenplay's chapter ending): he does not look back at the harbour
+  const out = hero.over(9, k => { ship.position.z = S0.z + (S1z - S0.z) * ease(k); });
+  hero.wait(3.2).then(() => comic.caption("Twelve ships went in. One came out.", { x: 6, y: 16, seconds: 4.6 }));
+  await out;
   s.stop();
   // the last frame: him at the bow, the dawn on his face
   const bow = hero.group.getWorldPosition(new THREE.Vector3());
-  s = shot(world, director, (tt, o) => { o.pos.copy(bow).add(new THREE.Vector3(1.6, 1.2, -3.4 + tt * 0.1)); o.look.copy(bow).add(up(1.6)); o.fov = 32; });
+  // in front of him above the rail, a little below his eyes: his face with the dawn sky behind him, aimed between
+  // the two cargo towers standing off the mouth so neither is in the frame
+  s = shot(world, director, (tt, o) => { o.pos.copy(bow).add(new THREE.Vector3(1.6, 1.0, -3.4 + tt * 0.08)); o.look.copy(bow).add(new THREE.Vector3(0.45, 1.85, 0)); o.fov = 34; });
   await hero.wait(2.0);
   await director.freeze(cardAfter.name, cardAfter.sub, 4.2);
   s.stop();
 
-  L.restore();
-  document.body.classList.remove("cinematic");
-  comic.clear();
   return { axe };
+  } finally {
+    hooks.forEach(unhook);
+    fling.stop();
+    for (const b of made) if (b.parent) b.parent.remove(b);
+    world.timeScale = 1;
+    world.grade.uniforms.freeze.value = 0;
+    world.grade.uniforms.letterbox.value = 0;
+    L.restore();
+    document.body.classList.remove("cinematic");
+    comic.clear();
+  }
 }

@@ -18,34 +18,7 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
   #loading h1 { margin: 0; font-family: Anton, Impact, sans-serif; font-weight: 400; letter-spacing: 4px; font-size: 34px; color: var(--ink); }
   #loading p { margin: 0; color: var(--ink); font-size: 15px; }
 
-  /* the chapter mark: Kill Bill black bands on a bright picture */
-  #title { position: fixed; left: 0; top: 7%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: opacity 0.6s; }
-  #title span { background: var(--ink); padding: 4px 18px 4px max(18px, 4vw); }
-  #title .k { font-size: 15px; letter-spacing: 4px; color: var(--paper); }
-  #title .t { font-family: Anton, Impact, sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: 1.05; color: var(--sun); letter-spacing: 1px; }
-  #title .t em { font-style: normal; color: var(--blood); }
-
-  /* three doors: three colours, three jobs */
-  #doors { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding: 0 max(16px, 3vw) 18px; display: flex; flex-direction: column; gap: 10px; transition: opacity 0.6s; }
-  #doors .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .door { position: relative; text-align: left; border: 0; border-top: 10px solid var(--c); background: rgba(14, 10, 7, 0.92); color: var(--paper); padding: 14px 16px 16px; cursor: pointer;
-          font: inherit; display: flex; flex-direction: column; gap: 6px; min-height: 150px; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 6px 6px 0 var(--ink); }
-  .door:hover, .door:focus-visible { transform: translate(-2px, -3px); box-shadow: 9px 10px 0 var(--ink); outline: none; }
-  .door:focus-visible { outline: 3px solid var(--paper); outline-offset: 2px; }
-  .door .kick { font-size: 12px; letter-spacing: 3px; color: var(--c); font-weight: 700; }
-  .door .name { font-family: Anton, Impact, sans-serif; font-size: clamp(26px, 2.8vw, 38px); line-height: 1; letter-spacing: 1px; }
-  .door .what { font-size: 14px; line-height: 1.4; color: #d8ccb2; }
-  .door .prog { margin-top: auto; font-size: 12.5px; color: var(--c); font-weight: 700; letter-spacing: 1px; }
-  .door.lesson { --c: #3b62ff; } .door.trials { --c: var(--blood); } .door.lab { --c: var(--sun); }
-  #doors .extra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  #doors .extra button, #doors .extra a { min-height: 36px; padding: 0 14px; background: var(--ink); color: var(--paper); border: 2px solid var(--ink); font: inherit; font-size: 13px;
-          letter-spacing: 1px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; box-sizing: border-box; }
-  #doors .extra button:hover, #doors .extra a:hover, #doors .extra :focus-visible { border-color: var(--sun); color: var(--sun); outline: none; }
-  #doors .extra .lbl { font-size: 11px; letter-spacing: 2px; color: var(--ink); background: var(--sun); padding: 2px 8px; font-weight: 700; }
-  @media (max-width: 760px) { #doors .row { grid-template-columns: minmax(0, 1fr); } .door { min-height: 0; } .door .what { display: none; } }
-
-  body.busy #doors, body.busy #title { opacity: 0; pointer-events: none; }
-  body.cinematic #doors, body.cinematic #title { display: none; }
+  /* the chapter mark and the three doors: the shared menu in js/ui/tokens.css (.odx-title, .odx-doors), dressed there for this island */
 
   /* the prologue: typed title cards on black */
   #lore { position: fixed; inset: 0; z-index: 33; background: #050403; display: none; flex-direction: column; justify-content: center; padding: 0 12vw; pointer-events: none; }
@@ -70,11 +43,11 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 </head>
 <body>
 <div id="loading"><h1>AEAEA · HIGH NOON</h1><p>polishing the marble…</p></div>
-<div id="title"><span class="k">CHAPTER THREE</span><span class="t">THE WITCH WHO <em>KEPT PIGS</em></span></div>
+<div id="title" class="odx-title"><span class="k">CHAPTER THREE</span><span class="t">THE WITCH WHO <em>KEPT PIGS</em></span></div>
 <div id="lore" aria-live="polite"><p></p></div>
 <button id="skip">SKIP SCENE ▸▸ (Esc)</button>
 <div id="fast">▸▸</div>
-<nav id="doors" aria-label="Chapter three">
+<nav id="doors" class="odx-doors" aria-label="Chapter three">
   <div class="row">
     <button class="door lesson" id="door-lesson"><span class="kick">LEARN</span><span class="name">ATHENA'S LESSON</span>
       <span class="what">The ten operations of your linked-list program. Your C runs on the pigs, line by line. Nothing is graded.</span><span class="prog" id="prog-lesson">10 operations</span></button>
@@ -83,7 +56,7 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
     <button class="door lab" id="door-lab"><span class="kick">PLAY</span><span class="name">THE LAB</span>
       <span class="what">No judge, no story. Your rope, your code, any of your ten functions.</span><span class="prog">up to 8 pigs</span></button>
   </div>
-  <div class="extra"><button id="open-btn">▶ PROLOGUE</button></div>
+  <div class="extra"><button id="open-btn">▶ PROLOGUE</button><button id="crawl-btn">THE STORY SO FAR</button></div>
 </nav>
 
 <script type="module">
@@ -99,6 +72,7 @@ import { nameCard } from "./js/story/tags.js";
 import { Sty, GATE } from "./js/islands/circe/sty.js";
 import { buildIsland } from "./js/islands/circe/helios.js";
 import { CirceTrials } from "./js/islands/circe/circeTrials.js";
+import { Crew, reachArm } from "./js/story/crew.js";
 
 // Aeaea has sound again, quietly: the sea, Circe's loudspeakers, ropes pulled tight. One button turns it all off.
 const params = new URLSearchParams(location.search);
@@ -175,11 +149,86 @@ async function typeCard(text, cls = "") {
   p.textContent = text;
   await sty.wait(cls ? 1.4 : Math.max(1.3, 0.022 * n));
 }
+// ---- CI1–CI3 (the screenplay's "Name them", 26 s): cards 1–5 acted out on the plaza, their words kept.
+// Eurylochus runs out of the hall; tells it; Odysseus asks who; then Eurylochus runs back in alone (the trials'
+// "Eurylochus went back in alone to find them") and Odysseus goes after him. The sty is hidden: the plaza is empty.
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+async function nameThem() {
+  const crew = await Crew.ready(world, hero);
+  const E = crew.add({ name: "Eurylochus", tint: 0xb8ae9c });
+  const wait = s => sty.wait(s);
+  const O = V3(2.2, 0, 9.4), EAT = V3(2.0, 0, 7.6);
+  const path = [V3(2, 2.2, -11.6), V3(2, 2.2, -9.6), V3(2, 0, -7.2), EAT];      // out of the doorway, down the steps, across the marble
+  const run = async (pts, speed) => {
+    const L = []; let tot = 0; for (let i = 1; i < pts.length; i++) { const d = pts[i].distanceTo(pts[i - 1]); L.push(d); tot += d; }
+    E.play("run", 0.2, { timeScale: speed / 4.5 });
+    await E.over(tot / speed, k => {
+      let d = k * tot, i = 0; while (i < L.length - 1 && d > L[i]) { d -= L[i]; i++; }
+      const a = pts[i], b = pts[i + 1], f = Math.min(1, d / L[i]);
+      E.group.position.lerpVectors(a, b, f); E.group.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+    });
+  };
+  let look = 0, hand = 0;
+  const uncaption = () => comic.el.querySelectorAll(".narr").forEach(n => n.remove());   // a cut cancels a caption's own timer: lift it by hand
+  const pose = { update: () => {
+    if (hand > 0) { hero.group.updateMatrixWorld(); reachArm(hero.bones, "r", V3(-0.12, 1.12, 0.38).applyMatrix4(hero.group.matrixWorld), hand); }
+    if (look > 0 && hero.bones.head) hero.bones.head.rotateX(0.55 * look);       // he looks down at his own hand
+  } };
+  world.add(pose);
+  const stying = sty.group.visible; sty.group.visible = false; sty.labels(false);
+  hero.teleport(O.x, O.z, Math.PI, 0); hero.play("idle", 0.01);
+  E.place(path[0].x, path[0].y, path[0].z, 0);
+  try {
+    // ---- CI1 · one came back. Low, over Odysseus's shoulder, across the empty plaza to the hall: one figure
+    //      bursts out of the doorway and runs toward us.
+    director.cut([O.x + 0.75, 1.55, O.z + 2.3], [O.x - 0.3, 2.4, -11.5], 42);
+    await wait(0.6);
+    comic.caption("Twenty-three men walked up the hill.", { x: 6, y: 16, seconds: 2.6 });
+    const r = run(path, 4.6);
+    await wait(2.8);
+    comic.caption("One came back down.", { x: 6, y: 16, seconds: 2.4 });
+    await r;
+    E.play("idle", 0.25, { timeScale: 1.8 }); E.face(O.x, O.z);                  // out of breath
+    // ---- CI2 · Eurylochus, close; Odysseus's shoulder in the foreground
+    uncaption();
+    director.cut([O.x + 0.55, 1.62, O.z + 0.9], [EAT.x, 1.62, EAT.z], 34);
+    await comic.subtitle("A house of polished stone. A woman singing at a loom. Wine that smelled like honey.", { speaker: "EURYLOCHUS", seconds: 3.6 });
+    comic.caption("He didn't drink it. That's the only reason he still has hands.", { x: 6, y: 16, seconds: 2.8 });
+    await wait(2.8);
+    uncaption();
+    lore.classList.add("on"); await typeCard("THE OTHERS DID.", "red"); lore.classList.remove("on");   // card 5, cut in full screen
+    // ---- CI3 · who? A slow push on Odysseus while the names are said
+    const c0 = V3(O.x - 1.0, 1.7, O.z - 2.7), c1 = V3(O.x - 0.6, 1.7, O.z - 1.7);
+    director.cut([c0.x, c0.y, c0.z], [O.x, 1.5, O.z], 36);
+    const push = director.glide([c1.x, c1.y, c1.z], [O.x, 1.52, O.z], 30, 10.5);
+    const say = (t, who, secs = 1.5) => comic.subtitle(t, { speaker: who, seconds: secs });
+    await say("Who?", "ODYSSEUS", 1.1);
+    await say("Polites.", "EURYLOCHUS", 1.2);
+    await say("Polites. And?", "ODYSSEUS", 1.6);
+    await say("Perimedes. Lycus. Elpenor—", "EURYLOCHUS", 1.9);
+    await say("Elpenor?", "ODYSSEUS", 1.2);
+    await say("The young one.", "EURYLOCHUS", 1.4);
+    // he looks down at his right hand, the one that held the wrist in the horse. He says nothing.
+    await sty._tween(0.6, k => { hand = k * k * (3 - 2 * k); look = hand; });
+    await wait(1.0);
+    const back = run([EAT, V3(2, 0, -7.2), V3(2, 2.2, -9.6), V3(2, 2.2, -11.6)], 4.6);   // already running back, alone
+    await sty._tween(0.5, k => { look = 1 - k; hand = 1 - k; });
+    await push;
+    await Promise.all([hero.walkTo(O.x - 0.1, O.z - 3.2, { speed: 1.6 }), Promise.race([back, wait(2.0)])]);   // a few steps behind him
+  } finally {
+    uncaption();
+    const i = world.updaters.indexOf(pose); if (i >= 0) world.updaters.splice(i, 1);
+    crew.dispose();
+    sty.group.visible = stying; sty.labels(true);
+    hero.teleport(GATE.x - 0.5, GATE.z + 1.9, Math.PI * 0.5, 0); hero.play("idle", 0.01);
+  }
+}
 async function opening() {
   await film(async () => {
     sty.show(trials.board.frames ? trials.board.frames[0] : sty.frame);
+    await nameThem();                                                             // cards 1–5, acted out
     lore.classList.add("on");
-    for (const [text, cls] of LORE) await typeCard(text, cls);
+    for (const [text, cls] of LORE.slice(5)) await typeCard(text, cls);           // cards 6–9 stay typed on black: they set up the list
     lore.classList.remove("on");
     director.cut([2, 5.2, 2], [2, 6.4, -13], 44);
     await comic.chapter("CHAPTER THREE", "THE WITCH WHO KEPT PIGS", 2.6);
@@ -197,6 +246,8 @@ async function opening() {
   try { localStorage.setItem("odyssey.circe.prologue", "1"); } catch { /* storage off */ }
 }
 document.getElementById("open-btn").onclick = () => opening();
+// all nine cards as they used to open the chapter, kept whole as a read
+document.getElementById("crawl-btn").onclick = () => film(async () => { lore.classList.add("on"); for (const [text, cls] of LORE) await typeCard(text, cls); lore.classList.remove("on"); });
 
 // ---------- the banquet, Act I: the table is laid, Circe asks, Odysseus answers, Athena reads the ration board
 async function banquetIntro() {
@@ -230,8 +281,32 @@ async function finale() {
     director.cut([2, 7.5, 10], [2, 1.6, -7], 50);                                  // the colonnade opens: seventeen more walk out
     await sty.walkOut(17, island.doorAt, { x0: -4, x1: 7.6, z0: -4.6, dz: 1.0, tableX0: -4.5, tableX1: 8.5, foot: -7.0 });
     await director.glide([1, 3.0, 12.5], [1, 2.6, -8], 50, 2.4);                 // twenty-two men, the palace behind them
-    comic.caption("Twenty-two men walked out of Circe's sty. They stayed a year.", { seconds: 3.4 });
-    await sty.wait(3.4);
+    // the roof image, no words: the camera rises past the hall as the evening comes, up to the roof under the sun
+    // machine. On the edge a young man lies asleep, one arm over the drop, a cup in his hand, the red cord on his
+    // wrist. It does not stop on him (the Underworld will).
+    const crew = await Crew.ready(world, hero);
+    const elp = crew.add({ name: "Elpenor", tint: 0xe3dccf, cord: true });
+    const roofY = 2.2 + 8.3 + 0.55, at = new THREE.Vector3(14.5, roofY + 0.14, -10.75);   // on the beam, clear of the pediment (x -6…10)
+    elp.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0, "YXZ"); elp.place(at.x, at.y, at.z); elp.play("idle", 0.01, { timeScale: 0.15 });
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.12, 10), new THREE.MeshStandardMaterial({ color: 0xc89a3a, metalness: 0.7, roughness: 0.35 }));
+    world.scene.add(cup);
+    const hang = { update: () => {
+      elp.group.updateMatrixWorld();
+      reachArm(elp.bones, "r", new THREE.Vector3(at.x + 0.45, roofY - 0.75, -9.75), 1);
+      elp.bones.rHand.updateWorldMatrix(true, false); cup.position.setFromMatrixPosition(elp.bones.rHand.matrixWorld).add(new THREE.Vector3(0, -0.08, 0.05));
+    } };
+    world.add(hang);
+    try {
+      dusk(0.7, 3.4);
+      director.cut([8, 3.4, 9.5], [9, 6.5, -11], 48);
+      comic.caption("Twenty-two men walked out of Circe's sty. They stayed a year.", { seconds: 3.4 });
+      await director.glide([17.2, 13.5, -5.6], [11.5, 12.4, -14], 46, 3.4);       // up past the hall, over the roof's edge, on toward the sun
+      comic.el.querySelectorAll(".narr").forEach(n => n.remove());               // (a camera move cancels a caption's own timer)
+      director.cut([1, 3.0, 12.5], [1, 2.6, -8], 50);                            // back to his men for his card
+    } finally {
+      const i = world.updaters.indexOf(hang); if (i >= 0) world.updaters.splice(i, 1);
+      world.scene.remove(cup); cup.geometry.dispose(); cup.material.dispose(); crew.dispose();
+    }
     const c = nameCard("circe", { done: true });
     await director.freeze(c.name, c.sub, 3.2);
     const y0 = island.machine.position.y;                                          // the last image: the sun goes all the way down

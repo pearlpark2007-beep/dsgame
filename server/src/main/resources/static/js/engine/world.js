@@ -128,7 +128,9 @@ export class World {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 6000);
 
-    this.composer = new EffectComposer(this.renderer);
+    // the renderer's own antialias does nothing once everything goes through the composer: its render targets need
+    // their own multisampling, or every edge and every label shimmers (found in the Underworld clarity audit)
+    this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.6, 0.82);
     this.composer.addPass(this.bloom);
@@ -154,6 +156,8 @@ export class World {
     const high = this.quality === "high";
     this.renderer.setPixelRatio(high ? Math.min(devicePixelRatio, 1.75) : 1);
     this.bloom.enabled = high && !this.noBloom;          // a page can turn the glow off for good (Circe: clarity first)
+    const samples = high ? 4 : 2;                         // MSAA: 4x when sharp, 2x on weak laptops
+    for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) if (rt.samples !== samples) { rt.samples = samples; rt.dispose(); }
     this.resize();
     this.updaters.forEach(u => u.onQuality && u.onQuality(this.quality));
   }

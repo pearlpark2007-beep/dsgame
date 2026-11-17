@@ -7,8 +7,11 @@
 //  3. THE DOOR  Dawn. Sheep pass his legs in silhouette. The ram, Odysseus under it. His blind head comes
 //               down, sniffing. HOLD SPACE. Daylight.
 //  4. OUT       Odysseus runs; the giant roars from the cave mouth. Freeze on the card.
-//  5. AFTERMATH the camera breathes: it rises and pulls back over the slope as he runs for the ship, the
-//               cave falling behind him; the sound opens out from the cave into wind and sea.
+//  5. THE NAME  (the screenplay's ending, replacing the old aftermath shot) From the stern of the ship pulling
+//               away: he climbs onto the rail; Eurylochus catches his wrist; he pulls free and shouts his real
+//               name. Close on the blind giant: he turns down to the sea and kneels: "Father. His name is
+//               Odysseus. Of Ithaca." The sea's note. From the deck: the sail goes slack, then fills from the
+//               other side with a crack, and the bow swings away from open water. He gets down. He says nothing.
 // Re-cut for the redesign: steadier cameras, real sounds instead of most lettering, shake only on impacts.
 // The stake is placed from Odysseus's two hands every frame (grip between them, tip to the eye) and
 // pushing it moves HIM forward, so it can never pass through his body.
@@ -21,6 +24,8 @@ import { crag } from "./caveRock.js";
 import { stoneTexture } from "../../engine/textures.js";
 import { buildOutside } from "./caveOutside.js";
 import { sound } from "../../engine/sound.js";
+import { Crew, reachArm } from "../../story/crew.js";
+import { buildSail } from "../../story/sail.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const yawTo = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
@@ -113,7 +118,10 @@ export async function playCaveClimax(c) {
   const tipLight = temp(new THREE.PointLight(0xff7a2a, 0, 9, 1.6));
   const tipU = { update: () => tipLight.position.copy(tipAt()) }; world.add(tipU); props.push(() => remove(world, tipU));
   tipMat.emissive = tipMat.emissive || new THREE.Color();
-  const heat = k => { tipMat.emissive.setRGB(1.0 * k, 0.35 * k + 0.25 * k * k, 0.05 * k + 0.4 * k * k * k); tipMat.emissiveIntensity = 1.4 * k; tipLight.intensity = 14 * k; };
+  // the tip glows deep orange to yellow-orange (it used to reach pure white and read as a flat paper triangle)
+  { const tg = stake.userData.tip.geometry.parameters; if (tg && tg.radius) stake.userData.tip.geometry = new THREE.ConeGeometry(tg.radius, tg.height, 18); }
+  tipMat.flatShading = false; tipMat.needsUpdate = true;
+  const heat = k => { tipMat.emissive.setRGB(1.0 * k, 0.28 * k + 0.14 * k * k, 0.03 * k); tipMat.emissiveIntensity = 0.55 * k; tipLight.intensity = 12 * k; };
   // a warm light on the giant's face, so the eye scenes read in the dark
   const faceL = temp(new THREE.PointLight(0xff8a40, 0, 9, 1.4));
   const faceU = { update: () => { giant.eyePos(faceL.position); faceL.position.addScaledVector(flat, -2.4).y -= 0.8; } };
@@ -123,6 +131,9 @@ export async function playCaveClimax(c) {
   const coalCol = lights.coalLight.color.clone();
   const amber = on => { lights.coalLight.userData.k = on ? 0.3 : 1; lights.coalLight.color.copy(on ? new THREE.Color(0xff7a30) : coalCol); };
   props.push(() => amber(false));
+  // the moonlight shafts belong to the night: the climax runs from the dark to dawn, so they are off for it
+  const beams = (cave.details && cave.details.beams) || [];
+  beams.forEach(b => (b.visible = false));
   try {
     await comic.black(true, 0.01);
     lights.setFires(0.4); amber(true);
@@ -154,7 +165,8 @@ export async function playCaveClimax(c) {
       // "Who are you?"
       cam(eyeECU);
       await comic.subtitle("Who are you?", { speaker: "POLYPHEMUS", villain: true, seconds: 1.8 });
-      cam((t, o) => { hero.bones.head.getWorldPosition(head); o.pos.copy(head).addScaledVector(heroFwd(), 1.3).addScaledVector(sd, 0.3).add(V(0, -0.15, 0)); o.look.copy(head).add(V(0, -0.05, 0)); o.fov = 30; });
+      // a medium shot, head and shoulders with the dark behind (a full-screen close-up of his plain face read as a mannequin)
+      cam((t, o) => { hero.bones.head.getWorldPosition(head); o.pos.copy(head).addScaledVector(heroFwd(), 3.0).addScaledVector(sd, 1.1).add(V(0, -0.35, 0)); o.look.copy(head).add(V(0, -0.35, 0)); o.fov = 34; });
       await wait(0.5);
       await comic.subtitle("...Nobody.", { speaker: "ODYSSEUS", seconds: 1.6 });
       // the eye sinks shut
@@ -191,9 +203,8 @@ export async function playCaveClimax(c) {
       // the four eye cameras
       const handsMid = () => { hero.body.updateMatrixWorld(true); return hero.bones.lHand.getWorldPosition(V()).add(hero.bones.rHand.getWorldPosition(V())).multiplyScalar(0.5); };
       const eyeCams = [
-        (t, o) => { giant.eyePos(eye); o.pos.copy(eye).addScaledVector(flat, -2.5).addScaledVector(sd, 1.2).add(V(0, -0.2, 0)); o.look.copy(eye).addScaledVector(flat, -0.3); o.fov = 32; },                // close on the eye, the tip coming in
-        (t, o) => { giant.eyePos(eye); o.pos.copy(handsMid()).add(V(0, 0.32, 0)).addScaledVector(sd, 0.22); o.look.copy(eye); o.fov = 26; },                                                         // down the stake
-        (t, o) => { giant.eyePos(eye); hero.bones.head.getWorldPosition(head); o.pos.copy(eye).addScaledVector(flat, -0.9).add(V(0, 0.1, 0)); o.look.copy(head).lerp(tipAt(), 0.4); o.fov = 54; },  // the eye's own view
+        (t, o) => { giant.eyePos(eye); o.pos.copy(eye).addScaledVector(flat, -3.6).addScaledVector(sd, 2.6).add(V(0, 0.2, 0)); o.look.copy(eye).addScaledVector(flat, -0.8); o.fov = 34; },                // close on the eye, the tip coming in
+        (t, o) => { giant.eyePos(eye); hero.bones.head.getWorldPosition(head); o.pos.copy(head).addScaledVector(flat, -0.9).addScaledVector(sd, -0.55).add(V(0, 0.35, 0)); o.look.copy(eye); o.fov = 30; },                                                         // down the stake
         (t, o) => { const m = mid(); o.pos.copy(m).addScaledVector(sd, 4.2).add(V(0, -0.4, 0)); o.look.copy(m); o.fov = 40; }                                                                         // profile
       ];
       cam(eyeCams[0]);
@@ -212,15 +223,16 @@ export async function playCaveClimax(c) {
             h.progress(k);
             hero.group.position.copy(standAt).addScaledVector(flat, 0.9 * k);
             // the cuts come faster the deeper it goes
-            if (h.down() && ct > 0.85 - 0.55 * k) { ct = 0; ci = (ci + 1) % eyeCams.length; cam(eyeCams[ci]); rise.step(); }
+            if (h.down() && ct > 1.5 - 0.6 * k) { ct = 0; ci = (ci + 1) % eyeCams.length; cam(eyeCams[ci]); rise.step(); }   // three angles, a cut every 1.5 s down to 0.9 s
             if (s) s.o.shake = Math.max(s.o.shake, 0.01 + 0.1 * k);
             // the eye fights it: the lid twitches, the eye rolls toward the heat, the whole giant trembles
-            if (h.down()) { giant.open(0.04 + k * 0.35 * Math.random()); giant.look(tipAt()); }
-            else if (k > 0.1) giant.open(0.3 + 0.4 * Math.random());                 // letting off: he stirs
+            // (smooth, not random every frame: random values made the lid and body strobe)
+            if (h.down()) { giant.open(0.04 + k * 0.22 * (0.5 + 0.5 * Math.sin(t * 9))); giant.look(tipAt()); }
+            else if (k > 0.1) giant.open(0.3 + 0.15 * Math.sin(t * 5));               // letting off: he stirs
             if (t > 6) giant.open(Math.min(1, (t - 6) / 4) * 0.7);
-            giant.group.position.copy(g0).add(V((Math.random() - 0.5) * 0.06 * k, 0, (Math.random() - 0.5) * 0.06 * k));
+            giant.group.position.copy(g0).add(V(Math.sin(t * 23) * 0.025 * k, 0, Math.cos(t * 19) * 0.025 * k));
             giant.roar(0.18 * k);
-            if (h.down() && k > 0.25 && Math.random() < dt * (6 + 30 * k)) sparks(world, tipAt(), 4 + Math.floor(10 * k));
+            if (h.down() && k > 0.25 && Math.random() < dt * (2 + 8 * k)) sparks(world, tipAt(), 3 + Math.floor(6 * k));
             if (beat > 0.75 - 0.4 * k) { beat = 0; sound.heart({ level: 0.35 + 0.4 * k }); }
             if (k >= 1 || t > 10) { remove(world, u); res(); }
           } };
@@ -258,7 +270,8 @@ export async function playCaveClimax(c) {
       giant.roar(1);
       const red = temp(new THREE.PointLight(0xff2a10, 0, 80, 1)); red.position.copy(GIANT_AT).add(V(-6, 8, 6));
       cam((t, o) => { giant.headPos(head); o.pos.copy(GIANT_AT).addScaledVector(gf, 10).addScaledVector(side, -3).add(V(0, 0.6, 0)); o.look.copy(head).add(V(0, -2.5, 0)); o.fov = 62; o.shake = Math.max(o.shake, 0.4); });
-      comic.sfx("AAAARRGH!!", { x: 12, y: 14, r: -6, size: 9, color: "#e0442a", seconds: 1.6 }); sound.roar({ seconds: 2.4, level: 0.55 });
+      comic.el.querySelectorAll(".sfx").forEach(e => e.remove());          // THUNK goes before AAAARRGH comes (they overlapped)
+      comic.sfx("AAAARRGH!!", { x: 26, y: 16, r: -5, size: 7.5, color: "#e0442a", seconds: 1.6 }); sound.roar({ seconds: 2.4, level: 0.55 });
       hero.fall("fall", { groundY: 0, back: 1.5 }); hero.groundY = 0;
       for (let q = 0; q < 5; q++) sparks(world, COALS_AT.clone().add(V(0, 0.5, 0)), 50);
       dustFall(world, V(GIANT_AT.x - 6, roofAt(GIANT_AT.x - 6, GIANT_AT.z + 6) - 1, GIANT_AT.z + 6), 220);
@@ -409,8 +422,14 @@ export async function playCaveClimax(c) {
     hero.teleport(DOOR_AT.x - 4.5, DOOR_AT.z + 0.5, -Math.PI / 2, 0); hero.groundY = 0;
     hero.play("walk", 0.1, { timeScale: 2.4 });
     // the giant fills the cave mouth behind him
-    giant.place(DOOR_AT.x - 0.8, 0, DOOR_AT.z, DOOR_AT.x - 40, DOOR_AT.z); giant.blind(); giant.group.rotation.z = 0;
-    await giant.pose("clutch", 0); giant.roar(0.2);
+    // he roars from the dark INSIDE the mouth: his body is not shown there (an 11 m giant in a 12 m door
+    // was squeezed into an arch of arms, and kept moving through the freeze frame)
+    // the boulder stands rolled aside (he has just run out through the gap); the blind giant is deep in the
+    // mouth behind him, a dark figure clutching his face, framed by the arch
+    door.skyColor = null; door.power = 0.15; door.set(1);
+    giant.place(DOOR_AT.x + 10, 0, DOOR_AT.z, DOOR_AT.x - 40, DOOR_AT.z); giant.blind(); giant.group.rotation.z = 0;
+    await giant.pose("clutch", 0); giant.roar(0.15);
+    giant.group.traverse(o => { if (o.isMesh) o.visible = true; });
     // his feet match the ground: the walk clip at 2.4x covers 4.1 m a second, so 3.4 s is 14 m
     const r0 = hero.group.position.clone(), r1 = r0.clone().add(V(-14, 0, 0.4));
     hero.group.position.y = outside.heightAt(r0.x, r0.z);
@@ -420,27 +439,74 @@ export async function playCaveClimax(c) {
     comic.black(false, 0.12);
     sound.ambience("title");                        // out of the cave: wind and sea
     await wait(1.3);
-    giant.roar(1);
     if (s) s.o.shake = 0.3;
-    sound.roar({ seconds: 2.0, level: 0.5 });
+    sound.roar({ seconds: 2.0, level: 0.5 }); giant.roar(1);
     comic.sfx("NOBODYYY!!", { x: 46, y: 14, r: -6, size: 9, color: "#e0442a", seconds: 1.8 });
     await wait(1.2);
     await director.freeze(cardAfter.name, cardAfter.sub, 3.6);
-    // ---- 5. AFTERMATH: let the camera breathe. It rises and drifts back over the slope while he runs on down
-    //      toward the ship; the cave mouth (and the giant in it) falls away behind him; wind and sea.
-    giant.roar(0);
-    const r2 = r1.clone().add(V(-16, 0, 1.2));
-    hero.play("walk", 0.2, { timeScale: 2.0 });
-    over(6.5, k => { hero.group.position.lerpVectors(r1, r2, k); hero.group.position.y = outside.heightAt(hero.group.position.x, hero.group.position.z); hero.group.rotation.y = -Math.PI / 2; });
-    cam((t, o) => {
-      const k = ease(Math.min(1, t / 6.5)), P = hero.group.position;
-      o.pos.set(r1.x - 7 - 10 * k, outside.heightAt(r1.x - 7, r1.z) + 2.2 + 7 * k, r1.z + 6 + 6 * k);
-      o.look.set(P.x + 6 * (1 - k) - 8 * k, P.y + 1.2, P.z - 1); o.fov = 48 + 6 * k;
-    });
-    await wait(6.2);
+    // ---- 5. THE NAME, THE PRAYER, THE ANSWER (16 s). The ship is already pulling away from the beach.
+    const ship = outside.ship, deckY = 2.45;
+    ship.rotation.set(0, Math.PI, 0);                                // bow out to sea (-x), stern to the cliff
+    const ship0 = ship.position.clone();
+    const onShip = (x, y, z) => { ship.updateMatrixWorld(); return V(x, y, z).applyMatrix4(ship.matrixWorld); };
+    const crew = await Crew.ready(world, hero); props.push(() => crew.dispose());
+    const eur = crew.add({ name: "Eurylochus", tint: 0xb8ae9c });
+    const sail = buildSail(); world.scene.add(sail.mesh); props.push(() => { world.scene.remove(sail.mesh); sail.dispose(); });
+    let rail = 0, grab = 0, shout = 0, heading = Math.PI, swing = 0;
+    const sea = { update: (dt, t) => {
+      ship.rotation.y = heading;
+      const f = V(Math.cos(heading), 0, -Math.sin(heading));
+      ship.position.addScaledVector(f, dt * 2.6); ship.position.y = ship0.y + Math.sin(t * 0.8) * 0.08; ship.rotation.z = Math.sin(t * 0.6) * 0.015;
+      ship.updateMatrixWorld();
+      sail.update(dt); sail.mesh.position.copy(onShip(1.5, deckY + 6.4, 0)); sail.mesh.quaternion.copy(ship.quaternion);
+      // Odysseus at the stern, up on the rail facing the cliff; Eurylochus a step behind him
+      const h = onShip(-12.6, deckY + 0.55 * rail, 0); hero.group.position.copy(h); hero.group.rotation.set(0, heading - Math.PI / 2 + swing, 0);
+      const e = onShip(-10.9, deckY, 0.75); eur.group.position.copy(e); eur.face(h.x, h.z);
+      hero.group.updateMatrixWorld();
+      if (shout > 0) reachArm(hero.bones, "l", V(0.35, 2.25, 0.6).applyMatrix4(hero.group.matrixWorld), shout);
+      if (grab > 0) { hero.bones.lHand.updateWorldMatrix(true, false); reachArm(eur.bones, "r", V().setFromMatrixPosition(hero.bones.lHand.matrixWorld), grab); }
+    } };
+    world.add(sea); props.push(() => remove(world, sea));
+    hero.play("idle", 0.2); eur.play("idle", 0.01);
+    giant.place(DOOR_AT.x - 6.5, outside.heightAt(DOOR_AT.x - 6.5, DOOR_AT.z), DOOR_AT.z, ship.position.x, ship.position.z);
+    await giant.pose("stand", 0); giant.roar(0);
+    // 0:00–0:05 · the name. From the deck behind them, looking back at the cliff: the blind giant at the cave mouth.
+    cam((t, o) => { o.pos.copy(onShip(-3.0, deckY + 1.4, -1.6)); o.look.set(DOOR_AT.x - 7, -2, DOOR_AT.z); o.fov = 40; });   // the two men low in the frame, the giant above them on the cliff
+    await over(0.6, k => rail = ease(k));
+    await over(0.35, k => grab = ease(k));
+    comic.subtitle("Don't.", { speaker: "EURYLOCHUS", seconds: 1.2 });
+    await wait(0.9);
+    await over(0.35, k => { grab = 1 - ease(k); shout = ease(k); });   // he pulls free, and his arm goes up at the cliff
+    comic.subtitle("Cyclops! If anyone asks who did this to you, it was Odysseus. Odysseus of Ithaca!", { speaker: "ODYSSEUS", seconds: 3.2 });
+    await wait(2.9);
+    s.stop(); s = null;
+    // 0:05–0:10 · the prayer. Close on the giant. He turns his blind face from the voice down to the sea, and kneels.
+    const G = giant.group.position, toShip = V(ship.position.x - G.x, 0, ship.position.z - G.z).normalize();
+    const gHead = giant.headPos(V()).clone(), gCam = gHead.clone().addScaledVector(toShip, 15).add(V(2.5, -4.5, 4));
+    cam((t, o) => { giant.headPos(head); o.pos.copy(gCam); o.look.copy(head).add(V(0, -1.2, 0)); o.fov = 42; });   // fixed, so he sinks within the frame
+    await wait(0.6);
+    await giant.pose("kneel", 1.6);
+    const prayer = comic.subtitle("Father. His name is Odysseus. Of Ithaca.", { speaker: "POLYPHEMUS", villain: true, seconds: 3.0 });
+    await wait(2.3);
+    sound.seaHeard({ level: 0.9, seconds: 5 });                     // the note from Troy, on "Ithaca": the loudest it has been
+    await prayer;
+    s.stop(); s = null;
+    // 0:10–0:16 · the answer. From the deck, as at Troy: the sail goes slack... and fills from the other side,
+    // with a crack; the bow swings away from the open water. He watches the wake curve behind them. He gets down.
+    cam((t, o) => { o.pos.copy(onShip(10.5, deckY + 2.6, -3.4)); o.look.copy(onShip(-6, deckY + 4.6, 0.4)); o.fov = 60; });
+    await wait(0.4);
+    await over(0.7, k => { sail.fill = 1 - ease(k); sail.flutter = ease(k); shout = 1 - ease(k); });
+    await wait(0.9);
+    sound.boom({ freq: 140, to: 70, seconds: 0.25, level: 0.5 }); sound.whoosh({ seconds: 0.8, level: 0.3 });
+    await over(0.22, k => { sail.fill = -ease(k); sail.flutter = 1 - k; });
+    if (s) s.o.shake = 0.12;
+    await over(2.6, k => { heading = Math.PI + 0.85 * ease(k); swing = -0.85 * ease(k); });
+    await over(0.6, k => rail = 1 - ease(k));
+    await wait(0.6);
     await comic.black(true, 0.9);
   } finally {
     if (s) s.stop();
+    beams.forEach(b => (b.visible = true));
     props.forEach(f => f());
     hero.raise = null;
     if (outside) outside.dispose();
