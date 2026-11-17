@@ -10,6 +10,8 @@ import { QueueBoard, SHADES } from "../../learn/queueBoard.js";
 import { Codex } from "../../learn/codex.js";
 import { LESSONS, lessonCode, UNDERWORLD_CODEX, FULL, PROGRAMS } from "./underworldLessons.js";
 import { icon } from "../../ui/icons.js";
+import { AthenaLine } from "../../learn/athenaLine.js";
+import { VillainVoice } from "../../ui/villainVoice.js";
 
 const STORE = "odyssey.underworld.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -140,6 +142,8 @@ const css = `
 export class UnderworldTrials {
   // ctx: { world, pit, island, director, comic, panelView(on), onClose(), onFinale(), skipping(), fast: { begin(), land(), end() } }
   constructor(ctx) {
+    this.athenaLine = new AthenaLine();                                    // Athena's code box, as on Circe's island
+    this.voice = new VillainVoice("underworld", { skipping: () => ctx.skipping() });   // the villain's voice box, as on Circe's island
     this.ctx = ctx; this.levels = []; this.level = null; this.busy = false;
     if (!document.getElementById("trial-css")) { const s = document.createElement("style"); s.id = "trial-css"; s.textContent = TRIAL_CSS; document.head.appendChild(s); }
     if (!document.getElementById("circe-trial-css")) { const s = document.createElement("style"); s.id = "circe-trial-css"; s.textContent = css; document.head.appendChild(s); }
@@ -321,6 +325,8 @@ export class UnderworldTrials {
   }
 
   async select(l, keepCode = false, card = false) {
+    this.athenaLine.clear();
+    if (!keepCode && l !== LAB && !l.lesson) this.voice.opened(l.id);
     this.level = l;
     this.ctx.pit.clearProphecy(); this.ctx.island.clearServing();
     const lab = l === LAB, ls = l.lesson;
@@ -413,6 +419,7 @@ export class UnderworldTrials {
     while (P.k < steps.length) {
       if (!P.playing && !P.once) { await new Promise(r => (P.wake = r)); if (P.k >= steps.length) break; }
       const st = steps[P.k], gen = P.gen;
+      this.athenaLine.step(this.code.value, st, P.k + 1, steps.length);
       this.mark(st.line); this.status(`line ${st.line}: ${(st.message || st.action).replace(/[Pp]en (\d+)/g, "seat [$1]").replace(/pens/g, "seats")}`);
       board.show(P.k + 1);
       if (/^(FULL|EMPTY|OUT_OF_BOUNDS)$/.test(st.action)) { world.timeScale = 1; this.ctx.fast.land(); }
@@ -422,6 +429,7 @@ export class UnderworldTrials {
       P.k++; board.setEnabled(P.k > 0, P.k < steps.length);
       this.moves(board.frames[P.k].drank.length);
     }
+    this.athenaLine.clear();
     P.ended = true; board.setPlaying(false); board.setEnabled(P.k > 0, false);
     world.timeScale = 1; this.ctx.fast.land();
     if (res.outcome === "SUCCESS") return this.endSuccess(res);
@@ -444,6 +452,7 @@ export class UnderworldTrials {
 
   // ---------- endings
   async endSuccess(res) {
+    if (this.level && this.level !== LAB) this.voice.solved(this.level.id);
     const { director, pit } = this.ctx;
     const f = this.board.frames[this.board.frames.length - 1], out = (f.out || "").trim();
     if (this.level === LAB || this.level.sandbox) {

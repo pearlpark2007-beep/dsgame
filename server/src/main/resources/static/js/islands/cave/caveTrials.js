@@ -11,6 +11,8 @@ import { ArrayBoard } from "../../learn/arrayBoard.js";
 import { Codex } from "../../learn/codex.js";
 import { CAVE_CODEX } from "../../learn/codexContent.js";
 import { icon } from "../../ui/icons.js";
+import { AthenaLine } from "../../learn/athenaLine.js";
+import { VillainVoice } from "../../ui/villainVoice.js";
 
 const STORE = "odyssey.cave.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -155,6 +157,8 @@ const css = `
 export class CaveTrials {
   // ctx: { world, pens, director, comic, panelView(on), onLesson(), onFinale(), fast: { on(), off() } }
   constructor(ctx) {
+    this.athenaLine = new AthenaLine();                                    // Athena's code box, as on Circe's island
+    this.voice = new VillainVoice("cave", { skipping: () => ctx.skipping() });   // the villain's voice box, as on Circe's island
     this.ctx = ctx; this.levels = []; this.level = null; this.busy = false;
     if (!document.getElementById("trial-css")) { const s = document.createElement("style"); s.id = "trial-css"; s.textContent = TRIAL_CSS; document.head.appendChild(s); }
     if (!document.getElementById("cave-trial-css")) { const s = document.createElement("style"); s.id = "cave-trial-css"; s.textContent = css; document.head.appendChild(s); }
@@ -297,6 +301,8 @@ export class CaveTrials {
 
   // set the pens up exactly as the trial starts
   async select(l, keepCode = false, card = false) {
+    this.athenaLine.clear();
+    if (!keepCode && l !== LAB && !l.lesson) this.voice.opened(l.id);
     const { pens } = this.ctx;
     this.level = l;
     const lab = l === LAB;
@@ -396,6 +402,7 @@ export class CaveTrials {
       if (stop) { P.ended = true; return stop(); }
       if (st.action === "VAR") await pens.wait(0.05);
     }
+    this.athenaLine.clear();
     P.ended = true; board.setPlaying(false); board.setEnabled(P.k > 0, false);
     world.timeScale = 1; this.ctx.fast.land();
     if (res.outcome === "SUCCESS") return this.endSuccess(res);
@@ -409,6 +416,7 @@ export class CaveTrials {
     const { pens, world } = this.ctx, P = this.player, board = this.board;
     this.mark(st.line);
     this.status(`line ${st.line}: ${st.message}`);
+    this.athenaLine.step(this.code.value, st, this.player.k + 1, this.steps.length);
     const idx = st.index;
     if (st.action === "VAR") {
       // an index variable moved: its coloured ring slides to the pen it points at
@@ -467,6 +475,7 @@ export class CaveTrials {
 
   // ---------- endings
   async endSuccess(res) {
+    if (this.level && this.level !== LAB) this.voice.solved(this.level.id);
     const { director } = this.ctx;
     this.focusI = null; this.view();
     if (this.level === LAB) {                 // the Lab has nothing to win: just say how the flock ended up

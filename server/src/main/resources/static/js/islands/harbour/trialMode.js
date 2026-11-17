@@ -13,6 +13,8 @@ import { StackBoard } from "../../learn/stackBoard.js";
 import { Codex } from "../../learn/codex.js";
 import { HARBOUR_CODEX } from "../../learn/codexContent.js";
 import { icon } from "../../ui/icons.js";
+import { AthenaLine } from "../../learn/athenaLine.js";
+import { VillainVoice } from "../../ui/villainVoice.js";
 
 const STORE = "odyssey.harbour.done";
 const done = () => { try { return JSON.parse(localStorage.getItem(STORE)) || []; } catch { return []; } };
@@ -76,9 +78,29 @@ const NAME_OK = /^[a-z][a-z0-9_]{0,9}$/, RESERVED = new Set(["int", "if", "else"
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const cargo = v => (cargoNames.on && CARGO[v]) || String(v);
 
+const CARD_CSS = `
+#trial-card { position: fixed; inset: 0; z-index: 33; background: #050403; display: none; flex-direction: column; justify-content: center; padding-left: 9vw;
+  font-family: Anton, Impact, sans-serif; color: #f2c230; pointer-events: none; }
+#trial-card.on { display: flex; }
+#trial-card .k { font: 700 clamp(13px, 1.2vw, 16px) 'Courier Prime', monospace; letter-spacing: 4px; color: #f2c230; margin-bottom: 14px; }
+#trial-card .h { font-size: clamp(56px, 11vw, 150px); line-height: 0.9; letter-spacing: 2px; text-shadow: 5px 5px 0 #7e1a0f; }
+#trial-card .s { margin-top: 18px; max-width: 70vw; font-family: 'Courier Prime', monospace; font-size: clamp(15px, 1.6vw, 22px); color: #efe1c2; letter-spacing: 1px; }
+`;
 export class TrialMode {
   // ctx: { world, hero, trial, nav, director, bench, HEAP, codeLine(text), skipping(), skipper: { begin(), end() }, onLesson() }
+  // the full-screen card, shown for 1.6 s when a trial is opened (not on a re-run, not in the Lab)
+  trialCard(l) {
+    if (!this.card || this.ctx.director.skipping) return;
+    const i = this.levels.indexOf(l); if (i < 0) return;
+    this.card.querySelector(".k").textContent = `TRIAL ${i + 1} OF ${this.levels.length} · ${l.title.toUpperCase()}`;
+    this.card.querySelector(".h").textContent = (["ONE.", "TWO.", "THREE.", "FOUR.", "FIVE.", "SIX."][i]) || `${i + 1}.`;
+    this.card.querySelector(".s").textContent = String(l.goal || "").split(/(?<=[.:!?])\s/)[0];
+    this.card.classList.add("on");
+    clearTimeout(this.cardT); this.cardT = setTimeout(() => this.card.classList.remove("on"), 1600);
+  }
   constructor(ctx) {
+    this.athenaLine = new AthenaLine();                                    // Athena's code box, as on Circe's island
+    this.voice = new VillainVoice("harbour", { skipping: () => ctx.skipping() });   // the villain's voice box, as on Circe's island
     this.ctx = ctx; this.levels = []; this.level = null; this.busy = false;
     this.board = new StackBoard();
     if (!document.getElementById("trial-css")) { const s = document.createElement("style"); s.id = "trial-css"; s.textContent = css; document.head.appendChild(s); }
@@ -94,6 +116,10 @@ export class TrialMode {
       <div class="status" role="status" aria-live="polite"></div>
       <div class="words">Words Athena understands: <code>push(&amp;s, x);</code> <code>pop(&amp;s)</code> <code>peek(&amp;s)</code> <code>isEmpty(&amp;s)</code> <code>isFull(&amp;s)</code> <code>size(&amp;s)</code> <code>int x = ...;</code> <code>if</code> <code>while</code> <code>for</code></div>`;
     document.body.appendChild(el);
+    // the full-screen card before each trial (the same card as Circe's island): TRIAL n OF N · TITLE, the number, the goal
+    if (!document.getElementById("harbour-card-css")) { const cs = document.createElement("style"); cs.id = "harbour-card-css"; cs.textContent = CARD_CSS; document.head.appendChild(cs); }
+    this.card = document.createElement("div"); this.card.id = "trial-card"; this.card.setAttribute("aria-live", "polite");
+    this.card.innerHTML = "<div class='k'></div><div class='h'></div><div class='s'></div>"; document.body.appendChild(this.card);
     this.$ = q => el.querySelector(q);
     this.code = this.$("textarea"); this.gutter = this.$(".gutter"); this.hl = this.$(".hl");
     this.code.addEventListener("input", () => this.updateGutter());
@@ -221,6 +247,8 @@ export class TrialMode {
 
   // set the harbour up exactly as the level starts
   select(l, keepCode = false) {
+    this.athenaLine.clear();
+    if (!keepCode && l !== LAB && !l.lesson) this.voice.opened(l.id);
     const { trial, nav, hero, bench, director } = this.ctx;
     this.level = l;
     if (!keepCode) this.board.close();
@@ -243,6 +271,7 @@ export class TrialMode {
     hero.teleport(first.x + 1.6, first.z + 2.2, Math.PI * 0.85);
     this.focus = null; this.stackView(true);
     this.renderTabs();
+    if (!keepCode && !lab) this.trialCard(l);
   }
   // the stack camera: the pile in use (or every pile, between runs) and Odysseus, as big as they fit
   stackView(snap = false) { const { trial, hero, director } = this.ctx; stackFrame(director, trial, hero, () => (this.focus ? [this.focus] : Object.values(trial.piles)), { snap }); }
@@ -326,6 +355,7 @@ export class TrialMode {
     try {
       for (let i = 0; i < all.length; i++) {
         const st = all[i];
+        this.athenaLine.step(this.code.value, st, i + 1, all.length);
         if (!acting(st)) { advanceBoard(i + 1); continue; }
         if (!P.playing && !P.once) { await new Promise(r => (P.wake = r)); }
         P.once = false;
@@ -376,6 +406,7 @@ export class TrialMode {
         }
         advanceBoard(i + 1);
       }
+    this.athenaLine.clear();
       this.end(all.length);
       this.mark(0);
       await this.freeHands();
@@ -469,6 +500,7 @@ export class TrialMode {
   // the win: the panel slides away so nothing covers it, a low angle from the open side of the quay
   // (away from the Return Values bench), he climbs, and the card lands. Then the panel comes back.
   async endSuccess(res) {
+    if (this.level && this.level !== LAB) this.voice.solved(this.level.id);
     if (this.level.tier === "FINALE") return this.endFinale(res);
     if (this.level === LAB) {                 // nothing to win in the Lab: say how the quay ended up
       this.status(res.message, "good");
