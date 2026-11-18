@@ -2,7 +2,7 @@
 //  1–2. the arrival (the screenplay's H1–H3, which replace the crawl and the empty glide; the crawl's full text
 //       is kept below and plays from the Story door as "The story so far"):
 //       H1 from his stern, the rain still falling, the narrow mouth ahead · H2 Polites and the order
-//       ("Bring them all in") · H3 from the cliff top, the fleet comes through the gap one ship at a time
+//       ("Bring them all in") · H3 from the open sea, low beside the line: the fleet threads into the gap one ship at a time
 //  3. Odysseus walks in; the frame freezes on his name (his titles and deeds so far)
 //  4. he looks up: lightning, and the Laestrygonians on the cliff edges
 //  5. one of his ships, moored, quiet... a boulder out of the dark breaks it in half
@@ -109,10 +109,12 @@ async function arrival({ world, hero, director, comic, harbour }) {
     await hero.wait(1.0);
     s.stop();
 
-    // ---- H3 · 0:16–0:24 · one at a time. High on the cliff top, looking down at the mouth: the other ships
-    // come through the gap one behind another, because only one can pass at a time. A slow drift toward the quay.
+    // ---- H3 · 0:16–0:24 · one at a time. Out on the open sea, low beside the line: the nearest ships row past
+    // the camera, and the rest of the twelve thread back into the gap between the cliffs, one behind another,
+    // because only one can pass at a time. A slow push along the line toward the mouth.
+    // (It used to be shot from the cliff top looking out; the rock filled the frame and only one ship showed.)
     lead = MOUTH_Z + 30;                                          // the cut lets time pass: he is through; the line follows
-    s = shot(world, director, (t, o) => { const k = ease(Math.min(1, t / 8)); o.pos.set(LANE - 24 + 4 * k, 60 - 16 * k, MOUTH_Z + 70 + 18 * k); o.look.set(LANE + 2, 0, MOUTH_Z - 60 + 20 * k); o.fov = 48; });
+    s = shot(world, director, (t, o) => { const k = ease(Math.min(1, t / 8)); o.pos.set(LANE + 50 - 6 * k, 36 - 6 * k, MOUTH_Z - 215 + 50 * k); o.look.set(LANE - 4, 12 - 3 * k, MOUTH_Z - 20 + 10 * k); o.fov = 48; });
     await hero.wait(1.6);
     comic.caption("Tonight, his fleet sailed in.", { x: 6, y: 16, seconds: 3.4 });
     bolt(harbour, -70, MOUTH_Z - 200);
