@@ -12,6 +12,9 @@
 //
 // Optional Mixamo clips (sit, point, drink, yell, talk, run): if a file is in assets/odysseus/, it is used;
 // if not, loadOptional() quietly returns without it and every call falls back (see FALLBACK below).
+// Where they play: sit, Troy (the men inside the horse) · run, Troy (the men slipping away from the horse)
+// · drink, Troy (the libation on the prow) · point, the Harbour (Polites at the silent cliffs)
+// · talk, the Cave (Eurylochus: "We have enough, Captain.") · yell, the Cave's end ("Odysseus of Ithaca!")
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
@@ -19,6 +22,11 @@ import { pinRoot } from "../engine/hero.js";
 
 const BONE = n => "mixamorig" + n;
 const WALK_CLIP_SPEED = 1.72;                 // the walk clip's own speed (m/s), as in hero.js
+const RUN_CLIP_SPEED = 5.4;                   // run.fbx's own speed (m/s) before it is pinned in place (3.76 m in 0.63 s, times HIPS_SCALE)
+// The optional clips were downloaded on a taller Mixamo character than idle.fbx and walk.fbx: his hips stand
+// 103 cm high there against 93 cm on ours. Scaling the hips' movement by 93/103 keeps his feet on the ground
+// (and puts a sitting man's seat at the right height). Rotations need no change: the skeleton is the same.
+const HIPS_SCALE = 0.9;
 
 // ---------- optional clips: file name, whether it plays once, and what stands in for it when it is missing
 export const OPTIONAL = {
@@ -45,6 +53,8 @@ export function loadOptional(names = Object.keys(OPTIONAL), dir = "assets/odysse
           const clip = fbx && fbx.animations && fbx.animations[0];
           if (!clip) return null;
           clip.name = name;
+          const hips = clip.tracks.find(t => /Hips\.position$/.test(t.name));
+          if (hips) for (let i = 0; i < hips.values.length; i++) hips.values[i] *= HIPS_SCALE;
           if (OPTIONAL[name] && OPTIONAL[name].inPlace) pinRoot(clip, ["x", "z"]);
           return clip;
         })
@@ -62,6 +72,20 @@ export function addClips(fig, clips) {
     if (OPTIONAL[k] && OPTIONAL[k].once) { fig.actions[k].setLoop(THREE.LoopOnce); fig.actions[k].clampWhenFinished = true; }
   }
   return fig;
+}
+// an optional clip with some bones taken from another clip instead (idle, by default), under a new name, for a
+// figure whose hands are busy. Mixamo's Drinking lifts the LEFT hand; a film that keeps the cup in the right
+// hand takes the drink's head and body, and the left arm from idle (left out, it would fall to the model's T-pose).
+// Returns the new name, or null if the clip did not load.
+export function withoutBones(fig, name, newName, bones, from = "idle") {
+  const clip = fig.clips[name], other = fig.clips[from]; if (!clip) return null;
+  if (!fig.actions[newName]) {
+    const tracks = clip.tracks.filter(t => !bones.test(t.name)).concat(other ? other.tracks.filter(t => bones.test(t.name)) : []);
+    const c = new THREE.AnimationClip(newName, clip.duration, tracks);
+    fig.clips[newName] = c; fig.actions[newName] = fig.mixer.clipAction(c);
+    if (OPTIONAL[name] && OPTIONAL[name].once) { fig.actions[newName].setLoop(THREE.LoopOnce); fig.actions[newName].clampWhenFinished = true; }
+  }
+  return newName;
 }
 // the clip a film should ask for: the optional one if it loaded, else its stand-in (and that stand-in's speed)
 export function clipFor(fig, name) {
@@ -173,7 +197,7 @@ export class Crewman {
     const yaw0 = this.group.rotation.y, yaw1 = Math.atan2(x - from.x, z - from.z);
     let dy = yaw1 - yaw0; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     const [k, ts] = clipFor(this, clip);
-    const clipSpeed = k === "walk" ? WALK_CLIP_SPEED * ts : speed;     // a real run clip is in place: any speed reads
+    const clipSpeed = k === "walk" ? WALK_CLIP_SPEED * ts : k === "run" ? RUN_CLIP_SPEED : speed;   // the legs keep pace with the ground
     this.play(clip, 0.25, { timeScale: speed / clipSpeed });
     const seconds = dist / speed;
     await this.over(seconds, k2 => {

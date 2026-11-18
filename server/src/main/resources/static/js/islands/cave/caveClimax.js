@@ -24,7 +24,7 @@ import { crag } from "./caveRock.js";
 import { stoneTexture } from "../../engine/textures.js";
 import { buildOutside } from "./caveOutside.js";
 import { sound } from "../../engine/sound.js";
-import { Crew, reachArm } from "../../story/crew.js";
+import { Crew, reachArm, addClips } from "../../story/crew.js";
 import { buildSail } from "../../story/sail.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -451,6 +451,7 @@ export async function playCaveClimax(c) {
     const onShip = (x, y, z) => { ship.updateMatrixWorld(); return V(x, y, z).applyMatrix4(ship.matrixWorld); };
     const crew = await Crew.ready(world, hero); props.push(() => crew.dispose());
     const eur = crew.add({ name: "Eurylochus", tint: 0xb8ae9c });
+    addClips(hero, crew.optional);                                   // yell.fbx for Odysseus, if it is there
     const sail = buildSail(); world.scene.add(sail.mesh); props.push(() => { world.scene.remove(sail.mesh); sail.dispose(); });
     let rail = 0, grab = 0, shout = 0, heading = Math.PI, swing = 0;
     const sea = { update: (dt, t) => {
@@ -476,9 +477,11 @@ export async function playCaveClimax(c) {
     await over(0.35, k => grab = ease(k));
     comic.subtitle("Don't.", { speaker: "EURYLOCHUS", seconds: 1.2 });
     await wait(0.9);
+    if (hero.actions.yell) hero.play("yell", 0.2);                  // the whole body in the shout (the arm stays up at the cliff)
     await over(0.35, k => { grab = 1 - ease(k); shout = ease(k); });   // he pulls free, and his arm goes up at the cliff
     comic.subtitle("Cyclops! If anyone asks who did this to you, it was Odysseus. Odysseus of Ithaca!", { speaker: "ODYSSEUS", seconds: 3.2 });
     await wait(2.9);
+    hero.play("idle", 0.6);
     s.stop(); s = null;
     // 0:05–0:10 · the prayer. Close on the giant. He turns his blind face from the voice down to the sea, and kneels.
     const G = giant.group.position, toShip = V(ship.position.x - G.x, 0, ship.position.z - G.z).normalize();

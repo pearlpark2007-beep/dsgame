@@ -96,7 +96,9 @@ async function arrival({ world, hero, director, comic, harbour }) {
     // ---- H2 · 0:07–0:16 · the order. Two-shot at the stern; Polites looks up at the cliffs.
     s = shot(world, director, (t, o) => { const m = onDeck(0.1, 12.2); o.pos.copy(m).add(new THREE.Vector3(-3.4 + t * 0.06, 1.05, 3.3)); o.look.copy(m).add(new THREE.Vector3(0, 1.4, 0)); o.fov = 42; });   // in front of them, square to the line they stand on, so neither hides the other
     await hero.over(0.8, k => look = ease(k));
+    polites.play("point", 0.25);                                  // his arm out at the cliffs (point.fbx; idle if it is missing)
     await comic.subtitle("No fishing boats. No smoke from the town.", { speaker: "POLITES", seconds: 2.8 });
+    polites.play("idle", 0.4);
     await comic.subtitle("Then no one to argue with. Bring them all in.", { speaker: "ODYSSEUS", seconds: 2.4 });
     // the wave back over his head, without turning round; Polites hesitates, then lifts the signal torch
     await hero.over(0.45, k => { helmHand = 1 - k; wave = ease(k); });

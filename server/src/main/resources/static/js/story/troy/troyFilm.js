@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { sound } from "../../engine/sound.js";
 import { Storm } from "./troyStorm.js";
 import { Fire } from "../../engine/weather.js";
-import { reachArm } from "../crew.js";
+import { reachArm, addClips, withoutBones } from "../crew.js";
 import { plankTexture } from "../../engine/textures.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -130,6 +130,7 @@ export async function playTroyOpening({ world, director, comic, troy, hero, crew
   for (const [name, tint, cord] of [["Polites", 0xd6cdbd], ["Elpenor", 0xe3dccf, true], ["Eurylochus", 0xb8ae9c], ["Perimedes", 0xc4b8a4], ["Lycus", 0xa9a08f], ["Antiphus", 0xcabfae]])
     men[name] = crew.add({ name, tint, cord: !!cord });
   const crewList = Object.values(men);
+  addClips(hero, crew.optional);                     // sit.fbx and drink.fbx for Odysseus too, if they are there
   const hide = (...ms) => ms.forEach(m => m.group.visible = false), show = (...ms) => ms.forEach(m => m.group.visible = true);
 
   // ---- the horse in the court, nose to the gate
@@ -161,9 +162,11 @@ export async function playTroyOpening({ world, director, comic, troy, hero, crew
     // the men, crammed in two rows, low (they are sitting on the planks: only heads, shoulders and hands are seen)
     const sitY = IN.y - 0.35;
     const rowA = [["Antiphus", -3.2], ["Perimedes", -1.9], ["Elpenor", 0.75]], rowB = [["Lycus", -2.6], ["Polites", -1.2]];
-    for (const [n, x] of rowA) { show(men[n]); men[n].place(IN.x + x, sitY, IN.z + (n === "Elpenor" ? -0.5 : -0.85), 0); men[n].play("idle", 0, { timeScale: 0.3 }); }
-    for (const [n, x] of rowB) { show(men[n]); men[n].place(IN.x + x, sitY, IN.z + 0.85, Math.PI); men[n].play("idle", 0, { timeScale: 0.3 }); }
-    hero.group.visible = true; hero.teleport(IN.x + 1.2, IN.z + 0.25, Math.PI, sitY);   // crammed in beside the boy hero.play("idle", 0, { timeScale: 0.3 });
+    // sit.fbx seats them on the planks (their legs go under the floor, out of sight); without it they stand low, breathing slowly
+    for (const [n, x] of rowA) { show(men[n]); men[n].place(IN.x + x, sitY, IN.z + (n === "Elpenor" ? -0.5 : -0.85), 0); men[n].play("sit", 0, { timeScale: 0.3 }); }
+    for (const [n, x] of rowB) { show(men[n]); men[n].place(IN.x + x, sitY, IN.z + 0.85, Math.PI); men[n].play("sit", 0, { timeScale: 0.3 }); }
+    hero.group.visible = true; hero.teleport(IN.x + 1.2, IN.z + 0.25, Math.PI, sitY);   // crammed in beside the boy
+    if (hero.actions.sit) hero.play("sit", 0);
     // torchlight moving past the gaps
     const torchMove = every(world, (dt, t) => { belly.lights.forEach((L, i) => { L.intensity = 420; L.position.x = IN.x + ((t * 0.9 + i * 4.5) % 14) - 7; }); });
     cleanup.push(() => torchMove.stop());
@@ -230,7 +233,7 @@ export async function playTroyOpening({ world, director, comic, troy, hero, crew
       const g = isHero ? hero.group : m.group;
       await tween(seconds, k => g.position.y = lerp(top.y, bot.y, k * k * (isHero ? 1 : 1.0)));
       g.position.y = PL;
-      if (isHero) { hero.play("walk", 0.3); } else { m.walkTo(H0.x - 3 - Math.random() * 3, H0.z + 4 + Math.random() * 5, { speed: 2.6 }); }
+      if (isHero) { hero.play("walk", 0.3); } else { m.walkTo(H0.x - 3 - Math.random() * 3, H0.z + 4 + Math.random() * 5, { speed: 3.6, clip: "run" }); }   // run.fbx (a fast walk without it)
     };
     const order = ["Lycus", "Perimedes", "Antiphus", "Eurylochus"];
     for (const n of order) { slide(men[n], 0.75); if (!sk()) sound.whoosh({ seconds: 0.5, level: 0.12 }); await wait(0.55); }
@@ -422,12 +425,17 @@ export async function playTroyOpening({ world, director, comic, troy, hero, crew
     await tween(0.6, k => oArm = ease(k));
     cupIn = "O"; await tween(0.4, k => pArm = 1 - ease(k));
     await wait(0.6);                                                    // he looks at the water
+    // drink.fbx gives his head and body the drink (its own LEFT hand is left out: his right hand has the cup);
+    // from 3.0 s into the clip, so its head goes back 1.4 s later, as the cup reaches his mouth
+    const sip = withoutBones(hero, "drink", "drinkBody", /Left(Shoulder|Arm|ForeArm|Hand)/);
+    if (sip) hero.play(sip, 0.3).time = 3.0;
     await tween(0.8, k => drink = ease(k));
     await wait(0.5);
     comic.subtitle("The sea didn't win this war.", { speaker: "ODYSSEUS", seconds: 2.6 });
     await wait(1.2);
     if (!sk()) sound.crowd(true, { mood: "roar", level: 0.07 });        // the men nearby laugh
     await wait(1.4);
+    if (sip) hero.play("idle", 0.6);
     sound.crowd(true, { mood: "roar", level: 0.02 });
     await P.turnTo(...(() => { const w = onShip(his, V(16, 0, 4)); return [w.x, w.z]; })(), 0.8);   // Polites doesn't laugh. He looks at the water
     await wait(0.4);

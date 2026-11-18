@@ -208,8 +208,13 @@ async function arrivalScene({ world, hero, director, comic }) {
     hero.teleport(-7.0, 3.55, Math.PI + 0.1, 0); hero.play("idle", 0.01);
     E.place(-10.3, 0, 6.0); E.face(-7.0, 3.55);                         // in the foreground, to one side of the line to him
     s = shot(world, director, (t, o) => { o.pos.set(-9.9 + t * 0.04, 1.6, 8.3); o.look.set(-8.1, 1.5, 4.3); o.fov = 46; });
+    // he lets his full sack drop at his feet, and argues with his hands free (talk.fbx; idle if it is missing)
+    const eSack = sacks.find(x => x.m === E);
+    eSack.held = false; E.bones.rHand.updateWorldMatrix(true, false); eSack.sack.position.setFromMatrixPosition(E.bones.rHand.matrixWorld).setY(0.32);
+    E.play("talk", 0.3);
     await hero.over(0.6, k => touch = ease(k));
     await Promise.all([hero.over(2.6, k => along = k), comic.subtitle("We have enough, Captain. To the ship. Now.", { speaker: "EURYLOCHUS", seconds: 2.6 })]);
+    E.play("idle", 0.5);
     await comic.subtitle("Not yet. I want him to see who took it.", { speaker: "ODYSSEUS", seconds: 2.8 });
     await hero.over(0.5, k => touch = 1 - ease(k));
     await wait(0.6);
@@ -218,6 +223,7 @@ async function arrivalScene({ world, hero, director, comic }) {
     // ---- C3 · 0:15–0:22 · They stay. A slow move across the men's faces; they look at each other, and put
     //      their sacks down one by one.
     working = false;
+    sacks.find(x => x.m === E).held = true;                         // (across the cut) he has picked it up again
     const line = [["Antiphus", -5.6], ["Polites", -4.1], ["Elpenor", -2.6], ["Lycus", -1.1], ["Perimedes", 0.4], ["Eurylochus", 1.9]];
     line.forEach(([n, x], i) => { const m = men[n]; m.place(x, 0, 5.6 + (i % 2) * 0.5); m.face(x, 12); m.play("idle", 0.01, { offset: i * 0.4 }); });
     s = shot(world, director, (t, o) => { const k = Math.min(1, t / 7); o.pos.set(-6.4 + 9 * k, 1.6, 10.2); o.look.set(-5.4 + 9 * k, 1.45, 5.8); o.fov = 38; });
