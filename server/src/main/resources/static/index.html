@@ -91,7 +91,7 @@ if (location.port === "63342") { const page = location.pathname.split("/static/"
 </script>
 </head>
 <body>
-<div id="title" aria-hidden="false"><h1><span>The Odyssey</span><span>of Data</span></h1><div class="rule"></div><div class="sub">FOUR WORLDS. FOUR STRUCTURES. ONE WAY HOME.</div></div>
+<div id="title" aria-hidden="false"><h1><span>The Odyssey</span><span>of Data</span></h1><div class="rule"></div><div class="sub">TEN YEARS AT WAR. A LONGER WAY HOME.</div></div>
 <nav id="menu" aria-label="Main menu">
   <button id="m-continue" hidden>Continue voyage <small></small></button>
   <button id="m-begin">Begin voyage</button>
@@ -255,7 +255,7 @@ function drawMap() {
     b.onpointerleave = b.onblur = () => chart.highlight(null);
     li.appendChild(b); ul.appendChild(li);
   }
-  const li = document.createElement("li"); li.innerHTML = `<div class="beyond">Beyond the Underworld: ${BEYOND.join(" · ")}. Not on this voyage.</div>`; ul.appendChild(li);
+  const li = document.createElement("li"); li.innerHTML = `<div class="beyond">Beyond the Underworld, the voyage goes on. Not yet charted.</div>`; ul.appendChild(li);
   $("#namecard .s").innerHTML = [TITLES.join(" "), ...deeds()].map(t => t.replace(/</g, "&lt;")).join("<br>");
 }
 

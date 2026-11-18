@@ -81,6 +81,8 @@ export function chapterDone(id, { onStay = null } = {}) {
   let el = document.getElementById("odx-done");
   if (!el) { el = document.createElement("div"); el.id = "odx-done"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); document.body.appendChild(el); }
   el.innerHTML = `<div class="box"><div class="k">CHAPTER ${c.word} · DONE</div><h2></h2><div class="deed"></div><div class="row"></div></div>`;
+  // the last chapter built so far is not the end of the journey: say so under its deed
+  if (!next) el.querySelector(".deed").insertAdjacentHTML("afterend", `<div class="deed onward">The voyage is not over.</div>`);
   el.querySelector("h2").textContent = c.title;
   el.querySelector(".deed").textContent = "ODYSSEUS: " + DEEDS[c.tag];
   const row = el.querySelector(".row");

@@ -333,7 +333,7 @@ export class SeaChart {
     }
     this.tags.push({ el: mk("place", "TROY"), p: new THREE.Vector3(AT.troy[0] - 10, 9, AT.troy[1] - 4) });
     this.tags.push({ el: mk("place sea", "POSEIDON'S MAELSTROM"), p: new THREE.Vector3(MAEL[0], 0, MAEL[1] + 4) });
-    this.tags.push({ el: mk("place", "BEYOND THE VOYAGE"), p: new THREE.Vector3(BEYOND_AT[1][0] + 4, 0, BEYOND_AT[1][1] + 9) });
+    this.tags.push({ el: mk("place", "NOT YET CHARTED"), p: new THREE.Vector3(BEYOND_AT[1][0] + 4, 0, BEYOND_AT[1][1] + 9) });
   }
 
   // read the saved voyage again (called each time the chart opens)

@@ -476,7 +476,7 @@ export class UnderworldTrials {
       this.status(res.message, "good");
       this.board.close();
       await pit.prophecy();
-      await director.stamp("THE WAY HOME", res.message, { kind: "good", seconds: 2.6 });
+      await director.stamp("THE WAY ON", res.message, { kind: "good", seconds: 2.6 });
       this.el.classList.remove("on"); this.ctx.panelView(false);
       if (this.ctx.onFinale) await this.ctx.onFinale();
       return;

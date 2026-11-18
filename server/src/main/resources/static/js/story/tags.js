@@ -4,16 +4,13 @@
 export const TITLES = ["King of Ithaca.", "Sacker of Troy."];
 
 // what he did, chapter by chapter, in the order he does it
-export const CHAPTERS = ["harbour", "cyclops", "circe", "underworld", "scheria", "voyage", "order", "ithaca"];
+// (only the chapters that exist: future chapters are chosen structure first, so none is named here yet)
+export const CHAPTERS = ["harbour", "cyclops", "circe", "underworld"];
 export const DEEDS = {
   harbour:    "Got one ship out of Telepylos.",
   cyclops:    "Told the Cyclops his name was Nobody.",
   circe:      "Walked into Circe's house. Walked out with his men.",
-  underworld: "Went down to the dead and came back.",
-  scheria:    "Washed up with nothing. Left with a ship.",
-  voyage:     "Found the way home.",
-  order:      "Put the islands in order.",
-  ithaca:     "Home."
+  underworld: "Went down to the dead and came back."
 };
 
 // the card for a chapter: his titles plus every deed before it (and this chapter's, once it is done)

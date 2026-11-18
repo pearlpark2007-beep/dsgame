@@ -73,6 +73,7 @@ body.odx-muted #odx-bar input[type=range] { opacity: .35; }
 body[data-chapter="circe"] #odx-done .k { color: #8fa6ff; }
 #odx-done h2 { font: 400 clamp(32px, 4vw, 48px)/1.05 var(--display); letter-spacing: 2px; margin: 8px 0 14px; text-transform: uppercase; }
 #odx-done .deed { font-size: 16px; line-height: 1.45; color: var(--gold); margin-bottom: 18px; }
+#odx-done .deed.onward { color: var(--paper, #f4ead2); font-style: italic; margin-top: -10px; }
 #odx-done .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .odx-btn { min-height: 42px; padding: 0 18px; border-radius: 4px; font: 700 14px var(--mono); letter-spacing: 1.5px; cursor: pointer; border: 1px solid var(--paper); background: transparent; color: var(--paper); }
 .odx-btn.primary { background: var(--gold); border-color: var(--gold); color: var(--ink); }
